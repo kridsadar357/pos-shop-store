@@ -1,0 +1,140 @@
+import { useState } from 'react';
+import { useShift } from '../../store/shift';
+import { useAuth } from '../../store/auth';
+import { toast } from '../../components/Toast';
+import { money, num } from '../../lib/format';
+import { th } from '../../lib/th';
+import type { Shift } from '../../types';
+
+/** Full-screen gate shown when the cashier has no open shift. */
+export function ShiftGate() {
+  const { user, logout } = useAuth();
+  const { open } = useShift();
+  const [float, setFloat] = useState(1000);
+  const [busy, setBusy] = useState(false);
+
+  async function start() {
+    setBusy(true);
+    try {
+      await open(float);
+      toast.success(th.startSelling);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid min-h-screen place-items-center bg-gradient-to-br from-ink-900 to-ink-800 p-6">
+      <div className="card w-full max-w-md p-8">
+        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-brand-600 text-2xl text-white">🔓</div>
+        <h1 className="text-center text-2xl font-bold">{th.openShiftTitle}</h1>
+        <p className="mt-1 text-center text-sm text-slate-500">{th.openShiftHint}</p>
+        <div className="mt-6">
+          <label className="label">{th.openingFloat}</label>
+          <input
+            type="number"
+            className="input text-lg"
+            value={float || ''}
+            autoFocus
+            onChange={(e) => setFloat(Number(e.target.value))}
+            onKeyDown={(e) => e.key === 'Enter' && start()}
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[500, 1000, 2000, 3000].map((v) => (
+              <button key={v} className="btn-ghost" onClick={() => setFloat(v)}>{money(v)}</button>
+            ))}
+          </div>
+        </div>
+        <button className="btn-primary mt-6 w-full py-3" disabled={busy} onClick={start}>{th.startSelling}</button>
+        <button className="mt-2 w-full text-sm text-slate-400" onClick={() => { logout(); }}>{user?.name} • {th.signOut}</button>
+      </div>
+    </div>
+  );
+}
+
+/** Close-shift modal with cash reconciliation, then a summary. */
+export function CloseShiftModal({ onClose }: { onClose: () => void }) {
+  const { current, close } = useShift();
+  const [counted, setCounted] = useState(0);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Shift | null>(null);
+
+  if (!current) return null;
+  const expected = num(current.expectedCash ?? 0);
+  const totals = current.totals;
+
+  async function confirm() {
+    setBusy(true);
+    try {
+      const closed = await close(counted, note);
+      setResult(closed);
+      toast.success(th.shiftClosed);
+    } catch (e) {
+      toast.error((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={result ? onClose : undefined}>
+      <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        {!result ? (
+          <>
+            <h3 className="text-xl font-bold">{th.closeShiftTitle}</h3>
+            <div className="mt-4 space-y-1.5 rounded-xl bg-slate-50 p-4 text-sm">
+              <Row label={th.openingFloat} value={money(current.openingFloat)} />
+              <Row label={th.cashSales} value={money(totals?.cashSales ?? 0)} />
+              <Row label={th.transferSales} value={money(totals?.transferSales ?? 0)} muted />
+              <Row label={th.orders} value={String(totals?.orders ?? 0)} muted />
+              <div className="border-t border-slate-200 pt-1.5">
+                <Row label={th.expectedCash} value={money(expected)} bold />
+              </div>
+            </div>
+            <div className="mt-4">
+              <label className="label">{th.countedCash}</label>
+              <input type="number" className="input text-lg" value={counted || ''} autoFocus onChange={(e) => setCounted(Number(e.target.value))} />
+            </div>
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 p-4">
+              <span className="font-semibold text-slate-500">{th.difference}</span>
+              <span className={`text-xl font-extrabold ${counted - expected === 0 ? 'text-slate-700' : counted - expected > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                {counted - expected > 0 ? '+' : ''}{money(counted - expected)}
+              </span>
+            </div>
+            <textarea className="input mt-3" rows={2} placeholder="หมายเหตุ (ถ้ามี)" value={note} onChange={(e) => setNote(e.target.value)} />
+            <div className="mt-5 flex gap-2">
+              <button className="btn-ghost flex-1" onClick={onClose} disabled={busy}>{th.cancel}</button>
+              <button className="btn-danger flex-1" onClick={confirm} disabled={busy}>{busy ? th.processing : th.confirmClose}</button>
+            </div>
+          </>
+        ) : (
+          <div className="text-center">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-3xl text-emerald-600">✓</div>
+            <h3 className="mt-3 text-lg font-bold">{th.shiftClosed}</h3>
+            <div className="mt-4 space-y-1.5 rounded-xl bg-slate-50 p-4 text-left text-sm">
+              <Row label={th.cashSales} value={money(result.totals?.cashSales ?? 0)} />
+              <Row label={th.transferSales} value={money(result.totals?.transferSales ?? 0)} />
+              <Row label={th.expectedCash} value={money(result.expectedCash ?? 0)} />
+              <Row label={th.countedCash} value={money(result.countedCash ?? 0)} />
+              <div className="border-t border-slate-200 pt-1.5">
+                <Row label={th.difference} value={money(result.cashDiff ?? 0)} bold />
+              </div>
+            </div>
+            <button className="btn-primary mt-5 w-full" onClick={onClose}>{th.openShift}</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value, muted, bold }: { label: string; value: string; muted?: boolean; bold?: boolean }) {
+  return (
+    <div className="flex justify-between">
+      <span className={muted ? 'text-slate-400' : 'text-slate-600'}>{label}</span>
+      <span className={bold ? 'font-extrabold' : muted ? 'text-slate-500' : 'font-semibold'}>{value}</span>
+    </div>
+  );
+}

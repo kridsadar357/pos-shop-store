@@ -1,0 +1,214 @@
+import { useEffect, useRef, useState } from 'react';
+import { api, uploadFile } from '../../api/client';
+import { Modal } from '../../components/Modal';
+import { ProductImage } from '../../components/ProductImage';
+import { PageHeader } from '../../components/ui';
+import { toast } from '../../components/Toast';
+import { money, num } from '../../lib/format';
+import type { Category, Product } from '../../types';
+
+const empty = {
+  sku: '',
+  barcode: '',
+  name: '',
+  imageUrl: '' as string | null,
+  categoryId: null as number | null,
+  unit: 'pc',
+  cost: 0,
+  retailPrice: 0,
+  wholesalePrice: 0,
+  wholesaleMinQty: 1,
+  reorderLevel: 0,
+  isActive: true,
+};
+type Form = typeof empty;
+
+export default function Products() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [q, setQ] = useState('');
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [form, setForm] = useState<Form | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function load() {
+    setProducts(await api<Product[]>('/products', { query: { q } }));
+  }
+  useEffect(() => {
+    api<Category[]>('/categories').then(setCategories);
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(load, 150);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  function openNew() {
+    setEditing(null);
+    setImageFile(null);
+    setForm({ ...empty });
+  }
+  function openEdit(p: Product) {
+    setEditing(p);
+    setImageFile(null);
+    setForm({
+      sku: p.sku,
+      barcode: p.barcode ?? '',
+      name: p.name,
+      imageUrl: p.imageUrl ?? '',
+      categoryId: p.categoryId,
+      unit: p.unit,
+      cost: num(p.cost),
+      retailPrice: num(p.retailPrice),
+      wholesalePrice: num(p.wholesalePrice),
+      wholesaleMinQty: p.wholesaleMinQty,
+      reorderLevel: p.reorderLevel,
+      isActive: p.isActive,
+    });
+  }
+
+  async function save() {
+    if (!form) return;
+    try {
+      const body = { ...form, barcode: form.barcode || null, imageUrl: form.imageUrl || null };
+      const saved = editing
+        ? await api<Product>(`/products/${editing.id}`, { method: 'PUT', body })
+        : await api<Product>('/products', { method: 'POST', body });
+      // Upload a newly picked image to the (now-existing) product.
+      if (imageFile) await uploadFile(`/products/${saved.id}/image`, 'image', imageFile);
+      toast.success('Saved');
+      setForm(null);
+      setImageFile(null);
+      load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  const previewUrl = imageFile ? URL.createObjectURL(imageFile) : form?.imageUrl || null;
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Products & Stock"
+        subtitle={`${products.length} products`}
+        icon="▦"
+        actions={<button className="btn-primary" onClick={openNew}>+ New product</button>}
+      />
+
+      <input className="input max-w-md" placeholder="Search name / SKU / barcode…" value={q} onChange={(e) => setQ(e.target.value)} />
+
+      <div className="card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
+            <tr>
+              <th className="px-4 py-3 w-14"></th>
+              <th className="px-4 py-3">Product</th>
+              <th className="px-4 py-3">Category</th>
+              <th className="px-4 py-3 text-right">Cost</th>
+              <th className="px-4 py-3 text-right">Retail</th>
+              <th className="px-4 py-3 text-right">Wholesale</th>
+              <th className="px-4 py-3 text-right">Stock</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {products.map((p) => (
+              <tr key={p.id} className="hover:bg-slate-50">
+                <td className="py-2 pl-4">
+                  <ProductImage src={p.imageUrl} name={p.name} className="h-10 w-10 rounded-lg ring-1 ring-slate-200" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="font-semibold">{p.name}</div>
+                  <div className="text-xs text-slate-400">{p.sku} {p.barcode && `• ${p.barcode}`}</div>
+                </td>
+                <td className="px-4 py-3 text-slate-500">{p.category?.name ?? '—'}</td>
+                <td className="px-4 py-3 text-right">{money(p.cost)}</td>
+                <td className="px-4 py-3 text-right">{money(p.retailPrice)}</td>
+                <td className="px-4 py-3 text-right">{money(p.wholesalePrice)} <span className="text-xs text-slate-400">≥{p.wholesaleMinQty}</span></td>
+                <td className="px-4 py-3 text-right">
+                  <span className={`chip ${p.stockQty <= p.reorderLevel ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                    {p.stockQty} {p.unit}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(p)}>Edit</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {form && (
+        <Modal title={editing ? 'Edit product' : 'New product'} wide onClose={() => setForm(null)}>
+          <div className="mb-3 flex items-center gap-4">
+            <ProductImage src={previewUrl} name={form.name || '?'} className="h-20 w-20 rounded-2xl ring-1 ring-slate-200" />
+            <div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+              />
+              <button type="button" className="btn-ghost" onClick={() => fileRef.current?.click()}>📷 Upload image</button>
+              {(imageFile || form.imageUrl) && (
+                <button type="button" className="ml-2 text-sm font-semibold text-rose-600" onClick={() => { setImageFile(null); setForm({ ...form, imageUrl: '' }); }}>
+                  Remove
+                </button>
+              )}
+              <p className="mt-1 text-xs text-slate-400">PNG/JPG, up to 4MB.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Name" className="col-span-2">
+              <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </Field>
+            <Field label="SKU">
+              <input className="input" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+            </Field>
+            <Field label="Barcode">
+              <input className="input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
+            </Field>
+            <Field label="Category">
+              <select className="input" value={form.categoryId ?? ''} onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : null })}>
+                <option value="">—</option>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Unit">
+              <input className="input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+            </Field>
+            <NumField label="Cost" v={form.cost} set={(v) => setForm({ ...form, cost: v })} />
+            <NumField label="Retail price" v={form.retailPrice} set={(v) => setForm({ ...form, retailPrice: v })} />
+            <NumField label="Wholesale price" v={form.wholesalePrice} set={(v) => setForm({ ...form, wholesalePrice: v })} />
+            <NumField label="Wholesale min qty" v={form.wholesaleMinQty} set={(v) => setForm({ ...form, wholesaleMinQty: v })} />
+            <NumField label="Reorder level" v={form.reorderLevel} set={(v) => setForm({ ...form, reorderLevel: v })} />
+          </div>
+          {editing && <p className="mt-3 text-xs text-slate-400">To change stock, use Receive Goods, Stock Count, or Stock Ledger adjustments — stock is ledger-controlled.</p>}
+          <div className="mt-5 flex gap-2">
+            <button className="btn-ghost flex-1" onClick={() => setForm(null)}>Cancel</button>
+            <button className="btn-primary flex-1" onClick={save}>Save</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <label className="label">{label}</label>
+      {children}
+    </div>
+  );
+}
+function NumField({ label, v, set }: { label: string; v: number; set: (v: number) => void }) {
+  return (
+    <Field label={label}>
+      <input type="number" className="input" value={v} onChange={(e) => set(Number(e.target.value))} />
+    </Field>
+  );
+}

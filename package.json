@@ -1,0 +1,22 @@
+{
+  "name": "pos-shop-store",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise Retail & Wholesale POS — React + Express + Prisma + PostgreSQL",
+  "type": "module",
+  "scripts": {
+    "preflight": "node scripts/preflight.mjs",
+    "db:up": "npm run preflight && docker compose up -d && node scripts/wait-db.mjs",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v",
+    "db:migrate": "npm --prefix server run migrate",
+    "db:seed": "npm --prefix server run seed",
+    "setup": "npm --prefix server install && npm --prefix web install",
+    "dev": "concurrently -n server,web -c blue,magenta \"npm --prefix server run dev\" \"npm --prefix web run dev\"",
+    "build": "npm --prefix server run build && npm --prefix web run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "dotenv": "^16.4.7"
+  }
+}
