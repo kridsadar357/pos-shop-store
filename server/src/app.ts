@@ -15,6 +15,7 @@ import { usersRouter } from './routes/users.js';
 import { membersRouter } from './routes/members.js';
 import { shiftsRouter } from './routes/shifts.js';
 import { promotionsRouter } from './routes/promotions.js';
+import { heldBillsRouter } from './routes/heldBills.js';
 
 export function createApp() {
   const app = express();
@@ -39,6 +40,7 @@ export function createApp() {
   app.use('/api/members', membersRouter);
   app.use('/api/shifts', shiftsRouter);
   app.use('/api/promotions', promotionsRouter);
+  app.use('/api/held-bills', heldBillsRouter);
 
   // Central error handler.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

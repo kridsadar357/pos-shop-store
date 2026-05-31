@@ -15,6 +15,7 @@ import Movements from './pages/back/Movements';
 import Reports from './pages/back/Reports';
 import Sales from './pages/back/Sales';
 import Members from './pages/back/Members';
+import Suppliers from './pages/back/Suppliers';
 import Promotions from './pages/back/Promotions';
 import Shifts from './pages/back/Shifts';
 import Settings from './pages/back/Settings';
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="movements" element={<Movements />} />
           <Route path="sales" element={<Sales />} />
           <Route path="members" element={<Members />} />
+          <Route path="suppliers" element={<Suppliers />} />
           <Route path="promotions" element={<Promotions />} />
           <Route path="shifts" element={<Shifts />} />
           <Route path="reports" element={<Reports />} />

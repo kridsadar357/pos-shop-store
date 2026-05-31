@@ -27,3 +27,12 @@ suppliersRouter.post(
     res.status(201).json(await prisma.supplier.create({ data: schema.parse(req.body) }));
   })
 );
+
+suppliersRouter.put(
+  '/:id',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const data = schema.partial().parse(req.body);
+    res.json(await prisma.supplier.update({ where: { id: Number(req.params.id) }, data }));
+  })
+);

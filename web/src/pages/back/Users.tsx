@@ -17,7 +17,7 @@ export default function Users() {
     if (!form) return;
     try {
       await api('/users', { method: 'POST', body: form });
-      toast.success('User created');
+      toast.success('สร้างผู้ใช้แล้ว');
       setForm(null);
       load();
     } catch (e) {
@@ -33,25 +33,25 @@ export default function Users() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Users"
-        subtitle="Manage staff and roles"
+        title="ระบบ / ผู้ใช้งาน"
+        subtitle="จัดการพนักงานและสิทธิ์การใช้งาน"
         icon="👤"
-        actions={<button className="btn-primary" onClick={() => setForm({ username: '', name: '', password: '', role: 'CASHIER' })}>+ New user</button>}
+        actions={<button className="btn-primary" onClick={() => setForm({ username: '', name: '', password: '', role: 'CASHIER' })}>+ เพิ่มผู้ใช้</button>}
       />
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
-            <tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Username</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Status</th><th /></tr>
+            <tr><th className="px-4 py-3">ชื่อ</th><th className="px-4 py-3">ชื่อผู้ใช้</th><th className="px-4 py-3">สิทธิ์</th><th className="px-4 py-3">สถานะ</th><th /></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {users.map((u) => (
               <tr key={u.id} className="hover:bg-slate-50">
                 <td className="px-4 py-3 font-semibold">{u.name}</td>
                 <td className="px-4 py-3 text-slate-500">{u.username}</td>
-                <td className="px-4 py-3"><span className="chip bg-brand-50 text-brand-700">{u.role}</span></td>
-                <td className="px-4 py-3"><span className={`chip ${u.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{u.isActive ? 'Active' : 'Disabled'}</span></td>
-                <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => toggle(u)}>{u.isActive ? 'Disable' : 'Enable'}</button></td>
+                <td className="px-4 py-3"><span className="chip bg-brand-50 text-brand-700">{({ ADMIN: 'ผู้ดูแลระบบ', MANAGER: 'ผู้จัดการ', CASHIER: 'แคชเชียร์' } as Record<string, string>)[u.role] ?? u.role}</span></td>
+                <td className="px-4 py-3"><span className={`chip ${u.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{u.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
+                <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => toggle(u)}>{u.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</button></td>
               </tr>
             ))}
           </tbody>
@@ -59,18 +59,18 @@ export default function Users() {
       </div>
 
       {form && (
-        <Modal title="New user" onClose={() => setForm(null)}>
+        <Modal title="เพิ่มผู้ใช้" onClose={() => setForm(null)}>
           <div className="space-y-3">
-            <div><label className="label">Name</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-            <div><label className="label">Username</label><input className="input" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></div>
-            <div><label className="label">Password</label><input className="input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
-            <div><label className="label">Role</label>
+            <div><label className="label">ชื่อ</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+            <div><label className="label">ชื่อผู้ใช้</label><input className="input" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></div>
+            <div><label className="label">รหัสผ่าน</label><input className="input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+            <div><label className="label">สิทธิ์การใช้งาน</label>
               <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                <option value="CASHIER">Cashier</option><option value="MANAGER">Manager</option><option value="ADMIN">Admin</option>
+                <option value="CASHIER">แคชเชียร์</option><option value="MANAGER">ผู้จัดการ</option><option value="ADMIN">ผู้ดูแลระบบ</option>
               </select>
             </div>
           </div>
-          <div className="mt-5 flex gap-2"><button className="btn-ghost flex-1" onClick={() => setForm(null)}>Cancel</button><button className="btn-primary flex-1" onClick={create}>Create</button></div>
+          <div className="mt-5 flex gap-2"><button className="btn-ghost flex-1" onClick={() => setForm(null)}>ยกเลิก</button><button className="btn-primary flex-1" onClick={create}>สร้าง</button></div>
         </Modal>
       )}
     </div>

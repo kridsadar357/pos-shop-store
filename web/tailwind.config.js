@@ -36,7 +36,7 @@ export default {
         '4xl': '2rem',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'Segoe UI', 'sans-serif'],
+        sans: ['Prompt', 'system-ui', 'Segoe UI', 'sans-serif'],
       },
       keyframes: {
         rise: {

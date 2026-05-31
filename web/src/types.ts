@@ -104,6 +104,18 @@ export interface Sale {
   items: SaleItem[];
 }
 
+export interface HeldBill {
+  id: number;
+  type: 'RETAIL' | 'WHOLESALE';
+  memberId: number | null;
+  discount: string;
+  couponCode: string;
+  note: string;
+  items: { productId: number; qty: number }[];
+  createdAt: string;
+  member?: { name: string } | null;
+}
+
 export interface Movement {
   id: number;
   productId: number;

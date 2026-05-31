@@ -305,6 +305,105 @@ reportsRouter.get(
   })
 );
 
+// --- Unified dashboard aggregate (powers the back-office dashboard) ---
+reportsRouter.get(
+  '/dashboard',
+  ah(async (req, res) => {
+    const { from, to } = range(req);
+    const spanMs = to.getTime() - from.getTime();
+    const prevFrom = new Date(from.getTime() - spanMs);
+    const prevTo = new Date(from.getTime());
+    const delta = (cur: number, prev: number) => (prev ? round2(((cur - prev) / prev) * 100) : null);
+    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+
+    const [setting, curSales, prevSales, newCust, prevCust, products] = await Promise.all([
+      prisma.setting.findUniqueOrThrow({ where: { id: 1 } }),
+      prisma.sale.findMany({
+        where: { status: 'PAID', createdAt: { gte: from, lte: to } },
+        include: { items: { select: { productId: true, qty: true, lineTotal: true, unitCost: true, nameSnapshot: true, product: { select: { category: { select: { name: true } } } } } } },
+      }),
+      prisma.sale.findMany({ where: { status: 'PAID', createdAt: { gte: prevFrom, lt: prevTo } }, include: { items: { select: { unitCost: true, qty: true } } } }),
+      prisma.member.count({ where: { createdAt: { gte: from, lte: to } } }),
+      prisma.member.count({ where: { createdAt: { gte: prevFrom, lt: prevTo } } }),
+      prisma.product.findMany({ where: { isActive: true }, select: { stockQty: true, reorderLevel: true, cost: true } }),
+    ]);
+
+    const sumSales = (rows: typeof curSales) => {
+      let rev = 0, tax = 0, cogs = 0;
+      for (const s of rows) { rev += num(s.total); tax += num(s.taxAmount); cogs += s.items.reduce((a, i) => a + num(i.unitCost) * i.qty, 0); }
+      return { rev: round2(rev), tax: round2(tax), cogs: round2(cogs), profit: round2(rev - tax - cogs), orders: rows.length };
+    };
+    const cur = sumSales(curSales);
+    const prev = sumSales(prevSales as typeof curSales);
+
+    // daily series (revenue / profit / orders)
+    const byDay = new Map<string, { date: string; sales: number; profit: number; orders: number }>();
+    for (const s of curSales) {
+      const k = dayKey(s.createdAt);
+      const row = byDay.get(k) || { date: k, sales: 0, profit: 0, orders: 0 };
+      const cogs = s.items.reduce((a, i) => a + num(i.unitCost) * i.qty, 0);
+      row.sales += num(s.total); row.profit += num(s.total) - num(s.taxAmount) - cogs; row.orders += 1;
+      byDay.set(k, row);
+    }
+    const prevByDay = new Map<string, number>();
+    for (const s of prevSales) { const k = dayKey(s.createdAt); prevByDay.set(k, (prevByDay.get(k) || 0) + num(s.total)); }
+    const days = [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date)).map((d) => ({ ...d, sales: round2(d.sales), profit: round2(d.profit) }));
+
+    // by channel (sale type)
+    const chan = new Map<string, number>();
+    for (const s of curSales) chan.set(s.type, (chan.get(s.type) || 0) + num(s.total));
+    const channelLabels: Record<string, string> = { RETAIL: 'หน้าร้าน (POS)', WHOLESALE: 'ขายส่ง' };
+    const byChannel = [...chan.entries()].map(([k, v]) => ({ name: channelLabels[k] ?? k, value: round2(v), pct: cur.rev ? round2((v / cur.rev) * 100) : 0 }));
+
+    // top products + categories
+    const prodMap = new Map<number, { name: string; category: string; qty: number; revenue: number }>();
+    const catMap = new Map<string, number>();
+    for (const s of curSales) for (const i of s.items) {
+      const catName = i.product?.category?.name ?? 'อื่นๆ';
+      const p = prodMap.get(i.productId) || { name: i.nameSnapshot, category: catName, qty: 0, revenue: 0 };
+      p.qty += i.qty; p.revenue += num(i.lineTotal); prodMap.set(i.productId, p);
+      catMap.set(catName, (catMap.get(catName) || 0) + num(i.lineTotal));
+    }
+    const topProducts = [...prodMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 10).map((p, i) => ({ rank: i + 1, ...p, revenue: round2(p.revenue) }));
+    const topCategories = [...catMap.entries()].map(([name, v]) => ({ name, revenue: round2(v) })).sort((a, b) => b.revenue - a.revenue).slice(0, 5).map((c, i) => ({ rank: i + 1, ...c }));
+
+    // inventory metrics
+    const lowStock = products.filter((p) => p.stockQty <= p.reorderLevel).length;
+    const outOfStock = products.filter((p) => p.stockQty <= 0).length;
+    const inventoryValue = round2(products.reduce((a, p) => a + num(p.cost) * p.stockQty, 0));
+    const [openCounts, creditSales] = await Promise.all([
+      prisma.stockCount.count({ where: { status: 'OPEN' } }),
+      prisma.sale.count({ where: { status: 'PAID', paymentMethod: 'CREDIT', createdAt: { gte: from, lte: to } } }),
+    ]);
+
+    const notifications = [
+      { tone: 'amber', icon: '📦', title: `สินค้าใกล้หมดสต็อก ${lowStock} รายการ`, detail: 'ตรวจสอบสินค้าที่ใกล้หมดสต็อก' },
+      { tone: 'rose', icon: '⛔', title: `สินค้าหมดสต็อก ${outOfStock} รายการ`, detail: 'ควรเติมสต็อกโดยด่วน' },
+      { tone: 'blue', icon: '🧾', title: `ใบนับสต็อกค้างอยู่ ${openCounts} รายการ`, detail: 'รอการตรวจนับและโพสต์' },
+      { tone: 'violet', icon: '💳', title: `ขายเงินเชื่อ ${creditSales} รายการ`, detail: 'ในช่วงเวลาที่เลือก' },
+    ];
+
+    res.json({
+      range: { from, to },
+      kpis: {
+        sales: { value: cur.rev, deltaPct: delta(cur.rev, prev.rev), series: days.map((d) => ({ x: d.date, y: d.sales })) },
+        grossProfit: { value: cur.profit, deltaPct: delta(cur.profit, prev.profit), series: days.map((d) => ({ x: d.date, y: d.profit })) },
+        orders: { value: cur.orders, deltaPct: delta(cur.orders, prev.orders), series: days.map((d) => ({ x: d.date, y: d.orders })) },
+        newCustomers: { value: newCust, deltaPct: delta(newCust, prevCust), series: [] },
+        lowStock: { value: lowStock, deltaPct: null, series: [] },
+        inventoryValue: { value: inventoryValue, deltaPct: null, series: [] },
+      },
+      salesByDay: days.map((d) => ({ date: d.date, sales: d.sales, prev: round2(prevByDay.get(dayKey(new Date(new Date(d.date).getTime() - spanMs))) || 0) })),
+      byChannel,
+      notifications,
+      topProducts,
+      topCategories,
+      finance: { revenue: cur.rev, cogs: cur.cogs, grossProfit: cur.profit, marginPct: cur.rev ? round2((cur.profit / (cur.rev - cur.tax || 1)) * 100) : 0 },
+      taxInclusive: setting.taxInclusive,
+    });
+  })
+);
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }

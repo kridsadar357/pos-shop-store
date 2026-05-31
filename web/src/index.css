@@ -111,7 +111,7 @@ input[type='number']::-webkit-inner-spin-button {
 .receipt-paper {
   width: 80mm;
   padding: 4mm;
-  font-family: 'Sarabun', 'Inter', ui-monospace, monospace;
+  font-family: 'Prompt', 'Sarabun', ui-monospace, monospace;
   color: #000;
   background: #fff;
   font-size: 12px;
@@ -121,10 +121,29 @@ input[type='number']::-webkit-inner-spin-button {
 .receipt-paper .r-hr { border-top: 1px dashed #000; margin: 6px 0; }
 .receipt-paper .r-center { text-align: center; }
 
+.receipt-paper { page: receipt; }
+@page receipt { margin: 0; size: 80mm auto; }
+
+/* ---------- A4 report PDF export (print to PDF; Thai-safe via system fonts) ---------- */
+.report-print { position: fixed; left: -9999px; top: 0; }
+.report-paper {
+  page: report;
+  font-family: 'Prompt', 'Sarabun', sans-serif;
+  color: #0f172a;
+  background: #fff;
+}
+.report-paper table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.report-paper th,
+.report-paper td { border: 1px solid #cbd5e1; padding: 5px 8px; }
+.report-paper th { background: #f1f5f9; text-align: left; font-weight: 700; }
+.report-paper tbody tr:nth-child(even) td { background: #fafcff; }
+.report-paper tfoot td { background: #f1f5f9; font-weight: 800; }
+@page report { size: A4 landscape; margin: 10mm; }
+
 @media print {
   body * { visibility: hidden !important; }
-  .receipt-print,
-  .receipt-print * { visibility: visible !important; }
+  .receipt-print, .receipt-print *,
+  .report-print, .report-print * { visibility: visible !important; }
   .receipt-print { position: absolute; left: 0; top: 0; }
-  @page { margin: 0; size: 80mm auto; }
+  .report-print { position: absolute; left: 0; top: 0; width: 100%; }
 }

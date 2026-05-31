@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import { useAuth } from '../../store/auth';
+import { useAuth, isBackStore } from '../../store/auth';
 import { useShift } from '../../store/shift';
 import { useScanner } from '../../hooks/useScanner';
 import { CameraScanner } from '../../components/CameraScanner';
@@ -14,7 +15,7 @@ import { toast } from '../../components/Toast';
 import { money, num } from '../../lib/format';
 import { th } from '../../lib/th';
 import { createPublisher, type DisplayState } from '../../lib/display';
-import type { Category, Member, Product, Sale, Setting } from '../../types';
+import type { Category, HeldBill, Member, Product, Sale, Setting } from '../../types';
 
 interface Line { product: Product; qty: number; }
 type PayKey = 'CASH' | 'TRANSFER' | 'CARD' | 'QR' | 'CREDIT';
@@ -35,7 +36,8 @@ interface Stats {
 }
 
 export default function POS() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const { current: shift, refresh: refreshShift } = useShift();
 
   const [setting, setSetting] = useState<Setting | null>(null);
@@ -69,17 +71,21 @@ export default function POS() {
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [printSale, setPrintSale] = useState<Sale | null>(null);
   const [autoPrint, setAutoPrint] = useState(localStorage.getItem('pos_autoprint') === '1');
-  const [holds, setHolds] = useState<{ lines: Line[]; member: Member | null; discount: number }[]>([]);
+  const [held, setHeld] = useState<HeldBill[]>([]);
+  const [showHeld, setShowHeld] = useState(false);
+  const [showNotif, setShowNotif] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const publisher = useRef<ReturnType<typeof createPublisher> | null>(null);
 
+  function loadHeld() { api<HeldBill[]>('/held-bills').then(setHeld).catch(() => setHeld([])); }
   function reload() {
     api<Product[]>('/products').then(setProducts).catch(() => {});
     api<Stats>('/sales/stats').then(setStats).catch(() => {});
     api<Product[]>('/products/favorites', { query: { limit: 8 } })
       .then((f) => setFavIds(new Set(f.map((p) => p.id))))
       .catch(() => {});
+    loadHeld();
   }
 
   useEffect(() => {
@@ -228,16 +234,37 @@ export default function POS() {
     if (payKey === 'CREDIT') return completeSale('CREDIT', 'เงินเชื่อ');
   }
 
-  function holdBill() {
+  async function holdBill() {
     if (!lines.length) return;
-    setHolds((h) => [...h, { lines, member, discount }]);
-    clearCart();
-    toast.success(`${th.held} (${holds.length + 1})`);
+    if (!shift) return toast.error('ต้องเปิดกะก่อนพักบิล');
+    try {
+      await api('/held-bills', {
+        method: 'POST',
+        body: { type: mode, memberId: member?.id ?? null, discount: totals.manualDisc, couponCode: coupon, items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })) },
+      });
+      clearCart();
+      loadHeld();
+      toast.success(th.held);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   }
-  function resumeHold(i: number) {
-    const h = holds[i];
-    setLines(h.lines); setMember(h.member); setDiscount(h.discount);
-    setHolds((arr) => arr.filter((_, idx) => idx !== i));
+  // Resume a held bill into the cart to finish the transaction.
+  async function resumeHeld(bill: HeldBill) {
+    const newLines: Line[] = [];
+    for (const it of bill.items) {
+      const p = products.find((x) => x.id === it.productId);
+      if (p) newLines.push({ product: p, qty: it.qty });
+    }
+    setLines(newLines);
+    setMode(bill.type);
+    setDiscount(num(bill.discount));
+    setCoupon(bill.couponCode || '');
+    setMember(bill.memberId ? await api<Member>(`/members/${bill.memberId}`).catch(() => null) : null);
+    setShowHeld(false);
+    try { await api(`/held-bills/${bill.id}`, { method: 'DELETE' }); } catch { /* ignore */ }
+    loadHeld();
+    toast.success('เปิดบิลที่พักไว้แล้ว');
   }
 
   // F-key shortcuts
@@ -258,11 +285,32 @@ export default function POS() {
     else document.documentElement.requestFullscreen().catch(() => {});
   }
 
+  // Open the most recent sale's receipt (works across refresh — fetched from server).
+  async function openLastBill() {
+    try {
+      const sales = await api<Sale[]>('/sales');
+      if (!sales.length) return toast.info('ยังไม่มีบิลล่าสุด');
+      setLastSale(await api<Sale>(`/sales/${sales[0].id}`));
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  // Live notifications: low/out-of-stock + held bills.
+  const lowStock = activeProductsForNotif();
+  function activeProductsForNotif() {
+    return products.filter((p) => p.isActive && p.stockQty <= p.reorderLevel);
+  }
+  const notifications = [
+    ...(held.length ? [{ icon: '📋', tone: 'amber', text: `มีบิลพักไว้ ${held.length} บิล`, onClick: () => { setShowNotif(false); setShowHeld(true); } }] : []),
+    ...lowStock.slice(0, 8).map((p) => ({ icon: p.stockQty <= 0 ? '⛔' : '📦', tone: p.stockQty <= 0 ? 'rose' : 'amber', text: `${p.name} ${p.stockQty <= 0 ? 'หมดสต็อก' : `เหลือ ${p.stockQty} ${p.unit}`}`, onClick: () => {} })),
+  ];
+
   if (!shift) return <ShiftGate />;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100">
-      <PosSidebar branch={setting?.storeName} />
+      {isBackStore(user?.role) && <PosSidebar branch={setting?.storeName} />}
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Topbar */}
@@ -280,10 +328,30 @@ export default function POS() {
             </div>
             <div className="flex items-center gap-1.5">
               <IconBtn title={th.customerDisplay} onClick={() => window.open('/display', 'pos-customer-display', 'width=1100,height=720')}>🖥️</IconBtn>
-              <IconBtn title="แจ้งเตือน"><span className="relative">🔔<span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-rose-500 text-[8px] font-bold leading-[14px] text-white">{holds.length || ''}</span></span></IconBtn>
-              <IconBtn title="พิมพ์ใบเสร็จล่าสุด" onClick={() => lastSale ? setPrintSale(lastSale) : toast.info(th.noHeld)}>🖨️</IconBtn>
+              <div className="relative">
+                <button onClick={() => setShowNotif((v) => !v)} className="grid h-9 w-9 place-items-center rounded-xl text-base text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50" title="แจ้งเตือน">
+                  <span className="relative">🔔{notifications.length > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[9px] font-bold text-white">{notifications.length}</span>}</span>
+                </button>
+                {showNotif && (
+                  <div className="absolute right-0 z-40 mt-1 w-72 overflow-hidden rounded-xl bg-white shadow-pop ring-1 ring-slate-200" onMouseLeave={() => setShowNotif(false)}>
+                    <div className="border-b border-slate-100 px-4 py-2 text-sm font-bold">การแจ้งเตือน</div>
+                    <div className="max-h-80 overflow-auto">
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-sm text-slate-400">ไม่มีการแจ้งเตือน</div>
+                      ) : notifications.map((n, i) => (
+                        <button key={i} onClick={n.onClick} className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm hover:bg-slate-50">
+                          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${n.tone === 'rose' ? 'bg-rose-50' : 'bg-amber-50'}`}>{n.icon}</span>
+                          <span className="text-slate-700">{n.text}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <IconBtn title="พิมพ์ใบเสร็จล่าสุด" onClick={() => lastSale ? setPrintSale(lastSale) : openLastBill()}>🖨️</IconBtn>
               <IconBtn title="ออนไลน์">📶</IconBtn>
               <IconBtn title="เต็มจอ" onClick={toggleFullscreen}>⛶</IconBtn>
+              <button onClick={() => { logout(); navigate('/login'); }} className="ml-1 inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600 ring-1 ring-rose-200 hover:bg-rose-100" title="ออกจากระบบ">⎋ ออกจากระบบ</button>
             </div>
           </div>
         </header>
@@ -300,7 +368,8 @@ export default function POS() {
           <ActionBtn icon="🏷️" label={th.aPromotion} k="F4" tone="rose" onClick={() => setShowPromo(true)} />
           <ActionBtn icon="🧮" label={th.aDiscount} k="F5" tone="amber" onClick={() => { setCartTab('bill'); setShowDiscount(true); }} />
           <ActionBtn icon="📥" label={th.aHold} k="F6" tone="sky" onClick={holdBill} />
-          <ActionBtn icon="🧾" label={th.aLastBill} k="F7" tone="violet" onClick={() => lastSale ? setLastSale({ ...lastSale }) : toast.info(th.noHeld)} />
+          <ActionBtn icon="📋" label={`พักไว้${held.length ? ` (${held.length})` : ''}`} tone="amber" onClick={() => held.length ? setShowHeld(true) : toast.info('ไม่มีบิลที่พักไว้')} />
+          <ActionBtn icon="🧾" label={th.aLastBill} k="F7" tone="violet" onClick={openLastBill} />
           <div className="relative">
             <ActionBtn icon="•••" label={th.aMore} tone="slate" onClick={() => setMoreOpen((v) => !v)} />
             {moreOpen && (
@@ -404,9 +473,11 @@ export default function POS() {
               </div>
             </div>
 
-            {/* items */}
+            {/* items / customer info */}
             <div className="flex-1 overflow-auto px-2">
-              {lines.length === 0 ? (
+              {cartTab === 'customer' ? (
+                <CustomerInfoPanel member={member} memberWholesale={memberWholesale} onPick={() => setPickMember(true)} onClear={() => setMember(null)} />
+              ) : lines.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center text-slate-400">
                   <div className="text-4xl">🧺</div>
                   <p className="mt-2 text-sm font-semibold text-slate-500">{th.emptyBill}</p>
@@ -455,7 +526,8 @@ export default function POS() {
               )}
             </div>
 
-            {/* discount + totals + payment */}
+            {/* discount + totals + payment (bill tab only) */}
+            {cartTab === 'bill' && (
             <div className="border-t border-slate-200 px-4 py-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">🏷️ {th.discountCoupon}</span>
@@ -508,19 +580,19 @@ export default function POS() {
                 💳 {th.pay} (F9)
               </button>
 
-              {holds.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {holds.map((h, i) => (
-                    <button key={i} onClick={() => resumeHold(i)} className="chip bg-amber-50 text-amber-700 ring-1 ring-amber-200">📋 พัก #{i + 1} · {h.lines.reduce((s, l) => s + l.qty, 0)}</button>
-                  ))}
-                </div>
+              {held.length > 0 && (
+                <button onClick={() => setShowHeld(true)} className="mt-2 w-full rounded-xl bg-amber-50 py-2 text-xs font-bold text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100">
+                  📋 มีบิลพักไว้ {held.length} บิล — แตะเพื่อเปิด
+                </button>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* modals */}
+      {showHeld && <HeldBillsModal held={held} products={products} currency={currency} onResume={resumeHeld} onDelete={async (id) => { await api(`/held-bills/${id}`, { method: 'DELETE' }).catch(() => {}); loadHeld(); }} onClose={() => setShowHeld(false)} />}
       {showCam && <CameraScanner onScan={(c) => { setShowCam(false); handleScan(c); }} onClose={() => setShowCam(false)} />}
       {pickMember && <MemberPicker onPick={(m) => { setMember(m); setPickMember(false); }} onClose={() => setPickMember(false)} />}
       {showPromo && (
@@ -560,6 +632,69 @@ export default function POS() {
 }
 
 /* ---------------- sub-components ---------------- */
+
+function CustomerInfoPanel({ member, memberWholesale, onPick, onClear }: { member: Member | null; memberWholesale: boolean; onPick: () => void; onClear: () => void }) {
+  if (!member) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center px-6 text-center text-slate-400">
+        <div className="text-4xl">👤</div>
+        <p className="mt-2 text-sm font-semibold text-slate-500">{th.generalCustomer}</p>
+        <p className="mb-3 text-xs">ยังไม่ได้เลือกสมาชิก</p>
+        <button className="btn-primary" onClick={onPick}>+ {th.selectMember}</button>
+      </div>
+    );
+  }
+  const Row = ({ label, value }: { label: string; value: string }) => (
+    <div className="flex justify-between border-b border-slate-100 py-2 text-sm"><span className="text-slate-400">{label}</span><span className="font-semibold text-ink-900">{value || '—'}</span></div>
+  );
+  return (
+    <div className="p-2">
+      <div className="flex items-center gap-3 rounded-2xl bg-brand-50 p-3 ring-1 ring-brand-200">
+        <div className="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-lg font-bold text-white">{member.name.charAt(0)}</div>
+        <div><div className="text-base font-bold text-brand-900">{member.name}</div><div className="text-xs text-brand-600">{member.phone}</div></div>
+      </div>
+      <div className="mt-3 px-1">
+        <Row label="รหัสสมาชิก" value={member.code || '—'} />
+        <Row label="เบอร์โทร" value={member.phone} />
+        <Row label="อีเมล" value={member.email} />
+        <Row label="หมายเหตุ" value={member.note} />
+        <Row label="สิทธิ์ราคา" value={memberWholesale ? th.memberPrice : th.retail} />
+      </div>
+      <div className="mt-4 flex gap-2">
+        <button className="btn-ghost flex-1" onClick={onPick}>✎ {th.changeCustomer}</button>
+        <button className="btn-danger flex-1" onClick={onClear}>{th.remove}</button>
+      </div>
+    </div>
+  );
+}
+
+function HeldBillsModal({ held, products, currency, onResume, onDelete, onClose }: { held: HeldBill[]; products: Product[]; currency: string; onResume: (b: HeldBill) => void; onDelete: (id: number) => void; onClose: () => void }) {
+  const estimate = (b: HeldBill) => b.items.reduce((s, it) => { const p = products.find((x) => x.id === it.productId); return s + (p ? num(p.retailPrice) * it.qty : 0); }, 0);
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
+      <div className="card w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-bold">📋 บิลที่พักไว้ ({held.length})</h3><button className="text-slate-400 hover:text-slate-700" onClick={onClose}>✕</button></div>
+        {held.length === 0 ? (
+          <div className="py-10 text-center text-sm text-slate-400">ไม่มีบิลที่พักไว้</div>
+        ) : (
+          <div className="max-h-[60vh] space-y-2 overflow-auto">
+            {held.map((b) => (
+              <div key={b.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-lg">🧾</div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-bold">{b.member?.name || th.generalCustomer} · {b.items.reduce((s, i) => s + i.qty, 0)} ชิ้น</div>
+                  <div className="text-xs text-slate-400">{new Date(b.createdAt).toLocaleString('th-TH')} · ~{money(estimate(b), currency)}</div>
+                </div>
+                <button className="btn-primary" onClick={() => onResume(b)}>เปิดบิล</button>
+                <button className="text-slate-300 hover:text-rose-500" onClick={() => onDelete(b.id)} title="ลบ">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function NowClock() {
   const [now, setNow] = useState(new Date());

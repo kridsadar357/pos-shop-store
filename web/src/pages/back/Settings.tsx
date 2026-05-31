@@ -27,7 +27,7 @@ export default function Settings() {
         method: 'PUT',
         body: { ...s, taxRatePct: num(s.taxRatePct) },
       });
-      toast.success('Settings saved');
+      toast.success('บันทึกการตั้งค่าแล้ว');
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -37,25 +37,25 @@ export default function Settings() {
 
   return (
     <div className="max-w-4xl space-y-4">
-      <PageHeader title="Settings" subtitle="Store profile, tax, members, and PromptPay payment configuration" icon="⚙" />
+      <PageHeader title="ตั้งค่า" subtitle="ข้อมูลร้าน ภาษี สมาชิก และการตั้งค่าพร้อมเพย์" icon="⚙" />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         <div className="card space-y-4 p-6">
           <div className="grid grid-cols-2 gap-3">
-            <F label="Store name" className="col-span-2"><input className="input" value={s.storeName} onChange={(e) => set({ storeName: e.target.value })} /></F>
-            <F label="Phone"><input className="input" value={s.phone} onChange={(e) => set({ phone: e.target.value })} /></F>
-            <F label="Tax ID"><input className="input" value={s.taxId} onChange={(e) => set({ taxId: e.target.value })} /></F>
-            <F label="Address" className="col-span-2"><input className="input" value={s.address} onChange={(e) => set({ address: e.target.value })} /></F>
+            <F label="ชื่อร้าน" className="col-span-2"><input className="input" value={s.storeName} onChange={(e) => set({ storeName: e.target.value })} /></F>
+            <F label="เบอร์โทร"><input className="input" value={s.phone} onChange={(e) => set({ phone: e.target.value })} /></F>
+            <F label="เลขผู้เสียภาษี"><input className="input" value={s.taxId} onChange={(e) => set({ taxId: e.target.value })} /></F>
+            <F label="ที่อยู่" className="col-span-2"><input className="input" value={s.address} onChange={(e) => set({ address: e.target.value })} /></F>
           </div>
 
           <div className="border-t border-slate-100 pt-4">
-            <h3 className="mb-3 font-bold">PromptPay (Transfer payments)</h3>
+            <h3 className="mb-3 font-bold">พร้อมเพย์ (การชำระแบบโอน)</h3>
             <div className="grid grid-cols-2 gap-3">
-              <F label="PromptPay ID"><input className="input" placeholder="Mobile or Tax/Citizen ID" value={s.promptPayId} onChange={(e) => set({ promptPayId: e.target.value })} /></F>
-              <F label="ID type">
+              <F label="หมายเลขพร้อมเพย์"><input className="input" placeholder="เบอร์มือถือ หรือ เลขบัตร/ภาษี" value={s.promptPayId} onChange={(e) => set({ promptPayId: e.target.value })} /></F>
+              <F label="ประเภทหมายเลข">
                 <select className="input" value={s.promptPayType} onChange={(e) => set({ promptPayType: e.target.value as Setting['promptPayType'] })}>
-                  <option value="MSISDN">Mobile number</option>
-                  <option value="NATID">National / Tax ID</option>
+                  <option value="MSISDN">เบอร์มือถือ</option>
+                  <option value="NATID">เลขบัตรประชาชน / ภาษี</option>
                   <option value="EWALLET">e-Wallet</option>
                 </select>
               </F>
@@ -63,25 +63,25 @@ export default function Settings() {
           </div>
 
           <div className="border-t border-slate-100 pt-4">
-            <h3 className="mb-3 font-bold">Tax</h3>
+            <h3 className="mb-3 font-bold">ภาษี</h3>
             <div className="grid grid-cols-2 gap-3">
-              <F label="Tax rate %"><input type="number" className="input" value={num(s.taxRatePct)} onChange={(e) => set({ taxRatePct: e.target.value as any })} /></F>
-              <F label="Tax mode">
+              <F label="อัตราภาษี %"><input type="number" className="input" value={num(s.taxRatePct)} onChange={(e) => set({ taxRatePct: e.target.value as any })} /></F>
+              <F label="รูปแบบภาษี">
                 <select className="input" value={s.taxInclusive ? '1' : '0'} onChange={(e) => set({ taxInclusive: e.target.value === '1' })}>
-                  <option value="1">Inclusive (price includes tax)</option>
-                  <option value="0">Exclusive (add tax on top)</option>
+                  <option value="1">รวมในราคา (ราคารวมภาษีแล้ว)</option>
+                  <option value="0">แยกต่างหาก (บวกภาษีเพิ่ม)</option>
                 </select>
               </F>
-              <F label="Receipt footer" className="col-span-2"><input className="input" value={s.receiptFooter} onChange={(e) => set({ receiptFooter: e.target.value })} /></F>
+              <F label="ข้อความท้ายใบเสร็จ" className="col-span-2"><input className="input" value={s.receiptFooter} onChange={(e) => set({ receiptFooter: e.target.value })} /></F>
             </div>
           </div>
 
           <div className="border-t border-slate-100 pt-4">
-            <h3 className="mb-3 font-bold">Members</h3>
+            <h3 className="mb-3 font-bold">สมาชิก</h3>
             <label className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
               <div>
-                <div className="text-sm font-semibold">Members get wholesale price</div>
-                <div className="text-xs text-slate-400">When on, attaching a member at checkout applies wholesale pricing to all lines.</div>
+                <div className="text-sm font-semibold">สมาชิกได้ราคาส่ง</div>
+                <div className="text-xs text-slate-400">เมื่อเปิด การเลือกสมาชิกตอนชำระเงินจะใช้ราคาส่งกับทุกรายการ</div>
               </div>
               <input
                 type="checkbox"
@@ -92,18 +92,18 @@ export default function Settings() {
             </label>
           </div>
 
-          <button className="btn-primary w-full" onClick={save}>Save settings</button>
+          <button className="btn-primary w-full" onClick={save}>บันทึกการตั้งค่า</button>
         </div>
 
         <div className="card h-fit p-5 text-center">
-          <h3 className="mb-3 font-bold">PromptPay preview</h3>
+          <h3 className="mb-3 font-bold">ตัวอย่าง QR พร้อมเพย์</h3>
           {preview ? (
             <>
               <div className="inline-block rounded-xl bg-white p-2 ring-1 ring-slate-200"><QRCanvas value={preview} size={200} /></div>
-              <p className="mt-2 text-xs text-slate-500">Sample QR for ฿100.00</p>
+              <p className="mt-2 text-xs text-slate-500">ตัวอย่าง QR สำหรับ ฿100.00</p>
             </>
           ) : (
-            <p className="py-10 text-sm text-slate-400">Enter a PromptPay ID to preview.</p>
+            <p className="py-10 text-sm text-slate-400">กรอกหมายเลขพร้อมเพย์เพื่อแสดงตัวอย่าง</p>
           )}
         </div>
       </div>

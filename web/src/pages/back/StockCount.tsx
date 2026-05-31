@@ -25,7 +25,7 @@ export default function StockCount() {
 
   async function startNew() {
     const c = await api<{ id: number }>('/stock-counts', { method: 'POST', body: { note: 'Full count' } });
-    toast.success('Count opened');
+    toast.success('เปิดรอบนับแล้ว');
     await loadList();
     openCount(c.id);
   }
@@ -36,7 +36,7 @@ export default function StockCount() {
       method: 'PUT',
       body: { items: active.items.map((i) => ({ productId: i.productId, countedQty: counted[i.productId] ?? i.systemQty })) },
     });
-    toast.success('Saved');
+    toast.success('บันทึกแล้ว');
   }
 
   async function post() {
@@ -44,7 +44,7 @@ export default function StockCount() {
     await save();
     try {
       await api(`/stock-counts/${active.id}/post`, { method: 'POST' });
-      toast.success('Posted — stock reconciled to counts');
+      toast.success('โพสต์แล้ว — ปรับสต็อกตามที่นับจริง');
       setActive(null);
       loadList();
     } catch (e) {
@@ -55,16 +55,16 @@ export default function StockCount() {
   if (active) {
     return (
       <div className="space-y-4">
-        <button className="text-sm font-semibold text-brand-600" onClick={() => setActive(null)}>← Back to counts</button>
+        <button className="text-sm font-semibold text-brand-600" onClick={() => setActive(null)}>← กลับไปรายการนับ</button>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">{active.refNo}</h1>
-            <p className="text-sm text-slate-500">Enter the physical counted quantity. Variances are posted as COUNT movements.</p>
+            <p className="text-sm text-slate-500">กรอกจำนวนที่นับได้จริง · ส่วนต่างจะถูกบันทึกเป็นความเคลื่อนไหว 'นับสต็อก'</p>
           </div>
           {active.status === 'OPEN' && (
             <div className="flex gap-2">
-              <button className="btn-ghost" onClick={save}>Save draft</button>
-              <button className="btn-primary" onClick={post}>Post count</button>
+              <button className="btn-ghost" onClick={save}>บันทึกร่าง</button>
+              <button className="btn-primary" onClick={post}>โพสต์การนับ</button>
             </div>
           )}
         </div>
@@ -72,7 +72,7 @@ export default function StockCount() {
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
-              <tr><th className="px-4 py-3">Product</th><th className="px-4 py-3 text-right">System</th><th className="px-4 py-3 w-36 text-right">Counted</th><th className="px-4 py-3 text-right">Variance</th></tr>
+              <tr><th className="px-4 py-3">สินค้า</th><th className="px-4 py-3 text-right">ในระบบ</th><th className="px-4 py-3 w-36 text-right">นับได้</th><th className="px-4 py-3 text-right">ส่วนต่าง</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {active.items.map((i) => {
@@ -107,28 +107,28 @@ export default function StockCount() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Stock Count"
-        subtitle="Professional cycle counts — reconcile system stock to physical counts"
+        title="นับสต็อก"
+        subtitle="การนับสต็อกแบบมืออาชีพ — ปรับยอดในระบบให้ตรงกับการนับจริง"
         icon="✓"
-        actions={<button className="btn-primary" onClick={startNew}>+ New count</button>}
+        actions={<button className="btn-primary" onClick={startNew}>+ เปิดรอบนับใหม่</button>}
       />
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
-            <tr><th className="px-4 py-3">Ref</th><th className="px-4 py-3">Items</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Created</th><th /></tr>
+            <tr><th className="px-4 py-3">เลขที่</th><th className="px-4 py-3">จำนวนรายการ</th><th className="px-4 py-3">สถานะ</th><th className="px-4 py-3">สร้างเมื่อ</th><th /></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {list.map((c) => (
               <tr key={c.id} className="hover:bg-slate-50">
                 <td className="px-4 py-3 font-semibold">{c.refNo}</td>
                 <td className="px-4 py-3">{c._count.items}</td>
-                <td className="px-4 py-3"><span className={`chip ${c.status === 'POSTED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{c.status}</span></td>
+                <td className="px-4 py-3"><span className={`chip ${c.status === 'POSTED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{c.status === 'POSTED' ? 'โพสต์แล้ว' : 'เปิดอยู่'}</span></td>
                 <td className="px-4 py-3 text-slate-500">{new Date(c.createdAt).toLocaleString()}</td>
-                <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openCount(c.id)}>Open</button></td>
+                <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openCount(c.id)}>เปิด</button></td>
               </tr>
             ))}
-            {list.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">No counts yet.</td></tr>}
+            {list.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">ยังไม่มีรอบนับ</td></tr>}
           </tbody>
         </table>
       </div>

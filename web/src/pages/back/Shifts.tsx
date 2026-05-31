@@ -13,21 +13,21 @@ export default function Shifts() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Shifts" subtitle="Cash drawer sessions and end-of-shift reconciliation" icon="🕒" />
+      <PageHeader title="การเงิน / กะการขาย" subtitle="รอบลิ้นชักเงินสดและการกระทบยอดเมื่อปิดกะ" icon="🕒" />
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-4 py-3">#</th>
-              <th className="px-4 py-3">Cashier</th>
-              <th className="px-4 py-3">Opened</th>
-              <th className="px-4 py-3">Closed</th>
-              <th className="px-4 py-3 text-right">Float</th>
-              <th className="px-4 py-3 text-right">Expected</th>
-              <th className="px-4 py-3 text-right">Counted</th>
-              <th className="px-4 py-3 text-right">Diff</th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">แคชเชียร์</th>
+              <th className="px-4 py-3">เปิดกะ</th>
+              <th className="px-4 py-3">ปิดกะ</th>
+              <th className="px-4 py-3 text-right">เงินตั้งต้น</th>
+              <th className="px-4 py-3 text-right">ที่ควรมี</th>
+              <th className="px-4 py-3 text-right">นับจริง</th>
+              <th className="px-4 py-3 text-right">ส่วนต่าง</th>
+              <th className="px-4 py-3">สถานะ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -45,11 +45,11 @@ export default function Shifts() {
                   <td className={`px-4 py-3 text-right font-semibold ${diff == null ? 'text-slate-400' : diff === 0 ? 'text-slate-600' : diff > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
                     {diff == null ? '—' : `${diff > 0 ? '+' : ''}${money(diff)}`}
                   </td>
-                  <td className="px-4 py-3"><span className={`chip ${s.status === 'OPEN' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{s.status}</span></td>
+                  <td className="px-4 py-3"><span className={`chip ${s.status === 'OPEN' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{s.status === 'OPEN' ? 'เปิดอยู่' : 'ปิดแล้ว'}</span></td>
                 </tr>
               );
             })}
-            {shifts.length === 0 && <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">No shifts yet.</td></tr>}
+            {shifts.length === 0 && <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">ยังไม่มีกะการขาย</td></tr>}
           </tbody>
         </table>
       </div>

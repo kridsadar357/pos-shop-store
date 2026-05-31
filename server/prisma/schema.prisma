@@ -99,7 +99,8 @@ model Member {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  sales Sale[]
+  sales     Sale[]
+  heldBills HeldBill[]
 
   @@index([name])
 }
@@ -138,10 +139,30 @@ model Shift {
   cashDiff     Decimal?  @db.Decimal(12, 2)
   note         String    @default("")
 
-  user  User   @relation(fields: [userId], references: [id])
-  sales Sale[]
+  user      User       @relation(fields: [userId], references: [id])
+  sales     Sale[]
+  heldBills HeldBill[]
 
   @@index([userId, status])
+}
+
+// A parked/held order that can be resumed and finished within the same shift.
+model HeldBill {
+  id         Int      @id @default(autoincrement())
+  shiftId    Int
+  cashierId  Int
+  type       SaleType @default(RETAIL)
+  memberId   Int?
+  discount   Decimal  @default(0) @db.Decimal(12, 2)
+  couponCode String   @default("")
+  note       String   @default("")
+  items      Json // [{ productId, qty }]
+  createdAt  DateTime @default(now())
+
+  shift  Shift   @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  member Member? @relation(fields: [memberId], references: [id])
+
+  @@index([shiftId])
 }
 
 model Category {

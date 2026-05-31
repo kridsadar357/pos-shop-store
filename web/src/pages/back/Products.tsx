@@ -76,7 +76,7 @@ export default function Products() {
         : await api<Product>('/products', { method: 'POST', body });
       // Upload a newly picked image to the (now-existing) product.
       if (imageFile) await uploadFile(`/products/${saved.id}/image`, 'image', imageFile);
-      toast.success('Saved');
+      toast.success('บันทึกแล้ว');
       setForm(null);
       setImageFile(null);
       load();
@@ -90,25 +90,25 @@ export default function Products() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Products & Stock"
-        subtitle={`${products.length} products`}
+        title="สินค้าและสต็อก"
+        subtitle={`${products.length} รายการ`}
         icon="▦"
-        actions={<button className="btn-primary" onClick={openNew}>+ New product</button>}
+        actions={<button className="btn-primary" onClick={openNew}>+ เพิ่มสินค้า</button>}
       />
 
-      <input className="input max-w-md" placeholder="Search name / SKU / barcode…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input className="input max-w-md" placeholder="ค้นหาชื่อ / รหัส SKU / บาร์โค้ด…" value={q} onChange={(e) => setQ(e.target.value)} />
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-4 py-3 w-14"></th>
-              <th className="px-4 py-3">Product</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3 text-right">Cost</th>
-              <th className="px-4 py-3 text-right">Retail</th>
-              <th className="px-4 py-3 text-right">Wholesale</th>
-              <th className="px-4 py-3 text-right">Stock</th>
+              <th className="px-4 py-3">สินค้า</th>
+              <th className="px-4 py-3">หมวดหมู่</th>
+              <th className="px-4 py-3 text-right">ทุน</th>
+              <th className="px-4 py-3 text-right">ปลีก</th>
+              <th className="px-4 py-3 text-right">ส่ง</th>
+              <th className="px-4 py-3 text-right">คงเหลือ</th>
               <th></th>
             </tr>
           </thead>
@@ -132,7 +132,7 @@ export default function Products() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(p)}>Edit</button>
+                  <button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(p)}>แก้ไข</button>
                 </td>
               </tr>
             ))}
@@ -141,7 +141,7 @@ export default function Products() {
       </div>
 
       {form && (
-        <Modal title={editing ? 'Edit product' : 'New product'} wide onClose={() => setForm(null)}>
+        <Modal title={editing ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า'} wide onClose={() => setForm(null)}>
           <div className="mb-3 flex items-center gap-4">
             <ProductImage src={previewUrl} name={form.name || '?'} className="h-20 w-20 rounded-2xl ring-1 ring-slate-200" />
             <div>
@@ -152,44 +152,44 @@ export default function Products() {
                 className="hidden"
                 onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
               />
-              <button type="button" className="btn-ghost" onClick={() => fileRef.current?.click()}>📷 Upload image</button>
+              <button type="button" className="btn-ghost" onClick={() => fileRef.current?.click()}>📷 อัปโหลดรูป</button>
               {(imageFile || form.imageUrl) && (
                 <button type="button" className="ml-2 text-sm font-semibold text-rose-600" onClick={() => { setImageFile(null); setForm({ ...form, imageUrl: '' }); }}>
-                  Remove
+                  ลบรูป
                 </button>
               )}
-              <p className="mt-1 text-xs text-slate-400">PNG/JPG, up to 4MB.</p>
+              <p className="mt-1 text-xs text-slate-400">PNG/JPG ไม่เกิน 4MB</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Name" className="col-span-2">
+            <Field label="ชื่อสินค้า" className="col-span-2">
               <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </Field>
-            <Field label="SKU">
+            <Field label="รหัส SKU">
               <input className="input" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
             </Field>
-            <Field label="Barcode">
+            <Field label="บาร์โค้ด">
               <input className="input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
             </Field>
-            <Field label="Category">
+            <Field label="หมวดหมู่">
               <select className="input" value={form.categoryId ?? ''} onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : null })}>
                 <option value="">—</option>
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </Field>
-            <Field label="Unit">
+            <Field label="หน่วย">
               <input className="input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
             </Field>
-            <NumField label="Cost" v={form.cost} set={(v) => setForm({ ...form, cost: v })} />
-            <NumField label="Retail price" v={form.retailPrice} set={(v) => setForm({ ...form, retailPrice: v })} />
-            <NumField label="Wholesale price" v={form.wholesalePrice} set={(v) => setForm({ ...form, wholesalePrice: v })} />
-            <NumField label="Wholesale min qty" v={form.wholesaleMinQty} set={(v) => setForm({ ...form, wholesaleMinQty: v })} />
-            <NumField label="Reorder level" v={form.reorderLevel} set={(v) => setForm({ ...form, reorderLevel: v })} />
+            <NumField label="ทุน" v={form.cost} set={(v) => setForm({ ...form, cost: v })} />
+            <NumField label="ราคาปลีก" v={form.retailPrice} set={(v) => setForm({ ...form, retailPrice: v })} />
+            <NumField label="ราคาส่ง" v={form.wholesalePrice} set={(v) => setForm({ ...form, wholesalePrice: v })} />
+            <NumField label="จำนวนขั้นต่ำราคาส่ง" v={form.wholesaleMinQty} set={(v) => setForm({ ...form, wholesaleMinQty: v })} />
+            <NumField label="จุดสั่งซื้อซ้ำ" v={form.reorderLevel} set={(v) => setForm({ ...form, reorderLevel: v })} />
           </div>
-          {editing && <p className="mt-3 text-xs text-slate-400">To change stock, use Receive Goods, Stock Count, or Stock Ledger adjustments — stock is ledger-controlled.</p>}
+          {editing && <p className="mt-3 text-xs text-slate-400">การปรับสต็อกทำผ่าน รับสินค้า / นับสต็อก / บัญชีสต็อก — สต็อกควบคุมด้วยบัญชีเดินสินค้า</p>}
           <div className="mt-5 flex gap-2">
-            <button className="btn-ghost flex-1" onClick={() => setForm(null)}>Cancel</button>
-            <button className="btn-primary flex-1" onClick={save}>Save</button>
+            <button className="btn-ghost flex-1" onClick={() => setForm(null)}>ยกเลิก</button>
+            <button className="btn-primary flex-1" onClick={save}>บันทึก</button>
           </div>
         </Modal>
       )}
