@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 import { api } from '../api/client';
+import { ProductImage } from './ProductImage';
+import { money } from '../lib/format';
 import { toast } from './Toast';
+import type { Member, Product } from '../types';
 
 interface StockAlert { id: number; sku: string; name: string; category: string; stockQty: number; reorderLevel: number; unit: string; }
 
@@ -56,7 +59,17 @@ export function BackLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const isAdmin = user?.role === 'ADMIN';
+
+  // Cmd/Ctrl+K opens global search.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearchOpen(true); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-transparent">
@@ -141,9 +154,13 @@ export function BackLayout() {
             >
               <i className="fa-solid fa-cash-register" /> หน้าขาย
             </button>
-            <button className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50" title="ค้นหา"><i className="fa-solid fa-magnifying-glass" /></button>
+            <button onClick={() => setSearchOpen(true)} className="flex h-9 items-center gap-2 rounded-xl px-3 text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50" title="ค้นหา (⌘K)">
+              <i className="fa-solid fa-magnifying-glass" />
+              <span className="hidden text-xs text-slate-400 lg:inline">ค้นหา</span>
+              <kbd className="hidden rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 lg:inline">⌘K</kbd>
+            </button>
             <Notifications />
-            <button className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50" title="ช่วยเหลือ"><i className="fa-regular fa-circle-question" /></button>
+            <button onClick={() => navigate('/back/settings?tab=manual')} className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50" title="ช่วยเหลือ / คู่มือใช้งาน"><i className="fa-regular fa-circle-question" /></button>
             <div className="relative">
               <button onClick={() => setMenuOpen((v) => !v)} className="flex items-center gap-2 rounded-xl bg-slate-50 px-2 py-1.5 ring-1 ring-slate-200 hover:bg-slate-100">
                 <div className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-xs font-bold text-white">{user?.name?.charAt(0)}</div>
@@ -169,8 +186,104 @@ export function BackLayout() {
           </div>
         </main>
       </div>
+
+      {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} navigate={navigate} />}
     </div>
   );
+}
+
+/** Global command-palette search across products and members (⌘K). */
+function SearchPalette({ onClose, navigate }: { onClose: () => void; navigate: (to: string) => void }) {
+  const [q, setQ] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (!term) { setProducts([]); setMembers([]); return; }
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const [p, m] = await Promise.all([
+          api<Product[]>('/products', { query: { q: term } }).catch(() => []),
+          api<Member[]>('/members', { query: { q: term } }).catch(() => []),
+        ]);
+        setProducts(p.slice(0, 6));
+        setMembers(m.slice(0, 5));
+      } finally { setLoading(false); }
+    }, 200);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const go = (to: string) => { onClose(); navigate(to); };
+  const term = q.trim();
+  const empty = term && !loading && !products.length && !members.length;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-start justify-center bg-black/50 p-4 pt-[12vh]" onClick={onClose}>
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-pop ring-1 ring-slate-200" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+          <i className="fa-solid fa-magnifying-glass text-slate-400" />
+          <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาสินค้า, สมาชิก, บิล…"
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+          {loading && <i className="fa-solid fa-spinner fa-spin text-slate-300" />}
+          <kbd className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">ESC</kbd>
+        </div>
+
+        <div className="max-h-[55vh] overflow-auto">
+          {!term && (
+            <div className="px-4 py-10 text-center text-sm text-slate-400">
+              <i className="fa-solid fa-keyboard mb-2 block text-2xl" />พิมพ์เพื่อค้นหาสินค้าและสมาชิก
+            </div>
+          )}
+          {empty && <div className="px-4 py-10 text-center text-sm text-slate-400">ไม่พบผลลัพธ์สำหรับ “{term}”</div>}
+
+          {products.length > 0 && (
+            <>
+              <Grp label="สินค้า" />
+              {products.map((p) => (
+                <button key={p.id} onClick={() => go(`/back/products?q=${encodeURIComponent(p.sku)}`)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50">
+                  <ProductImage src={p.imageUrl} name={p.name} className="h-9 w-9 rounded-lg ring-1 ring-slate-200" />
+                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium text-ink-900">{p.name}</div><div className="text-xs text-slate-400">{p.sku} · คงเหลือ {p.stockQty} {p.unit}</div></div>
+                  <span className="text-sm font-semibold text-slate-600">{money(p.retailPrice)}</span>
+                </button>
+              ))}
+            </>
+          )}
+          {members.length > 0 && (
+            <>
+              <Grp label="สมาชิก" />
+              {members.map((m) => (
+                <button key={m.id} onClick={() => go(`/back/members?q=${encodeURIComponent(m.phone || m.name)}`)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50">
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-50 text-brand-600"><i className="fa-solid fa-user" /></div>
+                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium text-ink-900">{m.name}</div><div className="text-xs text-slate-400">{m.phone} {m.code ? `· ${m.code}` : ''}</div></div>
+                </button>
+              ))}
+            </>
+          )}
+
+          {term && (
+            <button onClick={() => go(`/back/sales`)} className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2.5 text-left text-sm text-brand-600 hover:bg-slate-50">
+              <i className="fa-solid fa-receipt w-9 text-center" /> ค้นหาในรายการขายทั้งหมด
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Grp({ label }: { label: string }) {
+  return <div className="bg-slate-50 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</div>;
 }
 
 /** Topbar notifications — live low-stock / reorder alerts from the inventory. */

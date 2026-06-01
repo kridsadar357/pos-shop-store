@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, uploadFile, resolveUrl } from '../../api/client';
 import { QRCanvas } from '../../components/QRCode';
 import { PageHeader } from '../../components/ui';
@@ -16,8 +17,10 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
 ];
 
 export default function Settings() {
+  const [searchParams] = useSearchParams();
+  const initialTab = (TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'general') as TabKey;
   const [s, setS] = useState<Setting | null>(null);
-  const [tab, setTab] = useState<TabKey>('general');
+  const [tab, setTab] = useState<TabKey>(initialTab);
 
   useEffect(() => { api<Setting>('/settings').then(setS); }, []);
   if (!s) return null;

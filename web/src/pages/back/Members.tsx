@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Modal } from '../../components/Modal';
 import { DataTable } from '../../components/DataTable';
@@ -11,8 +12,9 @@ const empty = { code: '', name: '', phone: '', email: '', note: '', isActive: tr
 type Form = typeof empty;
 
 export default function Members() {
+  const [searchParams] = useSearchParams();
   const [members, setMembers] = useState<Member[]>([]);
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(searchParams.get('q') ?? '');
   const [statusFilter, setStatusFilter] = useState('');
   const [emailFilter, setEmailFilter] = useState('');
   const [editing, setEditing] = useState<Member | null>(null);
