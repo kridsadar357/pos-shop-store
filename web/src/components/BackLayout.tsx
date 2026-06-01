@@ -29,6 +29,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/back/products', label: 'สินค้า', icon: 'fa-box' },
       { to: '/back/movements', label: 'คลังสินค้า', icon: 'fa-warehouse' },
+      { to: '/back/purchase-orders', label: 'ใบสั่งซื้อ', icon: 'fa-file-invoice-dollar' },
       { to: '/back/receive', label: 'จัดซื้อ / รับเข้า', icon: 'fa-truck-ramp-box' },
     ],
   },

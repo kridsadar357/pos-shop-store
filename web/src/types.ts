@@ -133,6 +133,43 @@ export interface HeldBill {
   member?: { name: string } | null;
 }
 
+export type POStatus = 'DRAFT' | 'ORDERED' | 'PARTIAL' | 'RECEIVED' | 'CANCELLED';
+
+export interface POListItem {
+  id: number;
+  refNo: string;
+  status: POStatus;
+  note: string;
+  total: string;
+  expectedDate: string | null;
+  createdAt: string;
+  supplier?: { name: string } | null;
+  lineCount: number;
+  orderedQty: number;
+  receivedQty: number;
+}
+
+export interface POItem {
+  id: number;
+  productId: number;
+  qty: number;
+  unitCost: string;
+  receivedQty: number;
+  product?: { name: string; sku: string; unit: string; stockQty: number };
+}
+
+export interface PODetail {
+  id: number;
+  refNo: string;
+  status: POStatus;
+  note: string;
+  total: string;
+  expectedDate: string | null;
+  createdAt: string;
+  supplier?: { id: number; name: string } | null;
+  items: POItem[];
+}
+
 export interface Movement {
   id: number;
   productId: number;

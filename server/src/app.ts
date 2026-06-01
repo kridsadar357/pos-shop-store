@@ -19,6 +19,7 @@ import { heldBillsRouter } from './routes/heldBills.js';
 import { licenseRouter } from './routes/license.js';
 import { setupRouter } from './routes/setup.js';
 import { printRouter } from './routes/print.js';
+import { purchaseOrdersRouter } from './routes/purchaseOrders.js';
 
 export function createApp() {
   const app = express();
@@ -47,6 +48,7 @@ export function createApp() {
   app.use('/api/license', licenseRouter);
   app.use('/api/setup', setupRouter);
   app.use('/api/print', printRouter);
+  app.use('/api/purchase-orders', purchaseOrdersRouter);
 
   // Central error handler.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

@@ -203,12 +203,44 @@ model Category {
 }
 
 model Supplier {
-  id       Int            @id @default(autoincrement())
+  id       Int             @id @default(autoincrement())
   name     String
-  phone    String         @default("")
-  email    String         @default("")
-  note     String         @default("")
+  phone    String          @default("")
+  email    String          @default("")
+  note     String          @default("")
   receipts GoodsReceipt[]
+  purchaseOrders PurchaseOrder[]
+}
+
+/// Purchase order to a supplier; receiving against it drives RECEIVE movements.
+model PurchaseOrder {
+  id           Int       @id @default(autoincrement())
+  refNo        String    @unique
+  supplierId   Int?
+  status       String    @default("DRAFT") // DRAFT | ORDERED | PARTIAL | RECEIVED | CANCELLED
+  note         String    @default("")
+  total        Decimal   @default(0) @db.Decimal(12, 2)
+  expectedDate DateTime?
+  userId       Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  supplier Supplier?           @relation(fields: [supplierId], references: [id])
+  items    PurchaseOrderItem[]
+
+  @@index([status])
+}
+
+model PurchaseOrderItem {
+  id          Int     @id @default(autoincrement())
+  poId        Int
+  productId   Int
+  qty         Int
+  unitCost    Decimal @db.Decimal(12, 2)
+  receivedQty Int     @default(0)
+
+  po      PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product Product       @relation(fields: [productId], references: [id])
 }
 
 model Product {
@@ -236,6 +268,7 @@ model Product {
   grItems    GoodsReceiptItem[]
   countItems StockCountItem[]
   promotions Promotion[]
+  poItems    PurchaseOrderItem[]
 
   @@index([name])
 }
