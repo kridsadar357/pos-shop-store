@@ -76,7 +76,10 @@ is already branch-correct).
 - ✅ Petty cash / cash in-out during a shift — `CashMovement` model + POS drawer
   modal (pay-in / pay-out with reason); expected drawer cash and the close-shift
   reconciliation now account for `float + cash sales + pay-ins − pay-outs`
-- ⬜ Accounts payable: supplier invoices & payments against POs
+- ✅ Accounts payable: payments against POs — `SupplierPayment` model +
+  `/api/payables` (committed POs with total / paid / outstanding, supplier & status
+  filters, summary totals; record-payment capped at the outstanding balance).
+  Back-office Payables page with KPIs, payment modal + history, and export
 - ⬜ Full tax invoice (ใบกำกับภาษีเต็มรูป) vs. the current abbreviated receipt
 - ✅ Expense tracking & categories — `Expense` model + `/api/expenses` (date-range /
   branch / category filters); back-office Expenses page (ListToolbar + filters +

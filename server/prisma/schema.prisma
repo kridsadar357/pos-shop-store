@@ -328,6 +328,26 @@ model Supplier {
   receipts GoodsReceipt[]
   purchaseOrders PurchaseOrder[]
   products SupplierProduct[]
+  payments SupplierPayment[]
+}
+
+// Accounts payable: a payment made to a supplier against a purchase order.
+// A PO's outstanding balance = PO.total − sum(its payments).
+model SupplierPayment {
+  id         Int      @id @default(autoincrement())
+  poId       Int?
+  supplierId Int?
+  amount     Decimal  @db.Decimal(12, 2)
+  method     String   @default("TRANSFER") // CASH | TRANSFER
+  reference  String   @default("")
+  note       String   @default("")
+  userId     Int?
+  createdAt  DateTime @default(now())
+
+  po       PurchaseOrder? @relation(fields: [poId], references: [id])
+  supplier Supplier?      @relation(fields: [supplierId], references: [id])
+
+  @@index([poId])
 }
 
 /// A supplier's quoted price for a product (the supplier price list).
@@ -360,6 +380,7 @@ model PurchaseOrder {
 
   supplier Supplier?           @relation(fields: [supplierId], references: [id])
   items    PurchaseOrderItem[]
+  payments SupplierPayment[]
 
   @@index([status])
 }

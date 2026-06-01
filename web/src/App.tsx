@@ -29,6 +29,7 @@ const Suppliers = lazy(() => import('./pages/back/Suppliers'));
 const Promotions = lazy(() => import('./pages/back/Promotions'));
 const Shifts = lazy(() => import('./pages/back/Shifts'));
 const Expenses = lazy(() => import('./pages/back/Expenses'));
+const Payables = lazy(() => import('./pages/back/Payables'));
 const Settings = lazy(() => import('./pages/back/Settings'));
 const Users = lazy(() => import('./pages/back/Users'));
 const Branches = lazy(() => import('./pages/back/Branches'));
@@ -110,6 +111,7 @@ export default function App() {
           <Route path="promotions" element={<Promotions />} />
           <Route path="shifts" element={<Shifts />} />
           <Route path="expenses" element={<Expenses />} />
+          <Route path="payables" element={<Payables />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
           <Route path="branches" element={<Branches />} />

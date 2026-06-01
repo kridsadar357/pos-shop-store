@@ -158,6 +158,32 @@ export interface Sale {
   items: SaleItem[];
 }
 
+export interface Supplier { id: number; name: string; phone: string; email: string; note: string; }
+
+export interface Payable {
+  id: number;
+  refNo: string;
+  status: string;
+  supplierId: number | null;
+  supplier?: { name: string } | null;
+  createdAt: string;
+  expectedDate: string | null;
+  total: number;
+  paid: number;
+  outstanding: number;
+  paymentStatus: 'PAID' | 'PARTIAL' | 'UNPAID';
+}
+
+export interface SupplierPayment {
+  id: number;
+  poId: number | null;
+  amount: string;
+  method: 'CASH' | 'TRANSFER';
+  reference: string;
+  note: string;
+  createdAt: string;
+}
+
 export interface AuditLog {
   id: number;
   userId: number | null;
