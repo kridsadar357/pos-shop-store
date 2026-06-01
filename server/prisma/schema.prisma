@@ -529,9 +529,27 @@ model Sale {
   items     SaleItem[]
   returns   Return[]
   pointTxns PointTransaction[]
+  payments  SalePayment[]
 
   @@index([createdAt])
   @@index([status])
+}
+
+// One tender on a sale. For split/multi-tender bills there are several rows; for
+// a simple bill there is exactly one. `amount` is the portion APPLIED to the bill
+// (rows sum to Sale.total); cash change is tracked separately on the Sale. This is
+// the source of truth for per-method money in reports & shift reconciliation.
+model SalePayment {
+  id        Int           @id @default(autoincrement())
+  saleId    Int
+  method    PaymentMethod
+  amount    Decimal       @db.Decimal(12, 2)
+  reference String        @default("")
+  createdAt DateTime      @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
 }
 
 /// A (possibly partial) refund against a paid sale; returns stock via RETURN movements.

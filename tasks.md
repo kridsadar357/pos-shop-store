@@ -67,7 +67,11 @@ is already branch-correct).
   balance + history + manual adjust; receipt prints earned/redeemed points
 - ⬜ Quotations / proforma → convert to sale
 - ⬜ Layaway / deposits / partial payment
-- ⬜ Split / multi-tender payments on one bill
+- ✅ Split / multi-tender payments on one bill — `SalePayment` model (per-method
+  applied amount, summing to the total) is the source of truth; checkout accepts a
+  `payments[]` array (cash may overpay → change, non-cash must fit the bill). POS
+  split modal, receipt tender breakdown, and split-aware `shiftTotals` + reports
+  (payment-methods, cashier). Backfilled existing sales 1 tender each
 - ✅ Promotion **scheduling UI** — `startsAt`/`endsAt` editable in the Promotions
   form (datetime-local), with scheduled/active/expired status chips + date range in
   the list; the POS already enforces the window via `activePromotions()`

@@ -199,6 +199,8 @@ async function main() {
           voidedAt: voided ? new Date(createdAt.getTime() + 5 * 60000) : null,
           createdAt,
           items: { create: lineData },
+          // One tender per sale (the seed doesn't generate split bills).
+          payments: { create: [{ method: paymentMethod, amount: total, createdAt }] },
         },
       });
 

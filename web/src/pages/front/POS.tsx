@@ -74,6 +74,7 @@ export default function POS() {
   const [transfer, setTransfer] = useState(false);
   const [closing, setClosing] = useState(false);
   const [cashDrawer, setCashDrawer] = useState(false);
+  const [splitPay, setSplitPay] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [printSale, setPrintSale] = useState<Sale | null>(null);
@@ -228,7 +229,7 @@ export default function POS() {
   }, [lines, member, setting, totals.count]);
 
   // ---- checkout ----
-  async function completeSale(method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT', ref = '') {
+  async function completeSale(method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT', ref = '', payments?: { method: string; amount: number; reference?: string }[]) {
     try {
       const sale = await api<Sale>('/sales', {
         method: 'POST',
@@ -236,6 +237,7 @@ export default function POS() {
           type: mode, paymentMethod: method, discount: totals.manualDisc, couponCode: coupon,
           cashReceived: method === 'CASH' ? cashReceived : 0,
           paymentRef: ref, memberId: member?.id ?? null, pointsRedeem: totals.usePts, branchId: useBranch.getState().activeId ?? undefined,
+          ...(payments ? { payments } : {}),
           items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
         },
       });
@@ -244,6 +246,7 @@ export default function POS() {
       if (autoPrint) doPrint(sale);
       clearCart();
       setTransfer(false);
+      setSplitPay(false);
       setPayKey('CASH');
       reload();
       refreshShift();
@@ -312,7 +315,7 @@ export default function POS() {
   // Intelligent auto-focus: keep the invisible barcode reader focused so a scan
   // is always captured — unless the cashier is typing in a field or a modal is open.
   useEffect(() => {
-    const overlay = priceCheck || pickMember || transfer || closing || cashDrawer || showHeld || showPromo || !!lastSale || showCam || showSearch || showNotif || moreOpen;
+    const overlay = priceCheck || pickMember || transfer || closing || cashDrawer || splitPay || showHeld || showPromo || !!lastSale || showCam || showSearch || showNotif || moreOpen;
     const focusScan = () => {
       if (overlay) return;
       const a = document.activeElement as HTMLElement | null;
@@ -675,6 +678,9 @@ export default function POS() {
               <button className="btn-primary mt-3 w-full py-3.5 text-base" disabled={lines.length === 0} onClick={onPay}>
                 <i className="fa-solid fa-money-check-dollar mr-1.5" />{th.pay} (F9)
               </button>
+              <button className="mt-2 w-full rounded-xl bg-slate-100 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 disabled:opacity-40" disabled={lines.length === 0} onClick={() => setSplitPay(true)}>
+                <i className="fa-solid fa-money-bills mr-1.5" />{th.splitPayment}
+              </button>
 
               {held.length > 0 && (
                 <button onClick={() => setShowHeld(true)} className="mt-2 w-full rounded-xl bg-amber-50 py-2 text-xs font-bold text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100">
@@ -720,6 +726,7 @@ export default function POS() {
         />
       )}
       {cashDrawer && <CashDrawerModal onClose={() => { setCashDrawer(false); refreshShift(); }} />}
+      {splitPay && <SplitPaymentModal total={totals.net} currency={currency} onCancel={() => setSplitPay(false)} onConfirm={(payments) => completeSale(payments[0].method, '', payments)} />}
       {closing && <CloseShiftModal setting={setting} onClose={() => { setClosing(false); refreshShift(); }} />}
       {lastSale && (
         <ReceiptModal
@@ -987,6 +994,68 @@ function TransferModal({ amount, currency, onQR, onConfirm, onCancel }: { amount
         <div className="mt-5 flex gap-2">
           <button className="btn-ghost flex-1" onClick={onCancel}>{th.cancel}</button>
           <button className="btn-primary flex-1" onClick={onConfirm}>{th.confirmPayment}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type Tender = { method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT'; amount: number; reference: string };
+const TENDER_LABELS: { k: Tender['method']; label: string }[] = [
+  { k: 'CASH', label: 'เงินสด' }, { k: 'TRANSFER', label: 'โอน/พร้อมเพย์' }, { k: 'CARD', label: 'บัตร' }, { k: 'CREDIT', label: 'เงินเชื่อ' },
+];
+
+/** Split / multi-tender payment: add several tenders that together cover the bill. */
+function SplitPaymentModal({ total, currency, onConfirm, onCancel }: { total: number; currency: string; onConfirm: (payments: Tender[]) => void; onCancel: () => void }) {
+  const [rows, setRows] = useState<Tender[]>([{ method: 'CASH', amount: total, reference: '' }]);
+  const paid = Math.round(rows.reduce((s, r) => s + (r.amount || 0), 0) * 100) / 100;
+  const nonCash = Math.round(rows.filter((r) => r.method !== 'CASH').reduce((s, r) => s + (r.amount || 0), 0) * 100) / 100;
+  const remaining = Math.round((total - paid) * 100) / 100;
+  const change = Math.max(0, Math.round((paid - total) * 100) / 100);
+  const nonCashOver = nonCash > total + 0.001;
+  const valid = paid >= total - 0.001 && !nonCashOver && rows.every((r) => r.amount > 0);
+
+  function setRow(i: number, patch: Partial<Tender>) { setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r))); }
+  function addRow() {
+    const left = Math.max(0, remaining);
+    setRows((rs) => [...rs, { method: rs.some((r) => r.method === 'TRANSFER') ? 'CASH' : 'TRANSFER', amount: left, reference: '' }]);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onCancel}>
+      <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-xl font-bold"><i className="fa-solid fa-money-bills mr-2 text-brand-600" />{th.splitPayment}</h3>
+        <div className="mt-2 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5">
+          <span className="text-sm text-slate-500">{th.netTotal}</span>
+          <span className="text-xl font-extrabold text-brand-700">{money(total, currency)}</span>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <select className="input w-36" value={r.method} onChange={(e) => setRow(i, { method: e.target.value as Tender['method'] })}>
+                {TENDER_LABELS.map((t) => <option key={t.k} value={t.k}>{t.label}</option>)}
+              </select>
+              <input type="number" className="input flex-1 text-right" value={r.amount || ''} onChange={(e) => setRow(i, { amount: Math.max(0, Number(e.target.value)) })} placeholder="0.00" />
+              {rows.length > 1 && <button className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-500" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}><i className="fa-solid fa-xmark" /></button>}
+            </div>
+          ))}
+        </div>
+        <button className="mt-2 text-sm font-semibold text-brand-600" onClick={addRow}><i className="fa-solid fa-plus mr-1" />{th.addTender}</button>
+
+        <div className="mt-3 space-y-1 rounded-xl bg-slate-50 p-3 text-sm">
+          <div className="flex justify-between"><span className="text-slate-500">ชำระแล้ว</span><span className="font-semibold">{money(paid, currency)}</span></div>
+          {remaining > 0 ? (
+            <div className="flex justify-between text-rose-600"><span>คงเหลือต้องชำระ</span><span className="font-bold">{money(remaining, currency)}</span></div>
+          ) : (
+            <div className="flex justify-between text-emerald-600"><span>{th.change}</span><span className="font-bold">{money(change, currency)}</span></div>
+          )}
+          {nonCashOver && <div className="text-xs text-rose-500">* ยอดที่ไม่ใช่เงินสดเกินยอดบิล</div>}
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button className="btn-ghost flex-1" onClick={onCancel}>{th.cancel}</button>
+          <button className="btn-primary flex-1" disabled={!valid} onClick={() => onConfirm(rows.filter((r) => r.amount > 0))}>{th.confirmPayment}</button>
         </div>
       </div>
     </div>

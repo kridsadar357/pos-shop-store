@@ -10,14 +10,16 @@ const num = (d: unknown) => Number(d ?? 0);
 
 /** Aggregate the sales totals for a shift (used for live X-report and closing). */
 async function shiftTotals(shiftId: number) {
-  const sales = await prisma.sale.findMany({ where: { shiftId, status: 'PAID' }, select: { total: true, paymentMethod: true } });
+  // Per-method money comes from SalePayment (handles split / multi-tender bills).
+  const payments = await prisma.salePayment.findMany({ where: { sale: { shiftId, status: 'PAID' } }, select: { method: true, amount: true } });
   const byMethod = { CASH: 0, TRANSFER: 0, CARD: 0, CREDIT: 0 };
-  for (const s of sales) {
-    byMethod[s.paymentMethod as keyof typeof byMethod] += num(s.total);
+  for (const p of payments) {
+    byMethod[p.method as keyof typeof byMethod] += num(p.amount);
   }
   const cash = byMethod.CASH;
   const transfer = byMethod.TRANSFER + byMethod.CARD + byMethod.CREDIT; // non-cash, for compat
   for (const k of Object.keys(byMethod) as (keyof typeof byMethod)[]) byMethod[k] = round2(byMethod[k]);
+  const orders = await prisma.sale.count({ where: { shiftId, status: 'PAID' } });
   const voids = await prisma.sale.count({ where: { shiftId, status: 'VOID' } });
   // Petty cash in/out recorded against the shift.
   const cashMoves = await prisma.cashMovement.findMany({ where: { shiftId }, select: { type: true, amount: true } });
@@ -28,7 +30,7 @@ async function shiftTotals(shiftId: number) {
     else payOut += num(m.amount);
   }
   return {
-    orders: sales.length,
+    orders,
     cashSales: round2(cash),
     transferSales: round2(transfer),
     totalSales: round2(cash + transfer),

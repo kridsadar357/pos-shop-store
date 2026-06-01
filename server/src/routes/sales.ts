@@ -20,6 +20,11 @@ const checkoutSchema = z.object({
   memberId: z.number().int().nullable().optional(),
   pointsRedeem: z.number().int().nonnegative().default(0), // loyalty points to spend on this bill
   branchId: z.number().int().nullable().optional(),
+  // Optional split / multi-tender payments. When omitted, the single paymentMethod
+  // (+ cashReceived) is used as today.
+  payments: z
+    .array(z.object({ method: z.enum(['CASH', 'TRANSFER', 'CARD', 'CREDIT']), amount: z.number().positive(), reference: z.string().default('') }))
+    .optional(),
   items: z
     .array(z.object({ productId: z.number().int(), qty: z.number().int().positive() }))
     .min(1),
@@ -136,14 +141,32 @@ salesRouter.post(
         if (earnBaht > 0) pointsEarned = Math.floor(total / earnBaht);
       }
 
-      if (data.paymentMethod === 'CASH' && data.cashReceived < total) {
-        throw Object.assign(new Error('Cash received is less than total'), { status: 400 });
-      }
-      const changeDue = data.paymentMethod === 'CASH' ? round2(data.cashReceived - total) : 0;
+      // ---- Tender plan: single payment, or split / multi-tender ----
+      type Tender = { method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT'; amount: number; reference: string };
+      const tenders: Tender[] = data.payments?.length
+        ? data.payments.map((p) => ({ method: p.method, amount: round2(p.amount), reference: p.reference }))
+        : [{ method: data.paymentMethod, amount: data.paymentMethod === 'CASH' ? round2(data.cashReceived || total) : total, reference: data.paymentRef }];
 
-      // PromptPay QR payload for transfer payments (uses the branch's PromptPay if set).
+      const cashTendered = round2(tenders.filter((t) => t.method === 'CASH').reduce((s, t) => s + t.amount, 0));
+      const nonCash = round2(tenders.filter((t) => t.method !== 'CASH').reduce((s, t) => s + t.amount, 0));
+      if (nonCash > total + 0.001) throw Object.assign(new Error('ยอดชำระแบบไม่ใช่เงินสดเกินยอดบิล'), { status: 400 });
+      const tendered = round2(cashTendered + nonCash);
+      if (tendered < total - 0.001) throw Object.assign(new Error('ยอดชำระไม่เพียงพอกับยอดบิล'), { status: 400 });
+      const changeDue = round2(Math.max(0, tendered - total)); // change comes out of cash
+      const cashApplied = round2(cashTendered - changeDue);
+
+      // Applied-per-method rows (sum exactly to total) — the source of truth for reports.
+      const paymentRows: { method: Tender['method']; amount: number; reference: string }[] = [];
+      for (const t of tenders) if (t.method !== 'CASH') paymentRows.push({ method: t.method, amount: t.amount, reference: t.reference });
+      if (cashApplied > 0.001) paymentRows.push({ method: 'CASH', amount: cashApplied, reference: tenders.find((t) => t.method === 'CASH')?.reference ?? '' });
+      if (!paymentRows.length) paymentRows.push({ method: data.paymentMethod, amount: total, reference: data.paymentRef });
+      const isSplit = paymentRows.length > 1;
+      // Largest applied portion drives the legacy single Sale.paymentMethod.
+      const dominant = paymentRows.slice().sort((a, b) => b.amount - a.amount)[0].method;
+
+      // PromptPay QR payload for a single transfer payment (uses the branch's PromptPay if set).
       let qrPayload = '';
-      if (data.paymentMethod === 'TRANSFER') {
+      if (!isSplit && dominant === 'TRANSFER') {
         let ppId = setting.promptPayId;
         let ppType = setting.promptPayType as PromptPayType;
         if (branchId) {
@@ -172,10 +195,10 @@ salesRouter.post(
           pointsRedeemed,
           taxAmount,
           total,
-          paymentMethod: data.paymentMethod,
-          cashReceived: data.paymentMethod === 'CASH' ? data.cashReceived : 0,
+          paymentMethod: dominant,
+          cashReceived: cashTendered,
           changeDue,
-          paymentRef: data.paymentRef,
+          paymentRef: isSplit ? 'แยกชำระ' : data.paymentRef,
           qrPayload,
           cashierId,
           memberId,
@@ -200,6 +223,11 @@ salesRouter.post(
         });
       }
 
+      // Record the tender(s) — the per-method source of truth.
+      const payments = await Promise.all(
+        paymentRows.map((p) => tx.salePayment.create({ data: { saleId: created.id, method: p.method, amount: p.amount, reference: p.reference } }))
+      );
+
       // Loyalty: spend redeemed points first, then credit earned points.
       if (memberId) {
         if (pointsRedeemed > 0) {
@@ -210,7 +238,7 @@ salesRouter.post(
         }
       }
 
-      return created;
+      return { ...created, payments };
     });
 
     res.status(201).json(sale);
@@ -288,7 +316,7 @@ salesRouter.get(
   ah(async (req, res) => {
     const sale = await prisma.sale.findUnique({
       where: { id: Number(req.params.id) },
-      include: { items: true, cashier: { select: { name: true } } },
+      include: { items: true, cashier: { select: { name: true } }, payments: true },
     });
     if (!sale) return res.status(404).json({ error: 'Not found' });
     res.json(sale);

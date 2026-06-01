@@ -68,6 +68,8 @@ export const th = {
   orders: 'จำนวนบิล',
   confirmClose: 'ยืนยันปิดกะ',
   shiftClosed: 'ปิดกะเรียบร้อย',
+  splitPayment: 'แยกชำระ (หลายช่องทาง)',
+  addTender: 'เพิ่มช่องทางชำระ',
   // Petty cash (drawer pay-in / pay-out)
   cashInOut: 'เงินเข้า-ออก',
   cashDrawerTitle: 'เงินเข้า-ออกลิ้นชัก',

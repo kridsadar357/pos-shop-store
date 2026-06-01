@@ -78,11 +78,24 @@ export function ReceiptPrint({ sale, setting, onDone }: { sale: Sale; setting: S
         <div className="r-row" style={{ fontSize: 16, fontWeight: 800 }}><span>ยอดสุทธิ</span><span>{money(sale.total, currency)}</span></div>
 
         <div className="r-hr" />
-        <div className="r-row"><span>ชำระโดย</span><span>{PM[sale.paymentMethod] ?? sale.paymentMethod}</span></div>
-        {sale.paymentMethod === 'CASH' && (
+        {sale.payments && sale.payments.length > 1 ? (
           <>
-            <div className="r-row"><span>รับเงิน</span><span>{num(sale.cashReceived).toFixed(2)}</span></div>
-            <div className="r-row"><span>เงินทอน</span><span>{num(sale.changeDue).toFixed(2)}</span></div>
+            <div className="r-row"><span>ชำระโดย</span><span>แยกชำระ</span></div>
+            {sale.payments.map((p, i) => (
+              <div className="r-row" key={i}><span>· {PM[p.method] ?? p.method}</span><span>{num(p.amount).toFixed(2)}</span></div>
+            ))}
+            {num(sale.cashReceived) > 0 && <div className="r-row"><span>รับเงินสด</span><span>{num(sale.cashReceived).toFixed(2)}</span></div>}
+            {num(sale.changeDue) > 0 && <div className="r-row"><span>เงินทอน</span><span>{num(sale.changeDue).toFixed(2)}</span></div>}
+          </>
+        ) : (
+          <>
+            <div className="r-row"><span>ชำระโดย</span><span>{PM[sale.paymentMethod] ?? sale.paymentMethod}</span></div>
+            {sale.paymentMethod === 'CASH' && (
+              <>
+                <div className="r-row"><span>รับเงิน</span><span>{num(sale.cashReceived).toFixed(2)}</span></div>
+                <div className="r-row"><span>เงินทอน</span><span>{num(sale.changeDue).toFixed(2)}</span></div>
+              </>
+            )}
           </>
         )}
         {sale.paymentMethod === 'TRANSFER' && <div className="r-center" style={{ marginTop: 4 }}>ชำระผ่าน PromptPay</div>}

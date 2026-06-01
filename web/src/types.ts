@@ -143,6 +143,7 @@ export interface Sale {
   promoNames?: string;
   pointsEarned?: number;
   pointsRedeemed?: number;
+  payments?: SaleTender[];
   taxAmount: string;
   total: string;
   paymentMethod: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT';
@@ -208,6 +209,13 @@ export interface Expense {
   branchId: number | null;
   branch?: { name: string } | null;
   user?: { name: string } | null;
+}
+
+export interface SaleTender {
+  id?: number;
+  method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT';
+  amount: string | number;
+  reference?: string;
 }
 
 export interface HeldBill {

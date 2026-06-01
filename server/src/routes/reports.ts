@@ -67,13 +67,14 @@ reportsRouter.get(
   '/payment-methods',
   ah(async (req, res) => {
     const { from, to, branchId } = range(req);
-    const grouped = await prisma.sale.groupBy({
-      by: ['paymentMethod'],
-      where: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } },
-      _sum: { total: true },
+    // Money per method comes from SalePayment (split-aware); order count is per sale.
+    const grouped = await prisma.salePayment.groupBy({
+      by: ['method'],
+      where: { sale: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } } },
+      _sum: { amount: true },
       _count: { _all: true },
     });
-    res.json(grouped.map((g) => ({ method: g.paymentMethod, total: round2(num(g._sum.total)), orders: g._count._all })));
+    res.json(grouped.map((g) => ({ method: g.method, total: round2(num(g._sum.amount)), orders: g._count._all })));
   })
 );
 
@@ -181,7 +182,7 @@ reportsRouter.get(
 
     const sales = await prisma.sale.findMany({
       where: { branchId, createdAt: { gte: start, lte: end } },
-      include: { cashier: { select: { name: true } } },
+      include: { cashier: { select: { name: true } }, payments: { select: { method: true, amount: true } } },
     });
 
     const byCashier = new Map<string, { cashier: string; orders: number; cash: number; transfer: number; total: number; voids: number }>();
@@ -197,12 +198,11 @@ reportsRouter.get(
       } else {
         row.orders += 1;
         row.total += num(s.total);
-        if (s.paymentMethod === 'CASH') {
-          row.cash += num(s.total);
-          cash += num(s.total);
-        } else {
-          row.transfer += num(s.total);
-          transfer += num(s.total);
+        // Split-aware: cash vs non-cash from the sale's tenders.
+        for (const p of s.payments) {
+          const amt = num(p.amount);
+          if (p.method === 'CASH') { row.cash += amt; cash += amt; }
+          else { row.transfer += amt; transfer += amt; }
         }
       }
       byCashier.set(name, row);
