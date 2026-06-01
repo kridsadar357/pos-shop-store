@@ -238,6 +238,17 @@ export interface Expense {
   user?: { name: string } | null;
 }
 
+export interface TaxInvoice {
+  id: number;
+  number: string;
+  saleId: number;
+  buyerName: string;
+  buyerTaxId: string;
+  buyerAddress: string;
+  buyerBranch: string;
+  issuedAt: string;
+}
+
 export interface SaleTender {
   id?: number;
   method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT' | 'GIFT';

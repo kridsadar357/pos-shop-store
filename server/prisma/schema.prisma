@@ -595,13 +595,30 @@ model Sale {
   member   Member?    @relation(fields: [memberId], references: [id])
   shift    Shift?     @relation(fields: [shiftId], references: [id])
   branch   Branch?    @relation(fields: [branchId], references: [id])
-  items     SaleItem[]
-  returns   Return[]
-  pointTxns PointTransaction[]
-  payments  SalePayment[]
+  items      SaleItem[]
+  returns    Return[]
+  pointTxns  PointTransaction[]
+  payments   SalePayment[]
+  taxInvoice TaxInvoice?
 
   @@index([createdAt])
   @@index([status])
+}
+
+// Full VAT tax invoice (ใบกำกับภาษีเต็มรูป) issued against a sale: captures the
+// buyer's legal name / tax ID / address and an official sequential number.
+model TaxInvoice {
+  id           Int      @id @default(autoincrement())
+  number       String   @unique
+  saleId       Int      @unique
+  buyerName    String
+  buyerTaxId   String   @default("")
+  buyerAddress String   @default("")
+  buyerBranch  String   @default("") // tax branch code, e.g. 00000 = head office
+  issuedAt     DateTime @default(now())
+  userId       Int?
+
+  sale Sale @relation(fields: [saleId], references: [id])
 }
 
 // One tender on a sale. For split/multi-tender bills there are several rows; for

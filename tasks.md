@@ -94,7 +94,10 @@ is already branch-correct).
   `/api/payables` (committed POs with total / paid / outstanding, supplier & status
   filters, summary totals; record-payment capped at the outstanding balance).
   Back-office Payables page with KPIs, payment modal + history, and export
-- ⬜ Full tax invoice (ใบกำกับภาษีเต็มรูป) vs. the current abbreviated receipt
+- ✅ Full tax invoice (ใบกำกับภาษีเต็มรูป) — `TaxInvoice` (1:1 with a sale) capturing
+  buyer legal name / tax ID / address / branch + an official sequential number; issued
+  from the Sales bill detail (idempotent, PAID-only), prints a full A4 VAT invoice with
+  base / VAT / total derived from the inclusive total
 - ✅ Expense tracking & categories — `Expense` model + `/api/expenses` (date-range /
   branch / category filters); back-office Expenses page (ListToolbar + filters +
   Excel/PDF/CSV export, total + by-category summary, CRUD modal). Branch-aware,

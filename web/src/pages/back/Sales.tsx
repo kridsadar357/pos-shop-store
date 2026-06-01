@@ -6,11 +6,12 @@ import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { Modal } from '../../components/Modal';
 import { ReceiptPrint } from '../../components/ReceiptPrint';
+import { TaxInvoiceDoc } from '../../components/TaxInvoiceDoc';
 import { printReceipt } from '../../lib/printing';
 import { makeExporters, type Column } from '../../lib/export';
 import { useBranch } from '../../store/branch';
 import { dateTime, money, num } from '../../lib/format';
-import type { Sale, Setting } from '../../types';
+import type { Sale, Setting, TaxInvoice } from '../../types';
 
 const TYPE_TH: Record<string, string> = { RETAIL: 'ปลีก', WHOLESALE: 'ส่ง' };
 const PAY_TH: Record<string, string> = { CASH: 'เงินสด', TRANSFER: 'โอนเงิน', CARD: 'บัตร', CREDIT: 'เงินเชื่อ' };
@@ -24,6 +25,8 @@ export default function Sales() {
   const [setting, setSetting] = useState<Setting | null>(null);
   const [printSale, setPrintSale] = useState<Sale | null>(null);
   const [detail, setDetail] = useState<Sale | null>(null);
+  const [taxFor, setTaxFor] = useState<Sale | null>(null);
+  const [taxDoc, setTaxDoc] = useState<{ sale: Sale; invoice: TaxInvoice } | null>(null);
 
   const [from, setFrom] = useState(daysAgo(30));
   const [to, setTo] = useState(today());
@@ -186,11 +189,16 @@ export default function Sales() {
             {detail.status === 'PAID' && (
               <button className="btn-ghost flex-1 text-amber-600" onClick={() => navigate(`/back/returns?sale=${detail.id}`)}><i className="fa-solid fa-rotate-left mr-1.5" />คืนสินค้า</button>
             )}
+            {detail.status === 'PAID' && (
+              <button className="btn-ghost flex-1 text-sky-600" onClick={() => { setTaxFor(detail); setDetail(null); }}><i className="fa-solid fa-file-invoice mr-1.5" />ใบกำกับภาษี</button>
+            )}
             <button className="btn-primary flex-1" onClick={() => { doPrint(detail); setDetail(null); }}><i className="fa-solid fa-print mr-1.5" />พิมพ์ใบเสร็จ</button>
           </div>
         </Modal>
       )}
 
+      {taxFor && <TaxInvoiceModal sale={taxFor} onClose={() => setTaxFor(null)} onIssued={(invoice) => { setTaxDoc({ sale: taxFor, invoice }); setTaxFor(null); }} />}
+      {taxDoc && <TaxInvoiceDoc sale={taxDoc.sale} invoice={taxDoc.invoice} setting={setting} onDone={() => setTaxDoc(null)} />}
       {printSale && <ReceiptPrint sale={printSale} setting={setting} onDone={() => setPrintSale(null)} />}
     </div>
   );
@@ -208,6 +216,52 @@ function Sel({ label, value, onChange, options }: { label: string; value: string
 }
 function Info({ label, value }: { label: string; value: string }) {
   return <div><div className="text-[11px] uppercase tracking-wide text-slate-400">{label}</div><div className="font-medium text-ink-900">{value}</div></div>;
+}
+
+/** Enter buyer details and issue (or re-fetch) a full tax invoice for a sale. */
+function TaxInvoiceModal({ sale, onClose, onIssued }: { sale: Sale; onClose: () => void; onIssued: (invoice: TaxInvoice) => void }) {
+  const [buyerName, setBuyerName] = useState(sale.member?.name ?? '');
+  const [buyerTaxId, setBuyerTaxId] = useState('');
+  const [buyerAddress, setBuyerAddress] = useState('');
+  const [buyerBranch, setBuyerBranch] = useState('00000');
+  const [busy, setBusy] = useState(false);
+  const [existing, setExisting] = useState<TaxInvoice | null>(null);
+
+  useEffect(() => {
+    api<TaxInvoice>(`/tax-invoices/sale/${sale.id}`).then(setExisting).catch(() => setExisting(null));
+  }, [sale.id]);
+
+  async function issue() {
+    if (!buyerName.trim()) return toast.error('กรอกชื่อผู้ซื้อ');
+    setBusy(true);
+    try {
+      const invoice = await api<TaxInvoice>(`/tax-invoices/sale/${sale.id}`, { method: 'POST', body: { buyerName: buyerName.trim(), buyerTaxId: buyerTaxId.trim(), buyerAddress: buyerAddress.trim(), buyerBranch: buyerBranch.trim() } });
+      toast.success(`ออกใบกำกับภาษี ${invoice.number}`);
+      onIssued(invoice);
+    } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
+
+  return (
+    <Modal title={`ออกใบกำกับภาษี · ${sale.orderNo}`} onClose={onClose}>
+      {existing && (
+        <div className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-700 ring-1 ring-amber-200">
+          ออกใบกำกับภาษีแล้ว: <strong>{existing.number}</strong> — กดพิมพ์ซ้ำได้เลย
+        </div>
+      )}
+      <div className="space-y-3">
+        <div><label className="label">ชื่อผู้ซื้อ (นิติบุคคล/บุคคล)</label><input className="input" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} /></div>
+        <div><label className="label">เลขประจำตัวผู้เสียภาษี</label><input className="input font-mono" value={buyerTaxId} onChange={(e) => setBuyerTaxId(e.target.value)} placeholder="0000000000000" /></div>
+        <div><label className="label">ที่อยู่</label><textarea className="input" rows={2} value={buyerAddress} onChange={(e) => setBuyerAddress(e.target.value)} /></div>
+        <div><label className="label">สาขา</label><input className="input" value={buyerBranch} onChange={(e) => setBuyerBranch(e.target.value)} placeholder="00000 = สำนักงานใหญ่" /></div>
+      </div>
+      <div className="mt-5 flex gap-2">
+        <button className="btn-ghost flex-1" onClick={onClose}>ยกเลิก</button>
+        {existing
+          ? <button className="btn-primary flex-1" onClick={() => onIssued(existing)}><i className="fa-solid fa-print mr-1.5" />พิมพ์ใบเดิม</button>
+          : <button className="btn-primary flex-1" disabled={busy} onClick={issue}>ออกและพิมพ์</button>}
+      </div>
+    </Modal>
+  );
 }
 function Row({ label, value }: { label: string; value: string }) {
   return <div className="flex items-center justify-between text-slate-600"><span>{label}</span><span>{value}</span></div>;

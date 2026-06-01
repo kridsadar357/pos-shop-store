@@ -28,6 +28,7 @@ import { auditRouter } from './routes/audit.js';
 import { payablesRouter } from './routes/payables.js';
 import { giftCardsRouter } from './routes/giftcards.js';
 import { quotationsRouter } from './routes/quotations.js';
+import { taxInvoicesRouter } from './routes/taxInvoices.js';
 import { auditLogger } from './middleware/audit.js';
 
 export function createApp() {
@@ -69,6 +70,7 @@ export function createApp() {
   app.use('/api/payables', payablesRouter);
   app.use('/api/gift-cards', giftCardsRouter);
   app.use('/api/quotations', quotationsRouter);
+  app.use('/api/tax-invoices', taxInvoicesRouter);
 
   // Central error handler.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
