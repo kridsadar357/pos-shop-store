@@ -87,6 +87,8 @@ export interface Shift {
   note: string;
   totals?: ShiftTotals;
   user?: { name: string };
+  branchId?: number | null;
+  branch?: { name: string } | null;
 }
 
 export interface SaleItem {
@@ -229,6 +231,8 @@ export interface Movement {
   refType: string;
   note: string;
   createdAt: string;
+  branchId?: number | null;
   product?: { name: string; sku: string };
   user?: { name: string } | null;
+  branch?: { name: string } | null;
 }

@@ -13,6 +13,7 @@ inventoryRouter.get(
   ah(async (req, res) => {
     const productId = req.query.productId ? Number(req.query.productId) : undefined;
     const type = req.query.type ? String(req.query.type) : undefined;
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
     const from = req.query.from ? new Date(String(req.query.from)) : undefined;
     const to = req.query.to ? new Date(String(req.query.to)) : undefined;
 
@@ -20,9 +21,10 @@ inventoryRouter.get(
       where: {
         productId,
         type: type as any,
+        branchId,
         createdAt: { gte: from, lte: to },
       },
-      include: { product: { select: { name: true, sku: true } }, user: { select: { name: true } } },
+      include: { product: { select: { name: true, sku: true } }, user: { select: { name: true } }, branch: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
       take: 500,
     });

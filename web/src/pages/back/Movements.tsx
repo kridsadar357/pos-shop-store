@@ -3,11 +3,12 @@ import { api } from '../../api/client';
 import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { makeExporters, type Column } from '../../lib/export';
+import { useBranch } from '../../store/branch';
 import { dateTime } from '../../lib/format';
 import type { Movement } from '../../types';
 
-const TYPES = ['', 'RECEIVE', 'SALE', 'RETURN', 'ADJUST', 'COUNT', 'VOID'];
-const TYPE_TH: Record<string, string> = { '': 'ทุกประเภท', RECEIVE: 'รับเข้า', SALE: 'ขาย', RETURN: 'รับคืน', ADJUST: 'ปรับปรุง', COUNT: 'นับสต็อก', VOID: 'ยกเลิก' };
+const TYPES = ['', 'RECEIVE', 'SALE', 'RETURN', 'ADJUST', 'COUNT', 'VOID', 'TRANSFER'];
+const TYPE_TH: Record<string, string> = { '': 'ทุกประเภท', RECEIVE: 'รับเข้า', SALE: 'ขาย', RETURN: 'รับคืน', ADJUST: 'ปรับปรุง', COUNT: 'นับสต็อก', VOID: 'ยกเลิก', TRANSFER: 'โอนสาขา' };
 const COLOR: Record<string, string> = {
   RECEIVE: 'bg-emerald-50 text-emerald-700',
   SALE: 'bg-brand-50 text-brand-700',
@@ -15,22 +16,25 @@ const COLOR: Record<string, string> = {
   ADJUST: 'bg-violet-50 text-violet-700',
   COUNT: 'bg-cyan-50 text-cyan-700',
   VOID: 'bg-rose-50 text-rose-600',
+  TRANSFER: 'bg-indigo-50 text-indigo-700',
 };
 
 function today() { return new Date().toISOString().slice(0, 10); }
 function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
 export default function Movements() {
+  const branches = useBranch((s) => s.branches);
   const [rows, setRows] = useState<Movement[]>([]);
   const [type, setType] = useState('');
+  const [branch, setBranch] = useState('');
   const [q, setQ] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
   async function load() {
-    setRows(await api<Movement[]>('/inventory/movements', { query: { type } }));
+    setRows(await api<Movement[]>('/inventory/movements', { query: { type, branchId: branch || undefined } }));
   }
-  useEffect(() => { load(); }, [type]);
+  useEffect(() => { load(); }, [type, branch]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -43,7 +47,7 @@ export default function Movements() {
     });
   }, [rows, q, from, to]);
 
-  const filterCount = [type, from, to].filter(Boolean).length;
+  const filterCount = [type, branch, from, to].filter(Boolean).length;
 
   const columns: Column<Movement>[] = [
     { label: 'วันที่', value: (r) => dateTime(r.createdAt) },
@@ -66,9 +70,18 @@ export default function Movements() {
         q={q} setQ={setQ} placeholder="กรองตามสินค้า / SKU…"
         exports={exporters}
         filterCount={filterCount}
-        onResetFilter={() => { setType(''); setFrom(''); setTo(''); }}
+        onResetFilter={() => { setType(''); setBranch(''); setFrom(''); setTo(''); }}
         filter={
           <>
+            {branches.length > 1 && (
+              <div>
+                <label className="label">สาขา</label>
+                <select className="input" value={branch} onChange={(e) => setBranch(e.target.value)}>
+                  <option value="">ทุกสาขา</option>
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+            )}
             <div>
               <label className="label">ประเภทความเคลื่อนไหว</label>
               <select className="input" value={type} onChange={(e) => setType(e.target.value)}>

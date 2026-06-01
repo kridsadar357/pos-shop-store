@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { api } from '../../api/client';
 import { money } from '../../lib/format';
-import { toast } from '../../components/Toast';
+import { useBranch } from '../../store/branch';
 
 interface Kpi { value: number; deltaPct: number | null; series: { x: string; y: number }[]; }
 interface Dash {
@@ -28,14 +28,16 @@ const NOTE_TONE: Record<string, string> = { amber: 'bg-amber-50 text-amber-600',
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const branches = useBranch((s) => s.branches);
   const [from, setFrom] = useState(daysAgoISO(23));
   const [to, setTo] = useState(todayISO());
+  const [branchId, setBranchId] = useState('');
   const [d, setD] = useState<Dash | null>(null);
 
   useEffect(() => {
-    const range = { from: new Date(from).toISOString(), to: new Date(to + 'T23:59:59').toISOString() };
-    api<Dash>('/reports/dashboard', { query: range }).then(setD).catch(() => setD(null));
-  }, [from, to]);
+    const query = { from: new Date(from).toISOString(), to: new Date(to + 'T23:59:59').toISOString(), branchId: branchId || undefined };
+    api<Dash>('/reports/dashboard', { query }).then(setD).catch(() => setD(null));
+  }, [from, to, branchId]);
 
   const k = d?.kpis;
   const channelTotal = d?.byChannel.reduce((s, c) => s + c.value, 0) ?? 0;
@@ -55,7 +57,15 @@ export default function Dashboard() {
             <span className="text-slate-400">–</span>
             <input type="date" className="bg-transparent text-sm outline-none" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
-          <button className="btn-ghost" onClick={() => toast.info('ตัวกรองเพิ่มเติมกำลังจะมาเร็ว ๆ นี้')}>⛃ ตัวกรอง</button>
+          {branches.length > 1 && (
+            <div className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200">
+              <i className="fa-solid fa-code-branch text-slate-400" />
+              <select className="bg-transparent text-sm outline-none" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                <option value="">ทุกสาขา</option>
+                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

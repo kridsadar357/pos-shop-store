@@ -310,6 +310,7 @@ reportsRouter.get(
   '/dashboard',
   ah(async (req, res) => {
     const { from, to } = range(req);
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
     const spanMs = to.getTime() - from.getTime();
     const prevFrom = new Date(from.getTime() - spanMs);
     const prevTo = new Date(from.getTime());
@@ -319,14 +320,16 @@ reportsRouter.get(
     const [setting, curSales, prevSales, newCust, prevCust, products] = await Promise.all([
       prisma.setting.findUniqueOrThrow({ where: { id: 1 } }),
       prisma.sale.findMany({
-        where: { status: 'PAID', createdAt: { gte: from, lte: to } },
+        where: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } },
         include: { items: { select: { productId: true, qty: true, lineTotal: true, unitCost: true, nameSnapshot: true, product: { select: { category: { select: { name: true } } } } } } },
       }),
-      prisma.sale.findMany({ where: { status: 'PAID', createdAt: { gte: prevFrom, lt: prevTo } }, include: { items: { select: { unitCost: true, qty: true } } } }),
+      prisma.sale.findMany({ where: { status: 'PAID', branchId, createdAt: { gte: prevFrom, lt: prevTo } }, include: { items: { select: { unitCost: true, qty: true } } } }),
       prisma.member.count({ where: { createdAt: { gte: from, lte: to } } }),
       prisma.member.count({ where: { createdAt: { gte: prevFrom, lt: prevTo } } }),
-      prisma.product.findMany({ where: { isActive: true }, select: { stockQty: true, reorderLevel: true, cost: true } }),
+      prisma.product.findMany({ where: { isActive: true }, select: { stockQty: true, reorderLevel: true, cost: true, ...(branchId ? { branchStock: { where: { branchId }, select: { qty: true } } } : {}) } as any }),
     ]);
+    // Effective on-hand for inventory metrics (branch view uses BranchStock).
+    const onHand = (p: any) => (branchId ? (p.branchStock?.[0]?.qty ?? 0) : p.stockQty);
 
     const sumSales = (rows: typeof curSales) => {
       let rev = 0, tax = 0, cogs = 0;
@@ -368,12 +371,12 @@ reportsRouter.get(
     const topCategories = [...catMap.entries()].map(([name, v]) => ({ name, revenue: round2(v) })).sort((a, b) => b.revenue - a.revenue).slice(0, 5).map((c, i) => ({ rank: i + 1, ...c }));
 
     // inventory metrics
-    const lowStock = products.filter((p) => p.stockQty <= p.reorderLevel).length;
-    const outOfStock = products.filter((p) => p.stockQty <= 0).length;
-    const inventoryValue = round2(products.reduce((a, p) => a + num(p.cost) * p.stockQty, 0));
+    const lowStock = products.filter((p) => onHand(p) <= p.reorderLevel).length;
+    const outOfStock = products.filter((p) => onHand(p) <= 0).length;
+    const inventoryValue = round2(products.reduce((a, p) => a + num(p.cost) * onHand(p), 0));
     const [openCounts, creditSales] = await Promise.all([
       prisma.stockCount.count({ where: { status: 'OPEN' } }),
-      prisma.sale.count({ where: { status: 'PAID', paymentMethod: 'CREDIT', createdAt: { gte: from, lte: to } } }),
+      prisma.sale.count({ where: { status: 'PAID', branchId, paymentMethod: 'CREDIT', createdAt: { gte: from, lte: to } } }),
     ]);
 
     const notifications = [

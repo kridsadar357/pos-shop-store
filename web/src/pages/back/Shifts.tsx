@@ -3,15 +3,18 @@ import { api } from '../../api/client';
 import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { makeExporters, type Column } from '../../lib/export';
+import { useBranch } from '../../store/branch';
 import { dateTime, money, num } from '../../lib/format';
 import type { Shift } from '../../types';
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
 export default function Shifts() {
+  const branches = useBranch((s) => s.branches);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [branch, setBranch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
@@ -26,12 +29,13 @@ export default function Shifts() {
     return shifts.filter((s) => {
       if (term && !s.user?.name?.toLowerCase().includes(term)) return false;
       if (status && s.status !== status) return false;
+      if (branch && s.branchId !== Number(branch)) return false;
       const ts = new Date(s.openedAt).getTime();
       return ts >= fromTs && ts <= toTs;
     });
-  }, [shifts, q, status, from, to]);
+  }, [shifts, q, status, branch, from, to]);
 
-  const filterCount = [status, from, to].filter(Boolean).length;
+  const filterCount = [status, branch, from, to].filter(Boolean).length;
 
   const columns: Column<Shift>[] = [
     { label: '#', value: (s) => s.id },
@@ -55,9 +59,18 @@ export default function Shifts() {
         q={q} setQ={setQ} placeholder="ค้นหาแคชเชียร์…"
         exports={exporters}
         filterCount={filterCount}
-        onResetFilter={() => { setStatus(''); setFrom(''); setTo(''); }}
+        onResetFilter={() => { setStatus(''); setBranch(''); setFrom(''); setTo(''); }}
         filter={
           <>
+            {branches.length > 1 && (
+              <div>
+                <label className="label">สาขา</label>
+                <select className="input" value={branch} onChange={(e) => setBranch(e.target.value)}>
+                  <option value="">ทุกสาขา</option>
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+            )}
             <div>
               <label className="label">สถานะกะ</label>
               <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>

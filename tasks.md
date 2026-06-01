@@ -22,10 +22,11 @@ Legend: ⬜ not started · 🟨 partial (notes)
   picker; defaults to the active branch)
 - ✅ POS reads **branch** stock for availability — products, out-of-stock KPIs and
   badges are scoped to the terminal's active branch (branch selector in the header)
+- ✅ Branch filter on **Dashboard, Movements, Shifts** (+ Sales); the no-branch
+  view is the consolidated all-branch dashboard
 - ⬜ Branch-scoped **stock count** (counts still compare against head-office on-hand)
 - ⬜ Per-branch settings (printer, PromptPay, receipt)
-- ⬜ Branch filter on Movements, Shifts, Reports & Dashboard (Sales done)
-- ⬜ Consolidated (all-branch) dashboard & reports
+- ⬜ Branch filter on the **Reports page** report types (dashboard/movements/shifts/sales done)
 
 ## 2. Hardware & printing
 - 🟨 ESC/POS **USB** printing — only network (port 9100) is implemented; USB needs a local print agent/bridge

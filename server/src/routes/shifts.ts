@@ -87,7 +87,7 @@ shiftsRouter.get(
     const shifts = await prisma.shift.findMany({
       orderBy: { openedAt: 'desc' },
       take: 100,
-      include: { user: { select: { name: true } } },
+      include: { user: { select: { name: true } }, branch: { select: { name: true } } },
     });
     res.json(shifts);
   })
