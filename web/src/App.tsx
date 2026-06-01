@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { isBackStore, useAuth, type Role } from './store/auth';
+import { useBranch } from './store/branch';
 import { api, setOnUnauthorized } from './api/client';
 import { ToastHost } from './components/Toast';
 import type { LicenseState } from './types';
@@ -28,6 +29,7 @@ const Promotions = lazy(() => import('./pages/back/Promotions'));
 const Shifts = lazy(() => import('./pages/back/Shifts'));
 const Settings = lazy(() => import('./pages/back/Settings'));
 const Users = lazy(() => import('./pages/back/Users'));
+const Branches = lazy(() => import('./pages/back/Branches'));
 
 function Loader() {
   return <div className="grid min-h-screen place-items-center bg-ink-950 text-brand-300"><i className="fa-solid fa-spinner fa-spin text-3xl" /></div>;
@@ -56,7 +58,7 @@ export default function App() {
     api<{ setupCompleted: boolean }>('/setup/status').then((r) => setSetupDone(r.setupCompleted)).catch(() => setSetupDone(true));
     refreshLicense();
   }, []);
-  useEffect(() => { if (user) refreshLicense(); }, [user]);
+  useEffect(() => { if (user) { refreshLicense(); useBranch.getState().load(); } }, [user]);
 
   // Wait until we know whether first-run setup is needed (avoids a flash).
   if (setupDone === null) {
@@ -105,6 +107,7 @@ export default function App() {
           <Route path="shifts" element={<Shifts />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="branches" element={<Branches />} />
           <Route path="users" element={<Users />} />
         </Route>
 

@@ -26,6 +26,13 @@ async function main() {
     },
   });
 
+  // --- Default branch (Phase 1 multi-branch) ---
+  await prisma.branch.upsert({
+    where: { code: 'HQ' },
+    update: {},
+    create: { code: 'HQ', name: 'สำนักงานใหญ่', address: '123 Market Rd, Bangkok 10100', phone: '02-123-4567', isDefault: true },
+  });
+
   // --- License (singleton) — seed a 14-day demo so the trial flow is visible ---
   const demoStart = new Date();
   await prisma.license.upsert({

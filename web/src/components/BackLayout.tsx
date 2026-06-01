@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/auth';
+import { useBranch } from '../store/branch';
 import { api } from '../api/client';
 import { ProductImage } from './ProductImage';
 import { money } from '../lib/format';
@@ -52,6 +53,7 @@ const GROUPS: NavGroup[] = [
     title: 'ตั้งค่าระบบ',
     items: [
       { to: '/back/settings', label: 'ตั้งค่า', icon: 'fa-gear' },
+      { to: '/back/branches', label: 'สาขา', icon: 'fa-code-branch', adminOnly: true },
       { to: '/back/users', label: 'ผู้ใช้งานระบบ', icon: 'fa-user-shield', adminOnly: true },
     ],
   },
@@ -125,14 +127,7 @@ export function BackLayout() {
 
         {/* Branch + user + version */}
         <div className="space-y-2 border-t border-white/10 p-3">
-          <div className="rounded-xl bg-white/5 p-2.5 ring-1 ring-white/10">
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> สาขาเริ่มต้น (สำนักงานใหญ่)
-            </div>
-            <button onClick={() => toast.info('ระบบหลายสาขากำลังจะมาเร็ว ๆ นี้')} className="mt-2 w-full rounded-lg bg-white/10 py-1.5 text-xs font-semibold text-white hover:bg-white/15">
-              <i className="fa-solid fa-arrows-rotate mr-1.5" /> เปลี่ยนสาขา
-            </button>
-          </div>
+          <BranchSwitcher />
           <div className="flex items-center gap-2.5 rounded-xl px-1 py-1">
             <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white">{user?.name?.charAt(0)}</div>
             <div className="min-w-0 leading-tight">
@@ -286,6 +281,30 @@ function SearchPalette({ onClose, navigate }: { onClose: () => void; navigate: (
 
 function Grp({ label }: { label: string }) {
   return <div className="bg-slate-50 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</div>;
+}
+
+/** Sidebar branch selector (Phase 1 multi-branch). */
+function BranchSwitcher() {
+  const { branches, activeId, setActive, active } = useBranch();
+  const current = active();
+  return (
+    <div className="rounded-xl bg-white/5 p-2.5 ring-1 ring-white/10">
+      <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> สาขาปัจจุบัน
+      </div>
+      {branches.length > 1 ? (
+        <select
+          value={activeId ?? current?.id ?? ''}
+          onChange={(e) => setActive(Number(e.target.value))}
+          className="mt-2 w-full rounded-lg bg-white/10 px-2 py-1.5 text-xs font-semibold text-white outline-none ring-1 ring-white/10 hover:bg-white/15"
+        >
+          {branches.map((b) => <option key={b.id} value={b.id} className="text-slate-900">{b.name}{b.isDefault ? ' (สำนักงานใหญ่)' : ''}</option>)}
+        </select>
+      ) : (
+        <div className="mt-1 truncate text-sm font-bold text-white">{current?.name ?? 'สำนักงานใหญ่'}</div>
+      )}
+    </div>
+  );
 }
 
 /** Topbar notifications — live low-stock / reorder alerts from the inventory. */

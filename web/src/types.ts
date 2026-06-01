@@ -116,8 +116,10 @@ export interface Sale {
   qrPayload: string;
   createdAt: string;
   memberId?: number | null;
+  branchId?: number | null;
   cashier?: { name: string };
   member?: { name: string; phone: string } | null;
+  branch?: { name: string } | null;
   items: SaleItem[];
 }
 

@@ -9,6 +9,7 @@ import { ProductImage } from '../../components/ProductImage';
 import { QRCanvas } from '../../components/QRCode';
 import { ReceiptPrint } from '../../components/ReceiptPrint';
 import { printReceipt } from '../../lib/printing';
+import { useBranch } from '../../store/branch';
 import { ShiftGate, CloseShiftModal } from './ShiftModals';
 import { MemberPicker } from './MemberWidget';
 import { PosSidebar } from './PosSidebar';
@@ -215,7 +216,7 @@ export default function POS() {
         body: {
           type: mode, paymentMethod: method, discount: totals.manualDisc, couponCode: coupon,
           cashReceived: method === 'CASH' ? cashReceived : 0,
-          paymentRef: ref, memberId: member?.id ?? null,
+          paymentRef: ref, memberId: member?.id ?? null, branchId: useBranch.getState().activeId ?? undefined,
           items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
         },
       });

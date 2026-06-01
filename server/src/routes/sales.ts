@@ -17,6 +17,7 @@ const checkoutSchema = z.object({
   cashReceived: z.number().nonnegative().default(0),
   paymentRef: z.string().default(''),
   memberId: z.number().int().nullable().optional(),
+  branchId: z.number().int().nullable().optional(),
   items: z
     .array(z.object({ productId: z.number().int(), qty: z.number().int().positive() }))
     .min(1),
@@ -48,6 +49,10 @@ salesRouter.post(
     const sale = await prisma.$transaction(async (tx) => {
       // Attach to the cashier's open shift, if any.
       const openShift = await tx.shift.findFirst({ where: { userId: cashierId, status: 'OPEN' } });
+
+      // Attribute the sale to a branch (explicit → the shift's branch → default).
+      let branchId = data.branchId ?? openShift?.branchId ?? null;
+      if (!branchId) branchId = (await tx.branch.findFirst({ where: { isDefault: true } }))?.id ?? null;
 
       const ids = data.items.map((i) => i.productId);
       const products = await tx.product.findMany({ where: { id: { in: ids } } });
@@ -148,6 +153,7 @@ salesRouter.post(
           cashierId,
           memberId,
           shiftId: openShift?.id ?? null,
+          branchId,
           items: { create: lineData },
         },
         include: { items: true, member: { select: { name: true, phone: true } } },
@@ -178,9 +184,10 @@ salesRouter.get(
   ah(async (req, res) => {
     const from = req.query.from ? new Date(String(req.query.from)) : undefined;
     const to = req.query.to ? new Date(String(req.query.to)) : undefined;
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
     const sales = await prisma.sale.findMany({
-      where: { createdAt: { gte: from, lte: to } },
-      include: { cashier: { select: { name: true } }, items: true },
+      where: { createdAt: { gte: from, lte: to }, branchId },
+      include: { cashier: { select: { name: true } }, branch: { select: { name: true } }, items: true },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });

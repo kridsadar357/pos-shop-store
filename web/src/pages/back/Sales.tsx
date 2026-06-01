@@ -8,6 +8,7 @@ import { Modal } from '../../components/Modal';
 import { ReceiptPrint } from '../../components/ReceiptPrint';
 import { printReceipt } from '../../lib/printing';
 import { makeExporters, type Column } from '../../lib/export';
+import { useBranch } from '../../store/branch';
 import { dateTime, money, num } from '../../lib/format';
 import type { Sale, Setting } from '../../types';
 
@@ -30,6 +31,8 @@ export default function Sales() {
   const [pay, setPay] = useState('');
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
+  const [branch, setBranch] = useState('');
+  const branches = useBranch((s) => s.branches);
 
   async function load() {
     setSales(await api<Sale[]>('/sales', { query: { from: `${from}T00:00:00`, to: `${to}T23:59:59` } }));
@@ -52,11 +55,12 @@ export default function Sales() {
       (!term || s.orderNo.toLowerCase().includes(term) || s.cashier?.name?.toLowerCase().includes(term) || s.member?.name?.toLowerCase().includes(term)) &&
       (!pay || s.paymentMethod === pay) &&
       (!type || s.type === type) &&
-      (!status || s.status === status)
+      (!status || s.status === status) &&
+      (!branch || s.branchId === Number(branch))
     );
-  }, [sales, q, pay, type, status]);
+  }, [sales, q, pay, type, status, branch]);
 
-  const filterCount = [pay, type, status].filter(Boolean).length;
+  const filterCount = [pay, type, status, branch].filter(Boolean).length;
   const doPrint = (sale: Sale) => printReceipt(sale, setting, () => setPrintSale(sale));
 
   const columns: Column<Sale>[] = [
@@ -99,9 +103,10 @@ export default function Sales() {
         }
         exports={exporters}
         filterCount={filterCount}
-        onResetFilter={() => { setPay(''); setType(''); setStatus(''); }}
+        onResetFilter={() => { setPay(''); setType(''); setStatus(''); setBranch(''); }}
         filter={
           <>
+            {branches.length > 1 && <Sel label="สาขา" value={branch} onChange={setBranch} options={[['', 'ทุกสาขา'], ...branches.map((b) => [String(b.id), b.name] as [string, string])]} />}
             <Sel label="วิธีชำระเงิน" value={pay} onChange={setPay} options={[['', 'ทั้งหมด'], ['CASH', 'เงินสด'], ['TRANSFER', 'โอนเงิน'], ['CARD', 'บัตร'], ['CREDIT', 'เงินเชื่อ']]} />
             <Sel label="ประเภทการขาย" value={type} onChange={setType} options={[['', 'ทั้งหมด'], ['RETAIL', 'ปลีก'], ['WHOLESALE', 'ส่ง']]} />
             <Sel label="สถานะ" value={status} onChange={setStatus} options={[['', 'ทั้งหมด'], ['PAID', 'ชำระแล้ว'], ['VOID', 'ยกเลิก']]} />

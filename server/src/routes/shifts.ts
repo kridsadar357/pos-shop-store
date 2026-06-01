@@ -43,10 +43,11 @@ shiftsRouter.get(
 shiftsRouter.post(
   '/open',
   ah(async (req, res) => {
-    const { openingFloat } = z.object({ openingFloat: z.number().nonnegative().default(0) }).parse(req.body);
+    const { openingFloat, branchId } = z.object({ openingFloat: z.number().nonnegative().default(0), branchId: z.number().int().nullable().optional() }).parse(req.body);
     const existing = await prisma.shift.findFirst({ where: { userId: req.user!.id, status: 'OPEN' } });
     if (existing) return res.status(400).json({ error: 'A shift is already open' });
-    const shift = await prisma.shift.create({ data: { userId: req.user!.id, openingFloat } });
+    const resolvedBranch = branchId ?? (await prisma.branch.findFirst({ where: { isDefault: true } }))?.id ?? null;
+    const shift = await prisma.shift.create({ data: { userId: req.user!.id, openingFloat, branchId: resolvedBranch } });
     res.status(201).json(shift);
   })
 );

@@ -21,6 +21,7 @@ import { setupRouter } from './routes/setup.js';
 import { printRouter } from './routes/print.js';
 import { purchaseOrdersRouter } from './routes/purchaseOrders.js';
 import { returnsRouter } from './routes/returns.js';
+import { branchesRouter } from './routes/branches.js';
 
 export function createApp() {
   const app = express();
@@ -51,6 +52,7 @@ export function createApp() {
   app.use('/api/print', printRouter);
   app.use('/api/purchase-orders', purchaseOrdersRouter);
   app.use('/api/returns', returnsRouter);
+  app.use('/api/branches', branchesRouter);
 
   // Central error handler.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

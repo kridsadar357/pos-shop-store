@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import { useBranch } from './branch';
 import type { Shift } from '../types';
 
 interface ShiftState {
@@ -25,7 +26,8 @@ export const useShift = create<ShiftState>((set, get) => ({
     }
   },
   async open(openingFloat) {
-    await api('/shifts/open', { method: 'POST', body: { openingFloat } });
+    const branchId = useBranch.getState().activeId ?? undefined;
+    await api('/shifts/open', { method: 'POST', body: { openingFloat, branchId } });
     await get().refresh();
   },
   async close(countedCash, note) {
