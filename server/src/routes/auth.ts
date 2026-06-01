@@ -31,3 +31,20 @@ authRouter.get(
     res.json({ user: req.user });
   })
 );
+
+// Self-service: the signed-in user changes their own password.
+authRouter.post(
+  '/change-password',
+  requireAuth,
+  ah(async (req, res) => {
+    const { currentPassword, newPassword } = z
+      .object({ currentPassword: z.string().min(1), newPassword: z.string().min(4) })
+      .parse(req.body);
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } });
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      return res.status(400).json({ error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
+    }
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(newPassword, 10) } });
+    res.json({ ok: true });
+  })
+);

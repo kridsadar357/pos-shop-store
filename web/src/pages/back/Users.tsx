@@ -10,6 +10,8 @@ interface U { id: number; username: string; name: string; role: string; isActive
 export default function Users() {
   const [users, setUsers] = useState<U[]>([]);
   const [form, setForm] = useState<{ username: string; name: string; password: string; role: string } | null>(null);
+  const [resetFor, setResetFor] = useState<U | null>(null);
+  const [newPw, setNewPw] = useState('');
 
   async function load() { setUsers(await api<U[]>('/users')); }
   useEffect(() => { load(); }, []);
@@ -29,6 +31,17 @@ export default function Users() {
   async function toggle(u: U) {
     await api(`/users/${u.id}`, { method: 'PUT', body: { isActive: !u.isActive } });
     load();
+  }
+
+  async function resetPassword() {
+    if (!resetFor) return;
+    if (newPw.length < 4) return toast.error('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร');
+    try {
+      await api(`/users/${resetFor.id}`, { method: 'PUT', body: { password: newPw } });
+      toast.success(`รีเซ็ตรหัสผ่านของ ${resetFor.name} แล้ว`);
+      setResetFor(null);
+      setNewPw('');
+    } catch (e) { toast.error((e as Error).message); }
   }
 
   return (
@@ -51,7 +64,10 @@ export default function Users() {
             <td className="px-4 py-3 text-slate-500">{u.username}</td>
             <td className="px-4 py-3"><span className="chip bg-brand-50 text-brand-700">{({ ADMIN: 'ผู้ดูแลระบบ', MANAGER: 'ผู้จัดการ', CASHIER: 'แคชเชียร์' } as Record<string, string>)[u.role] ?? u.role}</span></td>
             <td className="px-4 py-3"><span className={`chip ${u.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{u.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
-            <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => toggle(u)}>{u.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</button></td>
+            <td className="px-4 py-3 text-right whitespace-nowrap">
+              <button className="text-sm font-semibold text-amber-600" onClick={() => { setResetFor(u); setNewPw(''); }}>รีเซ็ตรหัสผ่าน</button>
+              <button className="ml-3 text-sm font-semibold text-brand-600" onClick={() => toggle(u)}>{u.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</button>
+            </td>
           </tr>
         )}
       />
@@ -69,6 +85,14 @@ export default function Users() {
             </div>
           </div>
           <div className="mt-5 flex gap-2"><button className="btn-ghost flex-1" onClick={() => setForm(null)}>ยกเลิก</button><button className="btn-primary flex-1" onClick={create}>สร้าง</button></div>
+        </Modal>
+      )}
+
+      {resetFor && (
+        <Modal title={`รีเซ็ตรหัสผ่าน · ${resetFor.name}`} onClose={() => setResetFor(null)}>
+          <div><label className="label">รหัสผ่านใหม่</label><input className="input" type="text" autoFocus value={newPw} onChange={(e) => setNewPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && resetPassword()} placeholder="อย่างน้อย 4 ตัวอักษร" /></div>
+          <p className="mt-2 text-xs text-slate-400">ผู้ใช้จะเข้าสู่ระบบด้วยรหัสผ่านนี้ และควรเปลี่ยนเองภายหลัง</p>
+          <div className="mt-5 flex gap-2"><button className="btn-ghost flex-1" onClick={() => setResetFor(null)}>ยกเลิก</button><button className="btn-primary flex-1" disabled={newPw.length < 4} onClick={resetPassword}>รีเซ็ต</button></div>
         </Modal>
       )}
     </div>

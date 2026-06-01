@@ -126,7 +126,10 @@ is already branch-correct).
   ADMIN-only viewer page (`/back/audit`) with search / date-range / method filters
   and export
 - ⬜ Per-user PIN / quick cashier switch on the POS
-- ⬜ Password reset / forgot-password flow
+- ✅ Password management — self-service **change password** (`/api/auth/change-password`,
+  verifies current; available to every role from the back-office user menu and the POS
+  More menu) + admin **reset password** per user on the Users page (PUT). (True
+  forgot-password email flow still pending — no mail infra.)
 - ⬜ Online license re-validation + grace handling (currently activate/demo only)
 
 ## 8. Platform / offline / PWA
