@@ -143,10 +143,39 @@ input[type='number']::-webkit-inner-spin-button {
 .report-paper tfoot td { background: #f1f5f9; font-weight: 800; }
 @page report { size: A4 landscape; margin: 10mm; }
 
+/* ---------- Product / shelf label printing (A4 grid of labels) ---------- */
+.label-print { position: fixed; left: -9999px; top: 0; }
+.label-sheet {
+  page: label;
+  display: grid;
+  gap: 3mm;
+  font-family: 'Prompt', 'Sarabun', sans-serif;
+  color: #000;
+  background: #fff;
+}
+.label-cell {
+  border: 1px dashed #cbd5e1;
+  border-radius: 4px;
+  padding: 3mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+}
+.label-cell .l-name { font-size: 11px; font-weight: 700; line-height: 1.2; max-height: 2.4em; overflow: hidden; }
+.label-cell .l-price { font-size: 18px; font-weight: 800; }
+.label-cell svg { max-width: 100%; height: auto; }
+@page label { size: A4; margin: 8mm; }
+
 @media print {
   body * { visibility: hidden !important; }
   .receipt-print, .receipt-print *,
-  .report-print, .report-print * { visibility: visible !important; }
+  .report-print, .report-print *,
+  .label-print, .label-print * { visibility: visible !important; }
   .receipt-print { position: absolute; left: 0; top: 0; }
   .report-print { position: absolute; left: 0; top: 0; width: 100%; }
+  .label-print { position: absolute; left: 0; top: 0; width: 100%; }
+  .label-cell { border-color: transparent; }
 }

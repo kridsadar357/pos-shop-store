@@ -30,6 +30,7 @@ const GROUPS: NavGroup[] = [
     title: 'สินค้าคงคลัง',
     items: [
       { to: '/back/products', label: 'สินค้า', icon: 'fa-box' },
+      { to: '/back/labels', label: 'พิมพ์ป้ายราคา/บาร์โค้ด', icon: 'fa-barcode' },
       { to: '/back/movements', label: 'คลังสินค้า', icon: 'fa-warehouse' },
       { to: '/back/transfers', label: 'โอนสินค้าระหว่างสาขา', icon: 'fa-right-left' },
       { to: '/back/purchase-orders', label: 'ใบสั่งซื้อ', icon: 'fa-file-invoice-dollar' },

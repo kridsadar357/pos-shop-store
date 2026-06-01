@@ -38,7 +38,9 @@ is already branch-correct).
 - 🟨 ESC/POS **USB** printing — only network (port 9100) is implemented; USB needs a local print agent/bridge
 - ⬜ Cash-drawer kick (ESC/POS drawer pulse on cash payment)
 - ⬜ Configurable Thai code page in the UI (currently env `ESCPOS_THAI_CODEPAGE`)
-- ⬜ Barcode / shelf-label printing (product labels with barcode + price)
+- ✅ Barcode / shelf-label printing — `Labels` page: pick products (search/category),
+  set copies + labels-per-row + retail/wholesale price, print an A4 grid of labels with
+  a CODE128 barcode (jsbarcode) of each product's barcode/SKU, name, and price
 - ⬜ Customer pole display (VFD) support
 
 ## 3. Inventory depth
