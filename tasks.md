@@ -62,7 +62,9 @@ is already branch-correct).
 - ⬜ Quotations / proforma → convert to sale
 - ⬜ Layaway / deposits / partial payment
 - ⬜ Split / multi-tender payments on one bill
-- 🟨 Promotion **scheduling UI** — `startsAt`/`endsAt` exist in the schema but aren't editable in the Promotions form
+- ✅ Promotion **scheduling UI** — `startsAt`/`endsAt` editable in the Promotions
+  form (datetime-local), with scheduled/active/expired status chips + date range in
+  the list; the POS already enforces the window via `activePromotions()`
 - ⬜ Gift cards / store credit (esp. as a refund option)
 - ⬜ Email / SMS / LINE receipt delivery
 

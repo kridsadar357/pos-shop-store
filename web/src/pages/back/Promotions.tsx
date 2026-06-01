@@ -24,6 +24,8 @@ interface Promotion {
   minSpend: string;
   autoApply: boolean;
   isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
   product?: { name: string } | null;
   category?: { name: string } | null;
 }
@@ -31,8 +33,40 @@ interface Promotion {
 const empty = {
   code: '', name: '', type: 'PERCENT' as PromoType, scope: 'BILL' as PromoScope,
   value: 0, buyQty: 1, getQty: 1, productId: null as number | null, categoryId: null as number | null,
-  minSpend: 0, autoApply: true, isActive: true,
+  minSpend: 0, autoApply: true, isActive: true, startsAt: '', endsAt: '',
 };
+
+/** ISO → value for a <input type="datetime-local"> (local wall-clock, no seconds). */
+function toLocalInput(iso?: string | null) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+type WindowState = 'scheduled' | 'active' | 'expired';
+/** Where `now` sits relative to a promo's date window (ignores the isActive toggle). */
+function windowState(p: { startsAt: string | null; endsAt: string | null }): WindowState {
+  const now = Date.now();
+  if (p.startsAt && new Date(p.startsAt).getTime() > now) return 'scheduled';
+  if (p.endsAt && new Date(p.endsAt).getTime() < now) return 'expired';
+  return 'active';
+}
+const WINDOW_LABEL: Record<WindowState, string> = { scheduled: 'ตั้งเวลาไว้', active: 'อยู่ในช่วง', expired: 'หมดเวลา' };
+const WINDOW_CHIP: Record<WindowState, string> = {
+  scheduled: 'bg-sky-50 text-sky-700',
+  active: 'bg-emerald-50 text-emerald-700',
+  expired: 'bg-slate-100 text-slate-500',
+};
+
+/** Short Thai-locale date for the schedule window (e.g. "1 มิ.ย. 09:00 – 30 มิ.ย."). */
+function fmtRange(startsAt: string | null, endsAt: string | null) {
+  const fmt = (iso: string) => new Date(iso).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (startsAt && endsAt) return `${fmt(startsAt)} – ${fmt(endsAt)}`;
+  if (startsAt) return `ตั้งแต่ ${fmt(startsAt)}`;
+  if (endsAt) return `ถึง ${fmt(endsAt)}`;
+  return '';
+}
 type Form = typeof empty;
 
 const TYPE_LABEL: Record<PromoType, string> = { PERCENT: '% ส่วนลด', FIXED: 'ลดจำนวนเงิน', BXGY: 'ซื้อ X แถม Y' };
@@ -64,13 +98,22 @@ export default function Promotions() {
       value: Number(p.value), buyQty: p.buyQty || 1, getQty: p.getQty || 1,
       productId: p.productId, categoryId: p.categoryId, minSpend: Number(p.minSpend),
       autoApply: p.autoApply, isActive: p.isActive,
+      startsAt: toLocalInput(p.startsAt), endsAt: toLocalInput(p.endsAt),
     });
   }
 
   async function save() {
     if (!form) return;
     try {
-      const body: any = { ...form, code: form.code || null };
+      const body: any = {
+        ...form,
+        code: form.code || null,
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
+        endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
+      };
+      if (body.startsAt && body.endsAt && new Date(body.endsAt) <= new Date(body.startsAt)) {
+        return toast.error('เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม');
+      }
       if (editing) await api(`/promotions/${editing.id}`, { method: 'PUT', body });
       else await api('/promotions', { method: 'POST', body });
       toast.success('บันทึกแล้ว');
@@ -169,7 +212,17 @@ export default function Promotions() {
             <td className="px-4 py-3 text-slate-500">{describe(p)}</td>
             <td className="px-4 py-3">{p.autoApply ? <span className="chip bg-emerald-50 text-emerald-700">อัตโนมัติ</span> : <span className="chip bg-amber-50 text-amber-700 font-mono">{p.code}</span>}</td>
             <td className="px-4 py-3 text-right">{Number(p.minSpend) ? money(p.minSpend) : '—'}</td>
-            <td className="px-4 py-3"><span className={`chip ${p.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{p.isActive ? 'ใช้งาน' : 'ปิด'}</span></td>
+            <td className="px-4 py-3">
+              <div className="flex flex-col items-start gap-1">
+                <span className={`chip ${p.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{p.isActive ? 'ใช้งาน' : 'ปิด'}</span>
+                {(p.startsAt || p.endsAt) && (
+                  <span className="flex items-center gap-1.5">
+                    <span className={`chip ${WINDOW_CHIP[windowState(p)]}`}>{WINDOW_LABEL[windowState(p)]}</span>
+                    <span className="text-[11px] text-slate-400">{fmtRange(p.startsAt, p.endsAt)}</span>
+                  </span>
+                )}
+              </div>
+            </td>
             <td className="px-4 py-3 text-right">
               <button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(p)}>แก้ไข</button>
               <button className="ml-3 text-sm font-semibold text-rose-600" onClick={() => remove(p)}>ลบ</button>
@@ -223,6 +276,15 @@ export default function Promotions() {
 
             <F label="ซื้อขั้นต่ำ (฿)"><input type="number" className="input" value={form.minSpend} onChange={(e) => setForm({ ...form, minSpend: Number(e.target.value) })} /></F>
             <F label="รหัสคูปอง (เว้นว่าง = อัตโนมัติ)"><input className="input font-mono" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value, autoApply: !e.target.value })} placeholder="auto-apply" /></F>
+
+            <F label="เริ่มใช้งาน (เว้นว่าง = ทันที)"><input type="datetime-local" className="input" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} /></F>
+            <F label="สิ้นสุด (เว้นว่าง = ไม่จำกัด)"><input type="datetime-local" className="input" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} /></F>
+            {(form.startsAt || form.endsAt) && (
+              <p className="col-span-2 -mt-1 text-xs text-slate-400">
+                <i className="fa-solid fa-circle-info mr-1" />
+                โปรโมชั่นจะถูกใช้ที่หน้าขายเฉพาะภายในช่วงเวลานี้ (สถานะปัจจุบัน: {WINDOW_LABEL[windowState({ startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null, endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null })]})
+              </p>
+            )}
 
             <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> ใช้งาน</label>
           </div>
