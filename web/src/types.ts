@@ -158,6 +158,19 @@ export interface Sale {
   items: SaleItem[];
 }
 
+export interface Expense {
+  id: number;
+  date: string;
+  category: string;
+  amount: string;
+  vendor: string;
+  note: string;
+  paymentMethod: 'CASH' | 'TRANSFER';
+  branchId: number | null;
+  branch?: { name: string } | null;
+  user?: { name: string } | null;
+}
+
 export interface HeldBill {
   id: number;
   type: 'RETAIL' | 'WHOLESALE';

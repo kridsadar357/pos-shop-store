@@ -47,6 +47,7 @@ const GROUPS: NavGroup[] = [
     title: 'การเงินและรายงาน',
     items: [
       { to: '/back/shifts', label: 'การเงิน / กะ', icon: 'fa-cash-register' },
+      { to: '/back/expenses', label: 'ค่าใช้จ่าย', icon: 'fa-money-bill-wave' },
       { to: '/back/reports', label: 'รายงาน', icon: 'fa-chart-line' },
     ],
   },

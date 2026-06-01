@@ -78,7 +78,10 @@ is already branch-correct).
   reconciliation now account for `float + cash sales + pay-ins − pay-outs`
 - ⬜ Accounts payable: supplier invoices & payments against POs
 - ⬜ Full tax invoice (ใบกำกับภาษีเต็มรูป) vs. the current abbreviated receipt
-- ⬜ Expense tracking & categories
+- ✅ Expense tracking & categories — `Expense` model + `/api/expenses` (date-range /
+  branch / category filters); back-office Expenses page (ListToolbar + filters +
+  Excel/PDF/CSV export, total + by-category summary, CRUD modal). Branch-aware,
+  records the user; seeded with a few demo expenses
 - ⬜ Multi-currency support (currently THB only)
 
 ## 6. Reporting & data

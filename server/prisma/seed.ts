@@ -164,6 +164,21 @@ async function main() {
     });
   }
 
+  // --- Operating expenses (only when none exist) ---
+  if ((await prisma.expense.count()) === 0) {
+    const hq = (await prisma.branch.findFirst({ where: { isDefault: true } }))?.id ?? null;
+    const admin = (await prisma.user.findFirst({ where: { role: 'ADMIN' } }))?.id ?? null;
+    const day = (n: number) => new Date(Date.now() - n * 86400000);
+    await prisma.expense.createMany({
+      data: [
+        { date: day(2), category: 'ค่าเช่า', amount: 15000, vendor: 'เจ้าของอาคาร', paymentMethod: 'TRANSFER', branchId: hq, userId: admin },
+        { date: day(5), category: 'ค่าน้ำ-ไฟ', amount: 3250, note: 'บิลประจำเดือน', paymentMethod: 'TRANSFER', branchId: hq, userId: admin },
+        { date: day(9), category: 'วัสดุสิ้นเปลือง', amount: 870, vendor: 'ร้านเครื่องเขียน', branchId: hq, userId: admin },
+        { date: day(14), category: 'ค่าขนส่ง', amount: 1200, vendor: 'ขนส่งเอกชน', branchId: hq, userId: admin },
+      ],
+    });
+  }
+
   console.log('✓ Seed complete.');
   console.log('  Logins: admin/admin123 · manager/manager123 · cashier/cashier123');
 }
