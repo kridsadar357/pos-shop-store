@@ -209,6 +209,44 @@ model GiftCardTxn {
   @@index([giftCardId])
 }
 
+// A price quotation / proforma that can be converted into a sale. Line prices are
+// snapshotted, so converting uses the quoted prices regardless of later changes.
+model Quotation {
+  id              Int       @id @default(autoincrement())
+  refNo           String    @unique // QT-xxxxx
+  customerName    String    @default("")
+  memberId        Int?
+  type            SaleType  @default(RETAIL)
+  status          String    @default("DRAFT") // DRAFT | SENT | ACCEPTED | CONVERTED | EXPIRED | CANCELLED
+  validUntil      DateTime?
+  note            String    @default("")
+  subtotal        Decimal   @db.Decimal(12, 2)
+  discount        Decimal   @default(0) @db.Decimal(12, 2)
+  taxAmount       Decimal   @default(0) @db.Decimal(12, 2)
+  total           Decimal   @db.Decimal(12, 2)
+  convertedSaleId Int?
+  userId          Int?
+  branchId        Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  items QuotationItem[]
+
+  @@index([status])
+}
+
+model QuotationItem {
+  id           Int     @id @default(autoincrement())
+  quotationId  Int
+  productId    Int
+  nameSnapshot String
+  qty          Int
+  unitPrice    Decimal @db.Decimal(12, 2)
+  lineTotal    Decimal @db.Decimal(12, 2)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+}
+
 /// Licensing / 14-day demo (singleton, id = 1).
 model License {
   id            Int       @id @default(1)

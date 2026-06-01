@@ -65,7 +65,11 @@ is already branch-correct).
   points as a bill discount at the POS (capped by balance + bill room); voids
   reverse both sides; Settings config (earn baht / redeem value); Members page shows
   balance + history + manual adjust; receipt prints earned/redeemed points
-- ⬜ Quotations / proforma → convert to sale
+- ✅ Quotations / proforma → convert to sale — `Quotation` + `QuotationItem`
+  (snapshotted line prices, retail/wholesale, tax-aware totals). Back-office page:
+  CRUD, status workflow (draft→sent→accepted/expired/cancelled), printable A4
+  document, export. One-click **convert** creates a completed sale server-side from
+  the quoted prices (default เงินเชื่อ/CREDIT), decrements stock, marks CONVERTED
 - ⬜ Layaway / deposits / partial payment
 - ✅ Split / multi-tender payments on one bill — `SalePayment` model (per-method
   applied amount, summing to the total) is the source of truth; checkout accepts a

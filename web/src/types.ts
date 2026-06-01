@@ -159,6 +159,33 @@ export interface Sale {
   items: SaleItem[];
 }
 
+export interface QuotationItem {
+  id?: number;
+  productId: number;
+  nameSnapshot: string;
+  qty: number;
+  unitPrice: string | number;
+  lineTotal: string | number;
+}
+
+export interface Quotation {
+  id: number;
+  refNo: string;
+  customerName: string;
+  memberId: number | null;
+  type: 'RETAIL' | 'WHOLESALE';
+  status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
+  validUntil: string | null;
+  note: string;
+  subtotal: string;
+  discount: string;
+  taxAmount: string;
+  total: string;
+  convertedSaleId: number | null;
+  createdAt: string;
+  items?: QuotationItem[];
+}
+
 export interface Supplier { id: number; name: string; phone: string; email: string; note: string; }
 
 export interface Payable {
