@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { toast } from '../../components/Toast';
 import { DataTable } from '../../components/DataTable';
@@ -17,6 +18,7 @@ function today() { return new Date().toISOString().slice(0, 10); }
 function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
 export default function Sales() {
+  const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
   const [setting, setSetting] = useState<Setting | null>(null);
   const [printSale, setPrintSale] = useState<Sale | null>(null);
@@ -176,6 +178,9 @@ export default function Sales() {
 
           <div className="mt-5 flex gap-2">
             <button className="btn-ghost flex-1" onClick={() => setDetail(null)}>ปิด</button>
+            {detail.status === 'PAID' && (
+              <button className="btn-ghost flex-1 text-amber-600" onClick={() => navigate(`/back/returns?sale=${detail.id}`)}><i className="fa-solid fa-rotate-left mr-1.5" />คืนสินค้า</button>
+            )}
             <button className="btn-primary flex-1" onClick={() => { doPrint(detail); setDetail(null); }}><i className="fa-solid fa-print mr-1.5" />พิมพ์ใบเสร็จ</button>
           </div>
         </Modal>

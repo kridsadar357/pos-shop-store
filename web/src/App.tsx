@@ -21,6 +21,7 @@ const StockCount = lazy(() => import('./pages/back/StockCount'));
 const Movements = lazy(() => import('./pages/back/Movements'));
 const Reports = lazy(() => import('./pages/back/Reports'));
 const Sales = lazy(() => import('./pages/back/Sales'));
+const Returns = lazy(() => import('./pages/back/Returns'));
 const Members = lazy(() => import('./pages/back/Members'));
 const Suppliers = lazy(() => import('./pages/back/Suppliers'));
 const Promotions = lazy(() => import('./pages/back/Promotions'));
@@ -97,6 +98,7 @@ export default function App() {
           <Route path="stock-count" element={<StockCount />} />
           <Route path="movements" element={<Movements />} />
           <Route path="sales" element={<Sales />} />
+          <Route path="returns" element={<Returns />} />
           <Route path="members" element={<Members />} />
           <Route path="suppliers" element={<Suppliers />} />
           <Route path="promotions" element={<Promotions />} />

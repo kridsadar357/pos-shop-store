@@ -170,6 +170,33 @@ export interface PODetail {
   items: POItem[];
 }
 
+export interface ReturnListItem {
+  id: number;
+  refNo: string;
+  orderNo: string;
+  total: string;
+  refundMethod: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT';
+  reason: string;
+  createdAt: string;
+  itemCount: number;
+  qty: number;
+}
+
+export interface ReturnableItem {
+  saleItemId: number;
+  productId: number;
+  name: string;
+  sold: number;
+  returned: number;
+  returnable: number;
+  unitPrice: string;
+}
+
+export interface Returnable {
+  sale: { id: number; orderNo: string; createdAt: string; total: string; subtotal: string; cashier?: { name: string } };
+  items: ReturnableItem[];
+}
+
 export interface Movement {
   id: number;
   productId: number;

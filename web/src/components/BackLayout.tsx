@@ -21,6 +21,7 @@ const GROUPS: NavGroup[] = [
     title: 'การขาย',
     items: [
       { to: '/back/sales', label: 'รายการขาย', icon: 'fa-receipt' },
+      { to: '/back/returns', label: 'การคืนสินค้า', icon: 'fa-rotate-left' },
       { to: '/back/promotions', label: 'การตลาด', icon: 'fa-bullhorn' },
     ],
   },
