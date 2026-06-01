@@ -285,6 +285,8 @@ model Product {
   imageUrl        String?
   categoryId      Int?
   unit            String   @default("pc")
+  purchaseUnit    String   @default("") // e.g. "ลัง/box"; empty = same as base unit
+  unitsPerPurchase Int     @default(1)  // base units per purchase unit (pack size)
   cost            Decimal  @default(0) @db.Decimal(12, 2)
   retailPrice     Decimal  @default(0) @db.Decimal(12, 2)
   wholesalePrice  Decimal  @default(0) @db.Decimal(12, 2)

@@ -14,6 +14,8 @@ export interface Product {
   categoryId: number | null;
   category?: Category | null;
   unit: string;
+  purchaseUnit?: string;
+  unitsPerPurchase?: number;
   cost: string;
   retailPrice: string;
   wholesalePrice: string;

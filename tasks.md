@@ -49,8 +49,9 @@ is already branch-correct).
   product editor) — feeds the reorder suggestions
 - 🟨 Editable **supplier price lists** (a `SupplierProduct` catalogue) — only the
   derived cost *history* exists; no maintained price list yet
-- ⬜ Units-of-measure conversion (buy by box, sell by piece) — add purchase unit +
-  units-per-pack to Product; convert on receiving/PO
+- 🟨 Units-of-measure conversion (buy by box, sell by piece) — Product has a
+  purchase unit + pack size, and **receiving** converts pack→base (stock stays in
+  base units). Follow-up: same pack toggle on the PO line entry
 - ⬜ Batch / lot & expiry-date tracking — **large**: needs batch-level balances
   layered on the per-branch stock model + FEFO picking
 - ⬜ Serial-number tracking — **large**: per-unit records + scan-in/scan-out

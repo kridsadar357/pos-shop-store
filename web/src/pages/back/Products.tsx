@@ -17,6 +17,8 @@ const empty = {
   imageUrl: '' as string | null,
   categoryId: null as number | null,
   unit: 'pc',
+  purchaseUnit: '',
+  unitsPerPurchase: 1,
   cost: 0,
   retailPrice: 0,
   wholesalePrice: 0,
@@ -70,6 +72,8 @@ export default function Products() {
       imageUrl: p.imageUrl ?? '',
       categoryId: p.categoryId,
       unit: p.unit,
+      purchaseUnit: p.purchaseUnit ?? '',
+      unitsPerPurchase: p.unitsPerPurchase ?? 1,
       cost: num(p.cost),
       retailPrice: num(p.retailPrice),
       wholesalePrice: num(p.wholesalePrice),
@@ -250,9 +254,13 @@ export default function Products() {
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </Field>
-            <Field label="หน่วย">
-              <input className="input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+            <Field label="หน่วยขาย (หน่วยฐาน)">
+              <input className="input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="เช่น ชิ้น" />
             </Field>
+            <Field label="หน่วยซื้อ (แพ็ก/ลัง)">
+              <input className="input" value={form.purchaseUnit} onChange={(e) => setForm({ ...form, purchaseUnit: e.target.value })} placeholder="เช่น ลัง (เว้นว่าง = เท่าหน่วยขาย)" />
+            </Field>
+            <NumField label={`จำนวนต่อ${form.purchaseUnit || 'หน่วยซื้อ'} (ชิ้น)`} v={form.unitsPerPurchase} set={(v) => setForm({ ...form, unitsPerPurchase: v })} />
             <NumField label="ทุน" v={form.cost} set={(v) => setForm({ ...form, cost: v })} />
             <NumField label="ราคาปลีก" v={form.retailPrice} set={(v) => setForm({ ...form, retailPrice: v })} />
             <NumField label="ราคาส่ง" v={form.wholesalePrice} set={(v) => setForm({ ...form, wholesalePrice: v })} />

@@ -146,6 +146,8 @@ const productSchema = z.object({
   imageUrl: z.string().trim().optional().nullable(),
   categoryId: z.number().int().nullable().optional(),
   unit: z.string().default('pc'),
+  purchaseUnit: z.string().default(''),
+  unitsPerPurchase: z.number().int().positive().default(1),
   cost: z.number().nonnegative().default(0),
   retailPrice: z.number().nonnegative().default(0),
   wholesalePrice: z.number().nonnegative().default(0),

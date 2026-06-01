@@ -10,7 +10,7 @@ import { dateTime, money, num } from '../../lib/format';
 import type { Product } from '../../types';
 
 interface Supplier { id: number; name: string; }
-interface Line { product: Product; qty: number; unitCost: number; }
+interface Line { product: Product; qty: number; unitCost: number; byPack: boolean; }
 interface Receipt { id: number; refNo: string; total: string; note: string; createdAt: string; supplier?: { name: string } | null; _count: { items: number }; }
 
 function today() { return new Date().toISOString().slice(0, 10); }
@@ -52,7 +52,9 @@ export default function Receive() {
 
   function add(p: Product) {
     if (lines.some((l) => l.product.id === p.id)) return;
-    setLines([...lines, { product: p, qty: 1, unitCost: num(p.cost) }]);
+    const upp = p.unitsPerPurchase ?? 1;
+    const byPack = upp > 1;
+    setLines([...lines, { product: p, qty: 1, unitCost: byPack ? num(p.cost) * upp : num(p.cost), byPack }]);
     setQ('');
     setResults([]);
   }
@@ -71,7 +73,12 @@ export default function Receive() {
           supplierId: supplierId || null,
           branchId: branchId || null,
           note,
-          items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, unitCost: l.unitCost })),
+          items: lines.map((l) => {
+            const upp = l.product.unitsPerPurchase ?? 1;
+            const baseQty = l.byPack ? l.qty * upp : l.qty;
+            const baseCost = l.byPack ? Math.round((l.unitCost / upp) * 100) / 100 : l.unitCost;
+            return { productId: l.product.id, qty: baseQty, unitCost: baseCost };
+          }),
         },
       });
       toast.success(`รับสินค้า ${res.refNo} — อัปเดตสต็อกแล้ว`);
@@ -134,15 +141,37 @@ export default function Receive() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {lines.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">ยังไม่มีรายการ — ค้นหาด้านบนเพื่อเพิ่ม</td></tr>}
-                {lines.map((l) => (
+                {lines.map((l) => {
+                  const upp = l.product.unitsPerPurchase ?? 1;
+                  const canPack = upp > 1;
+                  const unitLabel = l.byPack ? (l.product.purchaseUnit || 'แพ็ก') : l.product.unit;
+                  return (
                   <tr key={l.product.id}>
-                    <td className="px-4 py-2.5"><div className="font-medium">{l.product.name}</div><div className="text-xs text-slate-400">{l.product.sku}</div></td>
-                    <td className="px-3 py-2.5"><input type="number" className="input py-1.5" value={l.qty} onChange={(e) => update(l.product.id, { qty: Number(e.target.value) })} /></td>
-                    <td className="px-3 py-2.5"><input type="number" className="input py-1.5" value={l.unitCost} onChange={(e) => update(l.product.id, { unitCost: Number(e.target.value) })} /></td>
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium">{l.product.name}</div>
+                      <div className="text-xs text-slate-400">{l.product.sku}</div>
+                      {canPack && (
+                        <button
+                          className="mt-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
+                          onClick={() => update(l.product.id, { byPack: !l.byPack, unitCost: l.byPack ? Math.round((l.unitCost / upp) * 100) / 100 : Math.round(l.unitCost * upp * 100) / 100 })}
+                        >
+                          <i className="fa-solid fa-arrows-rotate mr-1" />รับเป็น: {unitLabel} {l.byPack && <span className="text-slate-400">(1 {l.product.purchaseUnit || 'แพ็ก'} = {upp} {l.product.unit})</span>}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <input type="number" className="input py-1.5" value={l.qty} onChange={(e) => update(l.product.id, { qty: Number(e.target.value) })} />
+                      {l.byPack && <div className="mt-0.5 text-[11px] text-slate-400">= {l.qty * upp} {l.product.unit}</div>}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <input type="number" className="input py-1.5" value={l.unitCost} onChange={(e) => update(l.product.id, { unitCost: Number(e.target.value) })} />
+                      <div className="mt-0.5 text-[11px] text-slate-400">฿/{unitLabel}</div>
+                    </td>
                     <td className="px-4 py-2.5 text-right font-semibold">{money(l.qty * l.unitCost)}</td>
                     <td className="px-3 py-2.5 text-right"><button className="text-slate-300 hover:text-rose-500" onClick={() => setLines(lines.filter((x) => x.product.id !== l.product.id))}>✕</button></td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
