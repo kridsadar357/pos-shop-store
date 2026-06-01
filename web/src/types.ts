@@ -158,6 +158,19 @@ export interface Sale {
   items: SaleItem[];
 }
 
+export interface AuditLog {
+  id: number;
+  userId: number | null;
+  userName: string;
+  role: string;
+  method: string;
+  path: string;
+  action: string;
+  status: number;
+  ip: string;
+  createdAt: string;
+}
+
 export interface Expense {
   id: number;
   date: string;

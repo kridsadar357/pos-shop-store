@@ -141,6 +141,24 @@ model Branch {
   expenses      Expense[]
 }
 
+// Audit trail of user actions (every mutating API call). Stores a snapshot of
+// the actor — no relation — so logs survive user deletion. No request bodies are
+// stored (avoids capturing passwords / PII).
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  userName  String   @default("")
+  role      String   @default("")
+  method    String
+  path      String
+  action    String   @default("")
+  status    Int      @default(0)
+  ip        String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // Operating expense (rent, utilities, supplies, …) — feeds finance reporting.
 model Expense {
   id            Int      @id @default(autoincrement())

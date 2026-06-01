@@ -96,7 +96,11 @@ is already branch-correct).
 
 ## 7. Security & administration
 - ⬜ Granular permissions (beyond ADMIN/MANAGER/CASHIER roles)
-- ⬜ Audit log of user actions (general activity, not just the stock ledger)
+- ✅ Audit log of user actions — `AuditLog` model + app-level `auditLogger`
+  middleware that records every mutating /api call (actor snapshot, method, path,
+  action label, status, IP) after the response finishes; no request bodies stored.
+  ADMIN-only viewer page (`/back/audit`) with search / date-range / method filters
+  and export
 - ⬜ Per-user PIN / quick cashier switch on the POS
 - ⬜ Password reset / forgot-password flow
 - ⬜ Online license re-validation + grace handling (currently activate/demo only)

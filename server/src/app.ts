@@ -24,6 +24,8 @@ import { returnsRouter } from './routes/returns.js';
 import { branchesRouter } from './routes/branches.js';
 import { transfersRouter } from './routes/transfers.js';
 import { expensesRouter } from './routes/expenses.js';
+import { auditRouter } from './routes/audit.js';
+import { auditLogger } from './middleware/audit.js';
 
 export function createApp() {
   const app = express();
@@ -34,6 +36,9 @@ export function createApp() {
 
   // Serve uploaded product images.
   app.use('/uploads', express.static(uploadsDir));
+
+  // Audit trail — records mutating /api calls after the response finishes.
+  app.use(auditLogger);
 
   app.use('/api/auth', authRouter);
   app.use('/api/products', productsRouter);
@@ -57,6 +62,7 @@ export function createApp() {
   app.use('/api/branches', branchesRouter);
   app.use('/api/transfers', transfersRouter);
   app.use('/api/expenses', expensesRouter);
+  app.use('/api/audit', auditRouter);
 
   // Central error handler.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

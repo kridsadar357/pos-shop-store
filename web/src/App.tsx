@@ -32,6 +32,7 @@ const Expenses = lazy(() => import('./pages/back/Expenses'));
 const Settings = lazy(() => import('./pages/back/Settings'));
 const Users = lazy(() => import('./pages/back/Users'));
 const Branches = lazy(() => import('./pages/back/Branches'));
+const AuditLog = lazy(() => import('./pages/back/AuditLog'));
 
 function Loader() {
   return <div className="grid min-h-screen place-items-center bg-ink-950 text-brand-300"><i className="fa-solid fa-spinner fa-spin text-3xl" /></div>;
@@ -113,6 +114,7 @@ export default function App() {
           <Route path="settings" element={<Settings />} />
           <Route path="branches" element={<Branches />} />
           <Route path="users" element={<Users />} />
+          <Route path="audit" element={<AuditLog />} />
         </Route>
 
         <Route path="*" element={<Navigate to={user ? (isBackStore(user.role) ? '/back' : '/pos') : '/login'} replace />} />
