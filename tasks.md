@@ -18,10 +18,11 @@ Legend: ⬜ not started · 🟨 partial (notes)
   total), sales decrement the selling branch
 - ✅ **Stock transfer between branches** — `StockTransfer` + page; moves
   BranchStock between branches (total preserved), with source-availability guard
-- 🟨 Branch selection on **receiving / PO receive / adjust / stock count** — these
-  currently default to the head-office branch (no branch picker yet)
-- 🟨 POS reads **branch** stock for availability — POS still shows the all-branch
-  total; should show/limit by the active branch
+- ✅ Branch selection on **receiving, PO receive, and adjust** (destination branch
+  picker; defaults to the active branch)
+- ✅ POS reads **branch** stock for availability — products, out-of-stock KPIs and
+  badges are scoped to the terminal's active branch (branch selector in the header)
+- ⬜ Branch-scoped **stock count** (counts still compare against head-office on-hand)
 - ⬜ Per-branch settings (printer, PromptPay, receipt)
 - ⬜ Branch filter on Movements, Shifts, Reports & Dashboard (Sales done)
 - ⬜ Consolidated (all-branch) dashboard & reports

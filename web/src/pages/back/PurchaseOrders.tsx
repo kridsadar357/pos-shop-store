@@ -5,6 +5,7 @@ import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { toast } from '../../components/Toast';
 import { makeExporters, type Column } from '../../lib/export';
+import { useBranch } from '../../store/branch';
 import { dateTime, money, num } from '../../lib/format';
 import type { POListItem, PODetail, POStatus, Product } from '../../types';
 
@@ -225,7 +226,9 @@ function POForm({ form, setForm, suppliers, onSaved }: {
 function PODetailModal({ po, onClose, onChanged, onEdit }: {
   po: PODetail; suppliers: Supplier[]; onClose: () => void; onChanged: (reopenId?: number) => void; onEdit: () => void;
 }) {
+  const branches = useBranch((s) => s.branches);
   const [receiving, setReceiving] = useState(false);
+  const [recvBranch, setRecvBranch] = useState<number | ''>(useBranch.getState().activeId ?? '');
   const [recv, setRecv] = useState<Record<number, number>>(() => Object.fromEntries(po.items.map((i) => [i.productId, Math.max(0, i.qty - i.receivedQty)])));
   const [busy, setBusy] = useState(false);
 
@@ -245,7 +248,7 @@ function PODetailModal({ po, onClose, onChanged, onEdit }: {
     const items = po.items.map((i) => ({ productId: i.productId, qty: recv[i.productId] || 0 })).filter((x) => x.qty > 0);
     if (!items.length) return toast.error('ไม่มีจำนวนที่จะรับ');
     setBusy(true);
-    try { const r = await api<{ refNo: string }>(`/purchase-orders/${po.id}/receive`, { method: 'POST', body: { items } }); toast.success(`รับสินค้าแล้ว · ${r.refNo}`); onChanged(po.id); }
+    try { const r = await api<{ refNo: string }>(`/purchase-orders/${po.id}/receive`, { method: 'POST', body: { items, branchId: recvBranch || null } }); toast.success(`รับสินค้าแล้ว · ${r.refNo}`); onChanged(po.id); }
     catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
 
@@ -294,6 +297,13 @@ function PODetailModal({ po, onClose, onChanged, onEdit }: {
           <button className="btn-primary" onClick={() => setReceiving(true)}><i className="fa-solid fa-truck-ramp-box mr-1.5" />รับสินค้า</button>
         </>}
         {receiving && <>
+          {branches.length > 1 && (
+            <label className="mr-auto flex items-center gap-2 text-sm text-slate-500">รับเข้าสาขา
+              <select className="input py-1.5" value={recvBranch} onChange={(e) => setRecvBranch(e.target.value ? Number(e.target.value) : '')}>
+                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </label>
+          )}
           <button className="btn-ghost" disabled={busy} onClick={() => setReceiving(false)}>ยกเลิก</button>
           <button className="btn-primary" disabled={busy} onClick={doReceive}>ยืนยันรับสินค้า</button>
         </>}

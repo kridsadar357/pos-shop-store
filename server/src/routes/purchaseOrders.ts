@@ -122,7 +122,7 @@ purchaseOrdersRouter.post(
 );
 
 // --- Receive against the PO (full or partial) ---
-const receiveSchema = z.object({ items: z.array(z.object({ productId: z.number().int(), qty: z.number().int().positive() })).min(1) });
+const receiveSchema = z.object({ branchId: z.number().int().nullable().optional(), items: z.array(z.object({ productId: z.number().int(), qty: z.number().int().positive() })).min(1) });
 
 purchaseOrdersRouter.post(
   '/:id/receive',
@@ -164,7 +164,7 @@ purchaseOrdersRouter.post(
         await tx.product.update({ where: { id: l.item.productId }, data: { cost: l.item.unitCost } });
         await postMovement(tx, {
           productId: l.item.productId, type: 'RECEIVE', qtyDelta: l.qty, unitCost: Number(l.item.unitCost),
-          refType: 'GOODS_RECEIPT', refId: receipt.id, note: `${grNo} (${po.refNo})`, userId,
+          refType: 'GOODS_RECEIPT', refId: receipt.id, note: `${grNo} (${po.refNo})`, userId, branchId: body.branchId ?? undefined,
         });
         await tx.purchaseOrderItem.update({ where: { id: l.item.id }, data: { receivedQty: { increment: l.qty } } });
       }

@@ -87,7 +87,9 @@ export default function POS() {
 
   function loadHeld() { api<HeldBill[]>('/held-bills').then(setHeld).catch(() => setHeld([])); }
   function reload() {
-    api<Product[]>('/products').then(setProducts).catch(() => {});
+    // Scope on-hand to the terminal's active branch (Phase 2 per-branch stock).
+    const branchId = useBranch.getState().activeId ?? undefined;
+    api<Product[]>('/products', { query: { branchId } }).then(setProducts).catch(() => {});
     api<Stats>('/sales/stats').then(setStats).catch(() => {});
     api<Product[]>('/products/favorites', { query: { limit: 8 } })
       .then((f) => setFavIds(new Set(f.map((p) => p.id))))
@@ -95,14 +97,16 @@ export default function POS() {
     loadHeld();
   }
 
+  const activeBranchId = useBranch((s) => s.activeId);
   useEffect(() => {
     refreshShift();
     api<Setting>('/settings').then(setSetting).catch(() => {});
     api<Category[]>('/categories').then(setCategories).catch(() => {});
-    reload();
     publisher.current = createPublisher();
     return () => publisher.current?.close();
   }, []);
+  // (Re)load products scoped to the active branch — also fires when it resolves/changes.
+  useEffect(() => { reload(); }, [activeBranchId]);
 
   const memberWholesale = !!member && !!setting?.memberGetsWholesale;
   const currency = setting?.currency || 'THB';
@@ -355,6 +359,7 @@ export default function POS() {
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/20">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-200" /> {th.online}
             </span>
+            <BranchPill />
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right text-xs leading-tight text-white/80">
@@ -816,6 +821,23 @@ function PriceCheckModal({ product, currency, memberGetsWholesale, onLookup, onC
         <button className="btn-ghost mt-5 w-full" onClick={onClose}>เสร็จสิ้น</button>
       </div>
     </div>
+  );
+}
+
+function BranchPill() {
+  const { branches, activeId, setActive, active } = useBranch();
+  const cur = active();
+  if (!cur) return null;
+  if (branches.length <= 1) {
+    return <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/20"><i className="fa-solid fa-code-branch text-[10px]" /> {cur.name}</span>;
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white ring-1 ring-white/20">
+      <i className="fa-solid fa-code-branch text-[10px]" />
+      <select value={activeId ?? cur.id} onChange={(e) => setActive(Number(e.target.value))} className="bg-transparent text-xs font-semibold text-white outline-none [&>option]:text-slate-900">
+        {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+      </select>
+    </span>
   );
 }
 

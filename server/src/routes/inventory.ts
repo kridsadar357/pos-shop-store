@@ -70,6 +70,7 @@ inventoryRouter.get(
 // --- Receive goods from a supplier (RECEIVE movements) ---
 const receiveSchema = z.object({
   supplierId: z.number().int().nullable().optional(),
+  branchId: z.number().int().nullable().optional(),
   note: z.string().default(''),
   items: z
     .array(
@@ -117,6 +118,7 @@ inventoryRouter.post(
           refId: receipt.id,
           note: refNo,
           userId,
+          branchId: data.branchId ?? undefined,
         });
       }
       return receipt;
@@ -131,6 +133,7 @@ const adjustSchema = z.object({
   productId: z.number().int(),
   qtyDelta: z.number().int().refine((v) => v !== 0, 'qtyDelta cannot be 0'),
   note: z.string().default(''),
+  branchId: z.number().int().nullable().optional(),
 });
 
 inventoryRouter.post(
@@ -147,6 +150,7 @@ inventoryRouter.post(
         refType: 'MANUAL',
         note: data.note,
         userId,
+        branchId: data.branchId ?? undefined,
       })
     );
     res.json({ balanceAfter });

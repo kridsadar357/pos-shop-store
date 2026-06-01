@@ -33,6 +33,9 @@ productsRouter.get(
   ah(async (req, res) => {
     const q = String(req.query.q || '').trim();
     const lowStock = req.query.lowStock === '1';
+    // When a branch is given, report that branch's on-hand as stockQty so the POS
+    // (and any branch-scoped view) sees branch availability, not the all-branch total.
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
     const products = await prisma.product.findMany({
       where: {
         AND: [
@@ -47,10 +50,13 @@ productsRouter.get(
             : {},
         ],
       },
-      include: { category: true },
+      include: { category: true, ...(branchId ? { branchStock: { where: { branchId } } } : {}) },
       orderBy: { name: 'asc' },
     });
-    const filtered = lowStock ? products.filter((p) => p.stockQty <= p.reorderLevel) : products;
+    const scoped = branchId
+      ? products.map(({ branchStock, ...p }: any) => ({ ...p, stockQty: branchStock?.[0]?.qty ?? 0, totalStockQty: p.stockQty }))
+      : products;
+    const filtered = lowStock ? scoped.filter((p: any) => p.stockQty <= p.reorderLevel) : scoped;
     res.json(filtered);
   })
 );

@@ -5,6 +5,7 @@ import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { toast } from '../../components/Toast';
 import { makeExporters, type Column } from '../../lib/export';
+import { useBranch } from '../../store/branch';
 import { dateTime, money, num } from '../../lib/format';
 import type { Product } from '../../types';
 
@@ -16,6 +17,10 @@ function today() { return new Date().toISOString().slice(0, 10); }
 function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
 export default function Receive() {
+  const branches = useBranch((s) => s.branches);
+  const activeBranchId = useBranch((s) => s.activeId);
+  const [branchId, setBranchId] = useState<number | ''>('');
+  useEffect(() => { if (!branchId && activeBranchId) setBranchId(activeBranchId); }, [activeBranchId]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierId, setSupplierId] = useState<number | ''>('');
   const [note, setNote] = useState('');
@@ -64,6 +69,7 @@ export default function Receive() {
         method: 'POST',
         body: {
           supplierId: supplierId || null,
+          branchId: branchId || null,
           note,
           items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, unitCost: l.unitCost })),
         },
@@ -150,6 +156,14 @@ export default function Receive() {
               {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
+          {branches.length > 1 && (
+            <div>
+              <label className="label">รับเข้าสาขา</label>
+              <select className="input" value={branchId} onChange={(e) => setBranchId(e.target.value ? Number(e.target.value) : '')}>
+                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="label">หมายเหตุ</label>
             <textarea className="input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
