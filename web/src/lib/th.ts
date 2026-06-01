@@ -68,6 +68,16 @@ export const th = {
   orders: 'จำนวนบิล',
   confirmClose: 'ยืนยันปิดกะ',
   shiftClosed: 'ปิดกะเรียบร้อย',
+  // Petty cash (drawer pay-in / pay-out)
+  cashInOut: 'เงินเข้า-ออก',
+  cashDrawerTitle: 'เงินเข้า-ออกลิ้นชัก',
+  payIn: 'เงินเข้า',
+  payOut: 'เงินออก',
+  cashReason: 'เหตุผล / หมายเหตุ',
+  cashReasonHint: 'เช่น เติมเงินทอน, จ่ายค่าน้ำ-ไฟ, ถอนเงินฝากธนาคาร',
+  recordCash: 'บันทึกรายการ',
+  cashRecorded: 'บันทึกเงินเข้า-ออกแล้ว',
+  noCashMoves: 'ยังไม่มีรายการเงินเข้า-ออก',
   // Member
   member: 'สมาชิก',
   selectMember: 'เลือกสมาชิก',

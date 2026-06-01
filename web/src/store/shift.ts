@@ -9,6 +9,7 @@ interface ShiftState {
   refresh: () => Promise<void>;
   open: (openingFloat: number) => Promise<void>;
   close: (countedCash: number, note: string) => Promise<Shift>;
+  cashInOut: (type: 'PAY_IN' | 'PAY_OUT', amount: number, reason: string) => Promise<void>;
 }
 
 export const useShift = create<ShiftState>((set, get) => ({
@@ -36,5 +37,11 @@ export const useShift = create<ShiftState>((set, get) => ({
     const closed = await api<Shift>(`/shifts/${cur.id}/close`, { method: 'POST', body: { countedCash, note } });
     set({ current: null });
     return closed;
+  },
+  async cashInOut(type, amount, reason) {
+    const cur = get().current;
+    if (!cur) throw new Error('No open shift');
+    await api(`/shifts/${cur.id}/cash`, { method: 'POST', body: { type, amount, reason } });
+    await get().refresh();
   },
 }));

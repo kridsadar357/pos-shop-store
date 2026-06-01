@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useShift } from '../../store/shift';
 import { useAuth } from '../../store/auth';
+import { api } from '../../api/client';
 import { toast } from '../../components/Toast';
 import { money, num } from '../../lib/format';
 import { th } from '../../lib/th';
-import type { Shift } from '../../types';
+import type { CashMovement, Shift } from '../../types';
 
 /** Full-screen gate shown when the cashier has no open shift. */
 export function ShiftGate() {
@@ -87,6 +88,8 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
             <div className="mt-4 space-y-1.5 rounded-xl bg-slate-50 p-4 text-sm">
               <Row label={th.openingFloat} value={money(current.openingFloat)} />
               <Row label={th.cashSales} value={money(totals?.cashSales ?? 0)} />
+              {num(totals?.payIn ?? 0) > 0 && <Row label={th.payIn} value={`+${money(totals?.payIn ?? 0)}`} />}
+              {num(totals?.payOut ?? 0) > 0 && <Row label={th.payOut} value={`−${money(totals?.payOut ?? 0)}`} />}
               <Row label={th.transferSales} value={money(totals?.transferSales ?? 0)} muted />
               <Row label={th.orders} value={String(totals?.orders ?? 0)} muted />
               <div className="border-t border-slate-200 pt-1.5">
@@ -125,6 +128,98 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
             <button className="btn-primary mt-5 w-full" onClick={onClose}>{th.openShift}</button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Petty-cash modal: record a drawer pay-in or pay-out against the open shift. */
+export function CashDrawerModal({ onClose }: { onClose: () => void }) {
+  const { current, cashInOut } = useShift();
+  const [type, setType] = useState<'PAY_IN' | 'PAY_OUT'>('PAY_OUT');
+  const [amount, setAmount] = useState(0);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [moves, setMoves] = useState<CashMovement[]>([]);
+
+  const shiftId = current?.id;
+  useEffect(() => {
+    if (!shiftId) return;
+    api<CashMovement[]>(`/shifts/${shiftId}/cash`).then(setMoves).catch(() => setMoves([]));
+  }, [shiftId, busy]);
+
+  if (!current) return null;
+
+  async function submit() {
+    if (amount <= 0) return toast.error(th.amount);
+    setBusy(true);
+    try {
+      await cashInOut(type, amount, reason.trim());
+      toast.success(th.cashRecorded);
+      setAmount(0);
+      setReason('');
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
+      <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold"><i className="fa-solid fa-money-bill-transfer mr-2 text-brand-600" />{th.cashDrawerTitle}</h3>
+          <button className="text-slate-400 hover:text-slate-600" onClick={onClose}><i className="fa-solid fa-xmark text-lg" /></button>
+        </div>
+        <div className="mt-2 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 text-sm">
+          <span className="text-slate-500">{th.expectedCash}</span>
+          <span className="font-extrabold text-slate-700">{money(num(current.expectedCash ?? 0))}</span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold ring-1 transition ${type === 'PAY_IN' ? 'bg-emerald-600 text-white ring-emerald-600' : 'bg-white text-slate-500 ring-slate-200 hover:bg-slate-50'}`}
+            onClick={() => setType('PAY_IN')}
+          ><i className="fa-solid fa-arrow-down-to-bracket" /> {th.payIn}</button>
+          <button
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold ring-1 transition ${type === 'PAY_OUT' ? 'bg-rose-600 text-white ring-rose-600' : 'bg-white text-slate-500 ring-slate-200 hover:bg-slate-50'}`}
+            onClick={() => setType('PAY_OUT')}
+          ><i className="fa-solid fa-arrow-up-from-bracket" /> {th.payOut}</button>
+        </div>
+
+        <div className="mt-4">
+          <label className="label">{th.amount}</label>
+          <input type="number" className="input text-lg" value={amount || ''} autoFocus onChange={(e) => setAmount(Number(e.target.value))} onKeyDown={(e) => e.key === 'Enter' && submit()} />
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[100, 200, 500, 1000].map((v) => (
+              <button key={v} className="btn-ghost" onClick={() => setAmount((a) => a + v)}>+{money(v)}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <label className="label">{th.cashReason}</label>
+          <input className="input" placeholder={th.cashReasonHint} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+
+        <button className="btn-primary mt-5 w-full py-3" disabled={busy} onClick={submit}>{busy ? th.processing : th.recordCash}</button>
+
+        <div className="mt-4 max-h-40 overflow-auto rounded-xl bg-slate-50 p-1">
+          {moves.length === 0 ? (
+            <p className="px-3 py-3 text-center text-sm text-slate-400">{th.noCashMoves}</p>
+          ) : moves.map((m) => (
+            <div key={m.id} className="flex items-center justify-between px-3 py-2 text-sm">
+              <span className="flex items-center gap-2">
+                <span className={`grid h-6 w-6 place-items-center rounded-lg text-xs ${m.type === 'PAY_IN' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                  <i className={`fa-solid ${m.type === 'PAY_IN' ? 'fa-arrow-down' : 'fa-arrow-up'}`} />
+                </span>
+                <span className="text-slate-600">{m.reason || (m.type === 'PAY_IN' ? th.payIn : th.payOut)}</span>
+              </span>
+              <span className={`font-bold ${m.type === 'PAY_IN' ? 'text-emerald-600' : 'text-rose-500'}`}>{m.type === 'PAY_IN' ? '+' : '−'}{money(m.amount)}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

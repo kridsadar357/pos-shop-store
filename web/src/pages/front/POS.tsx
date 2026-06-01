@@ -10,7 +10,7 @@ import { QRCanvas } from '../../components/QRCode';
 import { ReceiptPrint } from '../../components/ReceiptPrint';
 import { printReceipt } from '../../lib/printing';
 import { useBranch } from '../../store/branch';
-import { ShiftGate, CloseShiftModal } from './ShiftModals';
+import { ShiftGate, CloseShiftModal, CashDrawerModal } from './ShiftModals';
 import { MemberPicker } from './MemberWidget';
 import { PosSidebar } from './PosSidebar';
 import { toast } from '../../components/Toast';
@@ -71,6 +71,7 @@ export default function POS() {
   const [pickMember, setPickMember] = useState(false);
   const [transfer, setTransfer] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [cashDrawer, setCashDrawer] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [printSale, setPrintSale] = useState<Sale | null>(null);
@@ -299,7 +300,7 @@ export default function POS() {
   // Intelligent auto-focus: keep the invisible barcode reader focused so a scan
   // is always captured — unless the cashier is typing in a field or a modal is open.
   useEffect(() => {
-    const overlay = priceCheck || pickMember || transfer || closing || showHeld || showPromo || !!lastSale || showCam || showSearch || showNotif || moreOpen;
+    const overlay = priceCheck || pickMember || transfer || closing || cashDrawer || showHeld || showPromo || !!lastSale || showCam || showSearch || showNotif || moreOpen;
     const focusScan = () => {
       if (overlay) return;
       const a = document.activeElement as HTMLElement | null;
@@ -443,6 +444,7 @@ export default function POS() {
             <ActionBtn icon="fa-ellipsis" label={th.aMore} tone="slate" onClick={() => setMoreOpen((v) => !v)} />
             {moreOpen && (
               <div className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl bg-white py-1 shadow-pop ring-1 ring-slate-200" onMouseLeave={() => setMoreOpen(false)}>
+                <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setCashDrawer(true); }}><i className="fa-solid fa-money-bill-transfer mr-2 text-slate-400" />{th.cashInOut}</button>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setClosing(true); }}><i className="fa-solid fa-clock mr-2 text-slate-400" />{th.closeShift}</button>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); window.open('/display', 'pos-customer-display', 'width=1100,height=720'); }}><i className="fa-solid fa-desktop mr-2 text-slate-400" />{th.customerDisplay}</button>
               </div>
@@ -692,6 +694,7 @@ export default function POS() {
           onCancel={() => { setTransfer(false); publisher.current?.publish({ ...baseDisplay(), status: totals.count ? 'CART' : 'IDLE' }); }}
         />
       )}
+      {cashDrawer && <CashDrawerModal onClose={() => { setCashDrawer(false); refreshShift(); }} />}
       {closing && <CloseShiftModal onClose={() => { setClosing(false); refreshShift(); }} />}
       {lastSale && (
         <ReceiptModal

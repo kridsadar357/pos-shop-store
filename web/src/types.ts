@@ -74,6 +74,18 @@ export interface ShiftTotals {
   transferSales: number;
   totalSales: number;
   voids: number;
+  payIn?: number;
+  payOut?: number;
+}
+
+export interface CashMovement {
+  id: number;
+  shiftId: number;
+  type: 'PAY_IN' | 'PAY_OUT';
+  amount: string;
+  reason: string;
+  createdAt: string;
+  user?: { name: string };
 }
 
 export interface Shift {

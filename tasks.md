@@ -67,7 +67,9 @@ is already branch-correct).
 - ⬜ Email / SMS / LINE receipt delivery
 
 ## 5. Finance & accounting
-- ⬜ Petty cash / cash in-out during a shift (pay-in / pay-out)
+- ✅ Petty cash / cash in-out during a shift — `CashMovement` model + POS drawer
+  modal (pay-in / pay-out with reason); expected drawer cash and the close-shift
+  reconciliation now account for `float + cash sales + pay-ins − pay-outs`
 - ⬜ Accounts payable: supplier invoices & payments against POs
 - ⬜ Full tax invoice (ใบกำกับภาษีเต็มรูป) vs. the current abbreviated receipt
 - ⬜ Expense tracking & categories

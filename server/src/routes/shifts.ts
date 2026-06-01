@@ -18,7 +18,28 @@ async function shiftTotals(shiftId: number) {
     else transfer += num(s.total);
   }
   const voids = await prisma.sale.count({ where: { shiftId, status: 'VOID' } });
-  return { orders: sales.length, cashSales: round2(cash), transferSales: round2(transfer), totalSales: round2(cash + transfer), voids };
+  // Petty cash in/out recorded against the shift.
+  const cashMoves = await prisma.cashMovement.findMany({ where: { shiftId }, select: { type: true, amount: true } });
+  let payIn = 0;
+  let payOut = 0;
+  for (const m of cashMoves) {
+    if (m.type === 'PAY_IN') payIn += num(m.amount);
+    else payOut += num(m.amount);
+  }
+  return {
+    orders: sales.length,
+    cashSales: round2(cash),
+    transferSales: round2(transfer),
+    totalSales: round2(cash + transfer),
+    voids,
+    payIn: round2(payIn),
+    payOut: round2(payOut),
+  };
+}
+
+/** Cash the drawer should hold = opening float + cash sales + pay-ins − pay-outs. */
+function expectedCashFrom(openingFloat: unknown, t: { cashSales: number; payIn: number; payOut: number }) {
+  return round2(num(openingFloat) + t.cashSales + t.payIn - t.payOut);
 }
 
 function round2(n: number) {
@@ -35,7 +56,7 @@ shiftsRouter.get(
     });
     if (!shift) return res.json(null);
     const totals = await shiftTotals(shift.id);
-    res.json({ ...shift, totals, expectedCash: round2(num(shift.openingFloat) + totals.cashSales) });
+    res.json({ ...shift, totals, expectedCash: expectedCashFrom(shift.openingFloat, totals) });
   })
 );
 
@@ -68,7 +89,7 @@ shiftsRouter.post(
     }
 
     const totals = await shiftTotals(id);
-    const expectedCash = round2(num(shift.openingFloat) + totals.cashSales);
+    const expectedCash = expectedCashFrom(shift.openingFloat, totals);
     const cashDiff = round2(countedCash - expectedCash);
 
     const closed = await prisma.shift.update({
@@ -76,6 +97,40 @@ shiftsRouter.post(
       data: { status: 'CLOSED', closedAt: new Date(), countedCash, expectedCash, cashDiff, note },
     });
     res.json({ ...closed, totals });
+  })
+);
+
+// Record a petty-cash pay-in or pay-out against an open shift.
+shiftsRouter.post(
+  '/:id/cash',
+  ah(async (req, res) => {
+    const { type, amount, reason } = z
+      .object({ type: z.enum(['PAY_IN', 'PAY_OUT']), amount: z.number().positive(), reason: z.string().default('') })
+      .parse(req.body);
+    const id = Number(req.params.id);
+    const shift = await prisma.shift.findUniqueOrThrow({ where: { id } });
+    if (shift.status === 'CLOSED') return res.status(400).json({ error: 'Shift already closed' });
+    if (shift.userId !== req.user!.id && req.user!.role === 'CASHIER') {
+      return res.status(403).json({ error: "Cannot modify another cashier's shift" });
+    }
+    const move = await prisma.cashMovement.create({
+      data: { shiftId: id, type, amount, reason, userId: req.user!.id },
+    });
+    const totals = await shiftTotals(id);
+    res.status(201).json({ move, totals, expectedCash: expectedCashFrom(shift.openingFloat, totals) });
+  })
+);
+
+// Petty-cash movements for a shift.
+shiftsRouter.get(
+  '/:id/cash',
+  ah(async (req, res) => {
+    const moves = await prisma.cashMovement.findMany({
+      where: { shiftId: Number(req.params.id) },
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { name: true } } },
+    });
+    res.json(moves);
   })
 );
 
@@ -102,6 +157,6 @@ shiftsRouter.get(
     });
     if (!shift) return res.status(404).json({ error: 'Not found' });
     const totals = await shiftTotals(shift.id);
-    res.json({ ...shift, totals });
+    res.json({ ...shift, totals, expectedCash: expectedCashFrom(shift.openingFloat, totals) });
   })
 );
