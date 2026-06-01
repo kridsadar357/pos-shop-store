@@ -50,9 +50,9 @@ is already branch-correct).
 - ✅ Editable **supplier price lists** — `SupplierProduct` catalogue (per-product
   supplier↔cost with a preferred flag), managed in the product editor; reorder
   suggestions prefer the price list (preferred → cheapest) over last-receipt cost
-- 🟨 Units-of-measure conversion (buy by box, sell by piece) — Product has a
-  purchase unit + pack size, and **receiving** converts pack→base (stock stays in
-  base units). Follow-up: same pack toggle on the PO line entry
+- ✅ Units-of-measure conversion (buy by box, sell by piece) — Product has a
+  purchase unit + pack size; **receiving and PO line entry** both convert
+  pack→base (stock & ledger stay in base units)
 - ⬜ Batch / lot & expiry-date tracking — **large**: needs batch-level balances
   layered on the per-branch stock model + FEFO picking
 - ⬜ Serial-number tracking — **large**: per-unit records + scan-in/scan-out

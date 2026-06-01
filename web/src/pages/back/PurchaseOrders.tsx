@@ -10,7 +10,7 @@ import { dateTime, money, num } from '../../lib/format';
 import type { POListItem, PODetail, POStatus, Product } from '../../types';
 
 interface Supplier { id: number; name: string; }
-interface FormLine { product: Product; qty: number; unitCost: number; }
+interface FormLine { product: Product; qty: number; unitCost: number; byPack?: boolean; }
 
 const STATUS: Record<POStatus, { label: string; cls: string }> = {
   DRAFT: { label: 'ร่าง', cls: 'bg-slate-100 text-slate-600' },
@@ -158,14 +158,26 @@ function POForm({ form, setForm, suppliers, onSaved }: {
   }, [q]);
 
   const setLines = (lines: FormLine[]) => setForm({ ...form, lines });
-  const add = (p: Product) => { if (!form.lines.some((l) => l.product.id === p.id)) setLines([...form.lines, { product: p, qty: 1, unitCost: num(p.cost) }]); setQ(''); setResults([]); };
+  const add = (p: Product) => {
+    if (!form.lines.some((l) => l.product.id === p.id)) {
+      const upp = p.unitsPerPurchase ?? 1;
+      const byPack = upp > 1;
+      setLines([...form.lines, { product: p, qty: 1, unitCost: byPack ? num(p.cost) * upp : num(p.cost), byPack }]);
+    }
+    setQ(''); setResults([]);
+  };
   const total = form.lines.reduce((s, l) => s + l.qty * l.unitCost, 0);
 
   async function save() {
     if (!form.lines.length) return;
     setBusy(true);
     try {
-      const body = { supplierId: form.supplierId || null, note: form.note, expectedDate: form.expectedDate || undefined, items: form.lines.map((l) => ({ productId: l.product.id, qty: l.qty, unitCost: l.unitCost })) };
+      const body = { supplierId: form.supplierId || null, note: form.note, expectedDate: form.expectedDate || undefined, items: form.lines.map((l) => {
+        const upp = l.product.unitsPerPurchase ?? 1;
+        const baseQty = l.byPack ? l.qty * upp : l.qty;
+        const baseCost = l.byPack ? Math.round((l.unitCost / upp) * 100) / 100 : l.unitCost;
+        return { productId: l.product.id, qty: baseQty, unitCost: baseCost };
+      }) };
       if (form.id) await api(`/purchase-orders/${form.id}`, { method: 'PUT', body });
       else await api('/purchase-orders', { method: 'POST', body });
       toast.success('บันทึกใบสั่งซื้อแล้ว');
@@ -203,15 +215,31 @@ function POForm({ form, setForm, suppliers, onSaved }: {
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-3 py-2.5">สินค้า</th><th className="px-3 py-2.5 w-24">จำนวน</th><th className="px-3 py-2.5 w-28">ทุน/หน่วย</th><th className="px-3 py-2.5 text-right">รวม</th><th /></tr></thead>
           <tbody className="divide-y divide-slate-100">
             {form.lines.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-400">ค้นหาด้านบนเพื่อเพิ่มสินค้า</td></tr>}
-            {form.lines.map((l) => (
+            {form.lines.map((l) => {
+              const upp = l.product.unitsPerPurchase ?? 1;
+              const unitLabel = l.byPack ? (l.product.purchaseUnit || 'แพ็ก') : l.product.unit;
+              return (
               <tr key={l.product.id}>
-                <td className="px-3 py-2"><div className="font-medium">{l.product.name}</div><div className="text-xs text-slate-400">{l.product.sku}</div></td>
-                <td className="px-3 py-2"><input type="number" className="input py-1.5" value={l.qty} onChange={(e) => setLines(form.lines.map((x) => x.product.id === l.product.id ? { ...x, qty: Number(e.target.value) } : x))} /></td>
+                <td className="px-3 py-2">
+                  <div className="font-medium">{l.product.name}</div>
+                  <div className="text-xs text-slate-400">{l.product.sku}</div>
+                  {upp > 1 && (
+                    <button className="mt-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
+                      onClick={() => setLines(form.lines.map((x) => x.product.id === l.product.id ? { ...x, byPack: !x.byPack, unitCost: x.byPack ? Math.round((x.unitCost / upp) * 100) / 100 : Math.round(x.unitCost * upp * 100) / 100 } : x))}>
+                      <i className="fa-solid fa-arrows-rotate mr-1" />สั่งเป็น: {unitLabel} {l.byPack && <span className="text-slate-400">(1 {l.product.purchaseUnit || 'แพ็ก'} = {upp} {l.product.unit})</span>}
+                    </button>
+                  )}
+                </td>
+                <td className="px-3 py-2">
+                  <input type="number" className="input py-1.5" value={l.qty} onChange={(e) => setLines(form.lines.map((x) => x.product.id === l.product.id ? { ...x, qty: Number(e.target.value) } : x))} />
+                  {l.byPack && <div className="mt-0.5 text-[11px] text-slate-400">= {l.qty * upp} {l.product.unit}</div>}
+                </td>
                 <td className="px-3 py-2"><input type="number" className="input py-1.5" value={l.unitCost} onChange={(e) => setLines(form.lines.map((x) => x.product.id === l.product.id ? { ...x, unitCost: Number(e.target.value) } : x))} /></td>
                 <td className="px-3 py-2 text-right font-semibold">{money(l.qty * l.unitCost)}</td>
                 <td className="px-3 py-2 text-right"><button className="text-slate-300 hover:text-rose-500" onClick={() => setLines(form.lines.filter((x) => x.product.id !== l.product.id))}>✕</button></td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
