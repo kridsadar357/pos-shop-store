@@ -39,6 +39,9 @@ export interface Setting {
   taxInclusive: boolean;
   receiptFooter: string;
   memberGetsWholesale: boolean;
+  loyaltyEnabled: boolean;
+  pointsEarnBaht: string;
+  pointsRedeemValue: string;
   receiptLogoUrl: string | null;
   receiptHeader: string;
   receiptShowQR: boolean;
@@ -65,7 +68,20 @@ export interface Member {
   phone: string;
   email: string;
   note: string;
+  points: number;
   isActive: boolean;
+  _count?: { sales: number };
+}
+
+export interface PointTransaction {
+  id: number;
+  memberId: number;
+  type: 'EARN' | 'REDEEM' | 'ADJUST';
+  points: number;
+  balance: number;
+  note: string;
+  createdAt: string;
+  sale?: { orderNo: string } | null;
 }
 
 export interface ShiftTotals {
@@ -124,6 +140,8 @@ export interface Sale {
   discount: string;
   promoDiscount?: string;
   promoNames?: string;
+  pointsEarned?: number;
+  pointsRedeemed?: number;
   taxAmount: string;
   total: string;
   paymentMethod: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT';

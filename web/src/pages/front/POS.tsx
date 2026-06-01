@@ -58,6 +58,7 @@ export default function POS() {
   const [member, setMember] = useState<Member | null>(null);
   const [discount, setDiscount] = useState(0);
   const [showDiscount, setShowDiscount] = useState(false);
+  const [redeemPts, setRedeemPts] = useState(0);
   const [coupon, setCoupon] = useState('');
   const [promo, setPromo] = useState<{ promoDiscount: number; applied: { id: number; name: string; amount: number }[] }>({ promoDiscount: 0, applied: [] });
   const [showPromo, setShowPromo] = useState(false);
@@ -151,7 +152,7 @@ export default function POS() {
     if (qty <= 0) return setLines((prev) => prev.filter((l) => l.product.id !== id));
     setLines((prev) => prev.map((l) => (l.product.id === id ? { ...l, qty } : l)));
   }
-  function clearCart() { setLines([]); setMember(null); setDiscount(0); setCashReceived(0); setCoupon(''); setPromo({ promoDiscount: 0, applied: [] }); }
+  function clearCart() { setLines([]); setMember(null); setDiscount(0); setRedeemPts(0); setCashReceived(0); setCoupon(''); setPromo({ promoDiscount: 0, applied: [] }); }
 
   // Live promotion preview whenever the cart / coupon / pricing context changes.
   useEffect(() => {
@@ -164,6 +165,9 @@ export default function POS() {
     }, 200);
     return () => clearTimeout(t);
   }, [lines, mode, member, coupon, setting]);
+
+  // Redeemed points belong to a specific member; reset when the customer changes.
+  useEffect(() => { setRedeemPts(0); }, [member?.id]);
 
   async function resolveProduct(code: string): Promise<Product | null> {
     const local = activeProducts.find((p) => p.barcode === code || p.sku === code);
@@ -192,11 +196,17 @@ export default function POS() {
     }
     const manualDisc = Math.min(discount, subtotal);
     const promoDisc = Math.min(promo.promoDiscount, subtotal - manualDisc);
-    const disc = manualDisc + promoDisc;
+    // Loyalty redemption — capped by the member's balance and the remaining bill room.
+    const redeemRate = num(setting?.pointsRedeemValue ?? 0);
+    const room = Math.max(0, subtotal - manualDisc - promoDisc);
+    const maxRedeemPts = setting?.loyaltyEnabled && member && redeemRate > 0 ? Math.min(member.points, Math.floor(room / redeemRate)) : 0;
+    const usePts = Math.min(redeemPts, maxRedeemPts);
+    const redeemDisc = Math.round(usePts * redeemRate * 100) / 100;
+    const disc = manualDisc + promoDisc + redeemDisc;
     const net = inc ? subtotal - disc : subtotal + tax - disc;
     const count = lines.reduce((s, l) => s + l.qty, 0);
-    return { subtotal, tax, manualDisc, promoDisc, disc, net, count };
-  }, [lines, mode, member, setting, discount, promo]);
+    return { subtotal, tax, manualDisc, promoDisc, redeemDisc, usePts, maxRedeemPts, disc, net, count };
+  }, [lines, mode, member, setting, discount, promo, redeemPts]);
 
   const change = payKey === 'CASH' ? Math.max(0, cashReceived - totals.net) : 0;
   const vatPct = num(setting?.taxRatePct ?? 7);
@@ -223,7 +233,7 @@ export default function POS() {
         body: {
           type: mode, paymentMethod: method, discount: totals.manualDisc, couponCode: coupon,
           cashReceived: method === 'CASH' ? cashReceived : 0,
-          paymentRef: ref, memberId: member?.id ?? null, branchId: useBranch.getState().activeId ?? undefined,
+          paymentRef: ref, memberId: member?.id ?? null, pointsRedeem: totals.usePts, branchId: useBranch.getState().activeId ?? undefined,
           items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
         },
       });
@@ -609,9 +619,21 @@ export default function POS() {
                 )}
               </div>
 
+              {/* Loyalty: redeem the attached member's points as a discount */}
+              {setting?.loyaltyEnabled && member && totals.maxRedeemPts > 0 && (
+                <div className="mb-2 flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 ring-1 ring-amber-200">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700"><i className="fa-solid fa-star" /> {th.usePoints} <span className="text-amber-500">({member.points} {th.pointsUnit})</span></span>
+                  <div className="flex items-center gap-1.5">
+                    <input type="number" min={0} max={totals.maxRedeemPts} className="w-16 rounded-lg bg-white px-2 py-1 text-right text-sm ring-1 ring-amber-200 outline-none focus:ring-amber-500" value={redeemPts || ''} onChange={(e) => setRedeemPts(Math.max(0, Math.min(totals.maxRedeemPts, Math.floor(Number(e.target.value)) || 0)))} placeholder="0" />
+                    <button className="rounded-lg bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-200" onClick={() => setRedeemPts(totals.maxRedeemPts)}>{th.max}</button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1 text-[13px]">
                 <div className="flex justify-between text-slate-500"><span>{th.subtotalItems}</span><span className="font-semibold text-ink-800">{totals.subtotal.toFixed(2)}</span></div>
                 {totals.manualDisc > 0 && <div className="flex justify-between text-rose-500"><span>{th.billDiscount}</span><span>-{totals.manualDisc.toFixed(2)}</span></div>}
+                {totals.redeemDisc > 0 && <div className="flex justify-between text-amber-600"><span className="flex items-center gap-1"><i className="fa-solid fa-star mr-1" /> {th.pointsRedeemed} ({totals.usePts})</span><span>-{totals.redeemDisc.toFixed(2)}</span></div>}
                 {totals.promoDisc > 0 && (
                   <div className="flex justify-between text-rose-500">
                     <span className="flex items-center gap-1"><i className="fa-solid fa-tag mr-1" /> {th.aPromotion}{promo.applied.length ? ` · ${promo.applied[0].name}${promo.applied.length > 1 ? ` +${promo.applied.length - 1}` : ''}` : ''}</span>
@@ -732,12 +754,17 @@ function CustomerInfoPanel({ member, memberWholesale, onPick, onClear }: { membe
     <div className="p-2">
       <div className="flex items-center gap-3 rounded-2xl bg-brand-50 p-3 ring-1 ring-brand-200">
         <div className="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-lg font-bold text-white">{member.name.charAt(0)}</div>
-        <div><div className="text-base font-bold text-brand-900">{member.name}</div><div className="text-xs text-brand-600">{member.phone}</div></div>
+        <div className="flex-1"><div className="text-base font-bold text-brand-900">{member.name}</div><div className="text-xs text-brand-600">{member.phone}</div></div>
+        <div className="rounded-xl bg-amber-50 px-3 py-1.5 text-center ring-1 ring-amber-200">
+          <div className="text-lg font-extrabold leading-none text-amber-600">{member.points.toLocaleString()}</div>
+          <div className="text-[10px] font-semibold text-amber-500">{th.pointsUnit}</div>
+        </div>
       </div>
       <div className="mt-3 px-1">
         <Row label="รหัสสมาชิก" value={member.code || '—'} />
         <Row label="เบอร์โทร" value={member.phone} />
         <Row label="อีเมล" value={member.email} />
+        <Row label={th.pointsBalance} value={`${member.points.toLocaleString()} ${th.pointsUnit}`} />
         <Row label="หมายเหตุ" value={member.note} />
         <Row label="สิทธิ์ราคา" value={memberWholesale ? th.memberPrice : th.retail} />
       </div>

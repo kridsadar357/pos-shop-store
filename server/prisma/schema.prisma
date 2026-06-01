@@ -88,6 +88,10 @@ model Setting {
   receiptFooter String        @default("Thank you!")
   // When true, attaching a member to a sale applies wholesale pricing to all lines.
   memberGetsWholesale Boolean  @default(true)
+  // Loyalty points
+  loyaltyEnabled    Boolean @default(false)
+  pointsEarnBaht    Decimal @default(25) @db.Decimal(12, 2) // baht spent to earn 1 point (0 = no earning)
+  pointsRedeemValue Decimal @default(1) @db.Decimal(12, 2)  // baht value of 1 point when redeemed
 
   // Receipt design
   receiptLogoUrl String?
@@ -157,13 +161,34 @@ model Member {
   phone     String   @unique
   email     String   @default("")
   note      String   @default("")
+  points    Int      @default(0) // loyalty points balance
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
   sales     Sale[]
   heldBills HeldBill[]
+  pointTxns PointTransaction[]
 
   @@index([name])
+}
+
+// Loyalty-point ledger: one row per earn / redeem / manual adjustment.
+// `balance` is the member's running balance immediately after this entry.
+model PointTransaction {
+  id        Int      @id @default(autoincrement())
+  memberId  Int
+  saleId    Int?
+  type      String // EARN | REDEEM | ADJUST
+  points    Int // signed: +earn, −redeem
+  balance   Int
+  note      String   @default("")
+  userId    Int?
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id])
+  sale   Sale?  @relation(fields: [saleId], references: [id])
+
+  @@index([memberId])
 }
 
 model Promotion {
@@ -420,6 +445,8 @@ model Sale {
   total         Decimal       @db.Decimal(12, 2)
   promoDiscount Decimal       @default(0) @db.Decimal(12, 2)
   promoNames    String        @default("")
+  pointsEarned  Int           @default(0)
+  pointsRedeemed Int          @default(0)
   paymentMethod PaymentMethod
   cashReceived  Decimal       @default(0) @db.Decimal(12, 2)
   changeDue     Decimal       @default(0) @db.Decimal(12, 2)
@@ -439,8 +466,9 @@ model Sale {
   member   Member?    @relation(fields: [memberId], references: [id])
   shift    Shift?     @relation(fields: [shiftId], references: [id])
   branch   Branch?    @relation(fields: [branchId], references: [id])
-  items    SaleItem[]
-  returns  Return[]
+  items     SaleItem[]
+  returns   Return[]
+  pointTxns PointTransaction[]
 
   @@index([createdAt])
   @@index([status])

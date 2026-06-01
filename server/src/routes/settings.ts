@@ -50,6 +50,10 @@ const schema = z.object({
   taxInclusive: z.boolean().default(true),
   receiptFooter: z.string().default(''),
   memberGetsWholesale: z.boolean().default(true),
+  // Loyalty points
+  loyaltyEnabled: z.boolean().default(false),
+  pointsEarnBaht: z.number().nonnegative().default(25),
+  pointsRedeemValue: z.number().nonnegative().default(1),
   // Receipt design
   receiptLogoUrl: z.string().nullable().optional(),
   receiptHeader: z.string().default(''),

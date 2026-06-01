@@ -89,6 +89,13 @@ export const th = {
   save: 'บันทึก',
   remove: 'นำออก',
   memberPrice: 'ราคาสมาชิก',
+  max: 'สูงสุด',
+  // Loyalty points
+  pointsUnit: 'แต้ม',
+  pointsBalance: 'แต้มสะสม',
+  usePoints: 'ใช้แต้มสะสม',
+  pointsRedeemed: 'ส่วนลดจากแต้ม',
+  pointsEarned: 'ได้รับแต้ม',
   // Customer display
   customerDisplay: 'จอลูกค้า',
   welcome: 'ยินดีต้อนรับ',

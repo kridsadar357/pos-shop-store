@@ -71,6 +71,7 @@ export function ReceiptPrint({ sale, setting, onDone }: { sale: Sale; setting: S
         {manual > 0 && <div className="r-row"><span>ส่วนลดบิล</span><span>-{manual.toFixed(2)}</span></div>}
         {promo > 0 && <div className="r-row"><span>ส่วนลดโปรโมชั่น</span><span>-{promo.toFixed(2)}</span></div>}
         {promo > 0 && sale.promoNames && <div style={{ fontSize: 11 }}>({sale.promoNames})</div>}
+        {(sale.pointsRedeemed ?? 0) > 0 && <div className="r-row"><span>ส่วนลดจากแต้ม ({sale.pointsRedeemed})</span><span>-{((sale.pointsRedeemed ?? 0) * num(setting?.pointsRedeemValue ?? 0)).toFixed(2)}</span></div>}
         <div className="r-row"><span>ภาษีมูลค่าเพิ่ม{setting?.taxInclusive ? ' (รวม)' : ''} {num(setting?.taxRatePct ?? 7)}%</span><span>{num(sale.taxAmount).toFixed(2)}</span></div>
 
         <div className="r-hr" />
@@ -94,6 +95,13 @@ export function ReceiptPrint({ sale, setting, onDone }: { sale: Sale; setting: S
               <div style={{ margin: '4px auto 0', width: 'fit-content' }}><QRCanvas value={qr} size={120} /></div>
               <div style={{ fontSize: 11 }}>{money(sale.total, currency)}</div>
             </div>
+          </>
+        )}
+
+        {sale.member && (sale.pointsEarned ?? 0) > 0 && (
+          <>
+            <div className="r-hr" />
+            <div className="r-row"><span>ได้รับแต้มสะสม</span><span>+{sale.pointsEarned} แต้ม</span></div>
           </>
         )}
 

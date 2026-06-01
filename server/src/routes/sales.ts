@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
+import { postPoints } from '../lib/loyalty.js';
 import { buildPromptPayPayload, type PromptPayType } from '../lib/promptpay.js';
 import { evaluatePromotions, type PromoCartLine } from '../lib/promotions.js';
 
@@ -17,6 +18,7 @@ const checkoutSchema = z.object({
   cashReceived: z.number().nonnegative().default(0),
   paymentRef: z.string().default(''),
   memberId: z.number().int().nullable().optional(),
+  pointsRedeem: z.number().int().nonnegative().default(0), // loyalty points to spend on this bill
   branchId: z.number().int().nullable().optional(),
   items: z
     .array(z.object({ productId: z.number().int(), qty: z.number().int().positive() }))
@@ -109,9 +111,30 @@ salesRouter.post(
       }), { couponCode: data.couponCode });
       const promoDiscount = promoResult.promoDiscount;
       const manualDiscount = round2(data.discount);
-      const discount = round2(Math.min(subtotal, manualDiscount + promoDiscount));
+
+      // Loyalty redemption: spend points as a discount (capped by balance and the
+      // remaining bill room after promo + manual discounts).
+      let pointsRedeemed = 0;
+      let redeemValue = 0;
+      if (memberId && setting.loyaltyEnabled && data.pointsRedeem > 0) {
+        const m = await tx.member.findUniqueOrThrow({ where: { id: memberId }, select: { points: true } });
+        const redeemRate = Number(setting.pointsRedeemValue) || 0;
+        const room = Math.max(0, subtotal - promoDiscount - manualDiscount);
+        const maxByRoom = redeemRate > 0 ? Math.floor(room / redeemRate) : 0;
+        pointsRedeemed = Math.max(0, Math.min(data.pointsRedeem, m.points, maxByRoom));
+        redeemValue = round2(pointsRedeemed * redeemRate);
+      }
+
+      const discount = round2(Math.min(subtotal, manualDiscount + promoDiscount + redeemValue));
 
       const total = round2(taxInclusive ? subtotal - discount : subtotal + taxAmount - discount);
+
+      // Points earned on the net total (only when loyalty is on and a member is attached).
+      let pointsEarned = 0;
+      if (memberId && setting.loyaltyEnabled) {
+        const earnBaht = Number(setting.pointsEarnBaht) || 0;
+        if (earnBaht > 0) pointsEarned = Math.floor(total / earnBaht);
+      }
 
       if (data.paymentMethod === 'CASH' && data.cashReceived < total) {
         throw Object.assign(new Error('Cash received is less than total'), { status: 400 });
@@ -145,6 +168,8 @@ salesRouter.post(
           discount,
           promoDiscount,
           promoNames: promoResult.applied.map((a) => a.name).join(', '),
+          pointsEarned,
+          pointsRedeemed,
           taxAmount,
           total,
           paymentMethod: data.paymentMethod,
@@ -173,6 +198,16 @@ salesRouter.post(
           userId: cashierId,
           branchId,
         });
+      }
+
+      // Loyalty: spend redeemed points first, then credit earned points.
+      if (memberId) {
+        if (pointsRedeemed > 0) {
+          await postPoints(tx, { memberId, saleId: created.id, type: 'REDEEM', points: -pointsRedeemed, note: orderNo, userId: cashierId });
+        }
+        if (pointsEarned > 0) {
+          await postPoints(tx, { memberId, saleId: created.id, type: 'EARN', points: pointsEarned, note: orderNo, userId: cashierId });
+        }
       }
 
       return created;
@@ -283,6 +318,21 @@ salesRouter.post(
           userId,
           branchId: sale.branchId,
         });
+      }
+
+      // Reverse loyalty points: refund redeemed points, claw back earned points
+      // (clamped so the balance can't go negative if the member already spent them).
+      if (sale.memberId) {
+        if (sale.pointsRedeemed > 0) {
+          await postPoints(tx, { memberId: sale.memberId, saleId: sale.id, type: 'ADJUST', points: sale.pointsRedeemed, note: `คืนแต้มจากการยกเลิก ${sale.orderNo}`, userId });
+        }
+        if (sale.pointsEarned > 0) {
+          const m = await tx.member.findUniqueOrThrow({ where: { id: sale.memberId }, select: { points: true } });
+          const clawback = Math.min(sale.pointsEarned, m.points);
+          if (clawback > 0) {
+            await postPoints(tx, { memberId: sale.memberId, saleId: sale.id, type: 'ADJUST', points: -clawback, note: `ยกเลิกแต้มจากบิล ${sale.orderNo}`, userId });
+          }
+        }
       }
 
       return tx.sale.update({

@@ -29,7 +29,7 @@ export default function Settings() {
   async function save() {
     if (!s) return;
     try {
-      await api('/settings', { method: 'PUT', body: { ...s, taxRatePct: num(s.taxRatePct) } });
+      await api('/settings', { method: 'PUT', body: { ...s, taxRatePct: num(s.taxRatePct), pointsEarnBaht: num(s.pointsEarnBaht), pointsRedeemValue: num(s.pointsRedeemValue) } });
       toast.success('บันทึกการตั้งค่าแล้ว');
     } catch (e) { toast.error((e as Error).message); }
   }
@@ -106,6 +106,25 @@ function GeneralTab({ s, set, save }: { s: Setting; set: (p: Partial<Setting>) =
             </div>
             <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={s.memberGetsWholesale} onChange={(e) => set({ memberGetsWholesale: e.target.checked })} />
           </label>
+        </Section>
+        <Section title="แต้มสะสม (Loyalty)">
+          <label className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
+            <div>
+              <div className="text-sm font-semibold">เปิดใช้แต้มสะสม</div>
+              <div className="text-xs text-slate-400">สมาชิกจะได้รับแต้มจากยอดซื้อ และนำแต้มมาแลกเป็นส่วนลดได้ที่หน้าขาย</div>
+            </div>
+            <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={s.loyaltyEnabled} onChange={(e) => set({ loyaltyEnabled: e.target.checked })} />
+          </label>
+          {s.loyaltyEnabled && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <F label="ยอดซื้อต่อ 1 แต้ม (บาท)"><input type="number" className="input" value={num(s.pointsEarnBaht)} onChange={(e) => set({ pointsEarnBaht: e.target.value as any })} /></F>
+              <F label="มูลค่า 1 แต้มเมื่อแลก (บาท)"><input type="number" className="input" value={num(s.pointsRedeemValue)} onChange={(e) => set({ pointsRedeemValue: e.target.value as any })} /></F>
+              <p className="col-span-2 text-xs text-slate-400">
+                <i className="fa-solid fa-circle-info mr-1" />
+                ตัวอย่าง: ซื้อครบ {num(s.pointsEarnBaht) || 0} บาท ได้ 1 แต้ม · ใช้ 1 แต้มแทนเงิน {num(s.pointsRedeemValue) || 0} บาท
+              </p>
+            </div>
+          )}
         </Section>
         <button className="btn-primary w-full" onClick={save}>บันทึกการตั้งค่า</button>
       </div>

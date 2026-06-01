@@ -6,7 +6,7 @@ import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { makeExporters, type Column } from '../../lib/export';
 import { toast } from '../../components/Toast';
-import type { Member } from '../../types';
+import type { Member, PointTransaction } from '../../types';
 
 const empty = { code: '', name: '', phone: '', email: '', note: '', isActive: true };
 type Form = typeof empty;
@@ -19,6 +19,7 @@ export default function Members() {
   const [emailFilter, setEmailFilter] = useState('');
   const [editing, setEditing] = useState<Member | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  const [pointsFor, setPointsFor] = useState<Member | null>(null);
 
   async function load() {
     setMembers(await api<Member[]>('/members', { query: { q } }));
@@ -67,6 +68,7 @@ export default function Members() {
     { label: 'เบอร์โทร', value: (m) => m.phone },
     { label: 'อีเมล', value: (m) => m.email || '' },
     { label: 'หมายเหตุ', value: (m) => m.note || '' },
+    { label: 'แต้มสะสม', value: (m) => m.points ?? 0, right: true },
     { label: 'สถานะ', value: (m) => (m.isActive ? 'ใช้งาน' : 'ปิดใช้งาน') },
   ];
   const exporters = makeExporters({ filename: 'members', title: 'รายชื่อลูกค้า / สมาชิก', columns, rows: () => filtered });
@@ -106,17 +108,21 @@ export default function Members() {
 
       <DataTable
         rows={filtered}
-        colCount={6}
+        colCount={7}
         empty="ยังไม่มีสมาชิก"
-        head={<tr><th className="px-4 py-3">รหัส</th><th className="px-4 py-3">ชื่อ</th><th className="px-4 py-3">เบอร์โทร</th><th className="px-4 py-3">อีเมล</th><th className="px-4 py-3">สถานะ</th><th /></tr>}
+        head={<tr><th className="px-4 py-3">รหัส</th><th className="px-4 py-3">ชื่อ</th><th className="px-4 py-3">เบอร์โทร</th><th className="px-4 py-3">อีเมล</th><th className="px-4 py-3 text-right">แต้มสะสม</th><th className="px-4 py-3">สถานะ</th><th /></tr>}
         renderRow={(m) => (
           <tr key={m.id} className="hover:bg-slate-50">
             <td className="px-4 py-3 font-mono text-xs text-slate-500">{m.code ?? '—'}</td>
             <td className="px-4 py-3 font-semibold">{m.name}</td>
             <td className="px-4 py-3">{m.phone}</td>
             <td className="px-4 py-3 text-slate-500">{m.email || '—'}</td>
+            <td className="px-4 py-3 text-right"><span className="chip bg-amber-50 font-bold text-amber-700">{(m.points ?? 0).toLocaleString()} แต้ม</span></td>
             <td className="px-4 py-3"><span className={`chip ${m.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{m.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
-            <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(m)}>แก้ไข</button></td>
+            <td className="px-4 py-3 text-right whitespace-nowrap">
+              <button className="text-sm font-semibold text-amber-600" onClick={() => setPointsFor(m)}>แต้ม</button>
+              <button className="ml-3 text-sm font-semibold text-brand-600" onClick={() => openEdit(m)}>แก้ไข</button>
+            </td>
           </tr>
         )}
       />
@@ -138,6 +144,83 @@ export default function Members() {
           <div className="mt-5 flex gap-2"><button className="btn-ghost flex-1" onClick={() => setForm(null)}>ยกเลิก</button><button className="btn-primary flex-1" disabled={!form.name || !form.phone} onClick={save}>บันทึก</button></div>
         </Modal>
       )}
+
+      {pointsFor && (
+        <PointsModal member={pointsFor} onClose={() => setPointsFor(null)} onChanged={load} />
+      )}
     </div>
+  );
+}
+
+const PT_LABEL: Record<PointTransaction['type'], string> = { EARN: 'ได้รับ', REDEEM: 'ใช้แต้ม', ADJUST: 'ปรับแต้ม' };
+
+/** Points balance + ledger history + manual adjustment for one member. */
+function PointsModal({ member, onClose, onChanged }: { member: Member; onClose: () => void; onChanged: () => void }) {
+  const [txns, setTxns] = useState<PointTransaction[]>([]);
+  const [balance, setBalance] = useState(member.points ?? 0);
+  const [delta, setDelta] = useState(0);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    const t = await api<PointTransaction[]>(`/members/${member.id}/points`);
+    setTxns(t);
+    setBalance(t[0]?.balance ?? member.points ?? 0);
+  }
+  useEffect(() => { load(); }, [member.id]);
+
+  async function adjust() {
+    if (delta === 0) return toast.error('กรอกจำนวนแต้มที่ต้องการปรับ');
+    setBusy(true);
+    try {
+      await api(`/members/${member.id}/points`, { method: 'POST', body: { points: delta, note: note.trim() } });
+      toast.success('ปรับแต้มแล้ว');
+      setDelta(0); setNote('');
+      await load();
+      onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title={`แต้มสะสม · ${member.name}`} onClose={onClose}>
+      <div className="flex items-center justify-between rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+        <span className="text-sm font-semibold text-amber-700"><i className="fa-solid fa-star mr-1.5" /> แต้มคงเหลือ</span>
+        <span className="text-2xl font-extrabold text-amber-600">{balance.toLocaleString()} แต้ม</span>
+      </div>
+
+      <div className="mt-4 rounded-xl bg-slate-50 p-3">
+        <div className="text-xs font-semibold text-slate-500">ปรับแต้มด้วยตนเอง (ใส่ค่าลบเพื่อหักแต้ม)</div>
+        <div className="mt-2 flex gap-2">
+          <input type="number" className="input w-28" placeholder="+/− แต้ม" value={delta || ''} onChange={(e) => setDelta(Math.floor(Number(e.target.value)) || 0)} />
+          <input className="input flex-1" placeholder="หมายเหตุ (เช่น ของขวัญ, แก้ไขข้อผิดพลาด)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <button className="btn-primary" disabled={busy || delta === 0} onClick={adjust}>บันทึก</button>
+        </div>
+      </div>
+
+      <div className="mt-4 max-h-64 overflow-auto rounded-xl ring-1 ring-slate-100">
+        {txns.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-400">ยังไม่มีประวัติแต้ม</p>
+        ) : (
+          <table className="w-full text-sm">
+            <tbody>
+              {txns.map((t) => (
+                <tr key={t.id} className="border-b border-slate-50 last:border-0">
+                  <td className="px-3 py-2">
+                    <div className="font-semibold">{PT_LABEL[t.type]}{t.sale ? ` · ${t.sale.orderNo}` : ''}</div>
+                    <div className="text-[11px] text-slate-400">{new Date(t.createdAt).toLocaleString('th-TH')}{t.note ? ` · ${t.note}` : ''}</div>
+                  </td>
+                  <td className={`px-3 py-2 text-right font-bold ${t.points >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{t.points >= 0 ? '+' : ''}{t.points}</td>
+                  <td className="px-3 py-2 text-right text-xs text-slate-400">{t.balance}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </Modal>
   );
 }

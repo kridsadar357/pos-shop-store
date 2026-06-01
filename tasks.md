@@ -58,7 +58,11 @@ is already branch-correct).
 - ⬜ Serial-number tracking — **large**: per-unit records + scan-in/scan-out
 
 ## 4. Sales & customer features
-- ⬜ Loyalty points: accrual + redemption (members exist, points do not)
+- ✅ Loyalty points: accrual + redemption — `Member.points` + `PointTransaction`
+  ledger via a single `postPoints()` chokepoint; earn on the net total and redeem
+  points as a bill discount at the POS (capped by balance + bill room); voids
+  reverse both sides; Settings config (earn baht / redeem value); Members page shows
+  balance + history + manual adjust; receipt prints earned/redeemed points
 - ⬜ Quotations / proforma → convert to sale
 - ⬜ Layaway / deposits / partial payment
 - ⬜ Split / multi-tender payments on one bill

@@ -22,6 +22,9 @@ async function main() {
       taxRatePct: 7,
       taxInclusive: true,
       receiptFooter: 'Thank you & see you again!',
+      loyaltyEnabled: true,
+      pointsEarnBaht: 25, // 25 baht spent = 1 point
+      pointsRedeemValue: 1, // 1 point = 1 baht
       setupCompleted: true,
     },
   });
