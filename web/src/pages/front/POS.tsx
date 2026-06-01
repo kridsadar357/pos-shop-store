@@ -100,13 +100,15 @@ export default function POS() {
   const activeBranchId = useBranch((s) => s.activeId);
   useEffect(() => {
     refreshShift();
-    api<Setting>('/settings').then(setSetting).catch(() => {});
     api<Category[]>('/categories').then(setCategories).catch(() => {});
     publisher.current = createPublisher();
     return () => publisher.current?.close();
   }, []);
-  // (Re)load products scoped to the active branch — also fires when it resolves/changes.
-  useEffect(() => { reload(); }, [activeBranchId]);
+  // (Re)load products + branch-resolved settings for the active branch (also on change).
+  useEffect(() => {
+    reload();
+    api<Setting>('/settings/resolved', { query: { branchId: activeBranchId ?? undefined } }).then(setSetting).catch(() => {});
+  }, [activeBranchId]);
 
   const memberWholesale = !!member && !!setting?.memberGetsWholesale;
   const currency = setting?.currency || 'THB';

@@ -3,6 +3,7 @@ import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis
 import { api } from '../../api/client';
 import { PageHeader } from '../../components/ui';
 import { downloadCSV, money } from '../../lib/format';
+import { useBranch } from '../../store/branch';
 import type { Setting } from '../../types';
 
 // Shared report meta (store name + date range) for PDF headers, avoids prop drilling.
@@ -26,16 +27,19 @@ function todayISO() { return new Date().toISOString().slice(0, 10); }
 function daysAgoISO(n: number) { return new Date(Date.now() - n * 864e5).toISOString().slice(0, 10); }
 
 export default function Reports() {
+  const branches = useBranch((s) => s.branches);
   const [tab, setTab] = useState<Tab>('summary');
   const [from, setFrom] = useState(daysAgoISO(30));
   const [to, setTo] = useState(todayISO());
+  const [branchId, setBranchId] = useState('');
   const [data, setData] = useState<any>(null);
   const [store, setStore] = useState('POS Suite');
 
   useEffect(() => { api<Setting>('/settings').then((s) => setStore(s.storeName)).catch(() => {}); }, []);
 
   useEffect(() => {
-    const range = { from: new Date(from).toISOString(), to: new Date(to + 'T23:59:59').toISOString() };
+    const b = branchId || undefined;
+    const range = { from: new Date(from).toISOString(), to: new Date(to + 'T23:59:59').toISOString(), branchId: b };
     const endpoints: Record<Tab, () => Promise<any>> = {
       summary: () => api('/reports/summary', { query: range }),
       payments: () => api('/reports/payment-methods', { query: range }),
@@ -43,13 +47,13 @@ export default function Reports() {
       category: () => api('/reports/profit-by-category', { query: range }),
       hourly: () => api('/reports/sales-by-hour', { query: range }),
       tax: () => api('/reports/tax-summary', { query: range }),
-      low: () => api('/reports/low-stock'),
-      valuation: () => api('/reports/inventory-valuation'),
-      z: () => api('/reports/z-report', { query: { date: new Date(to).toISOString() } }),
+      low: () => api('/reports/low-stock', { query: { branchId: b } }),
+      valuation: () => api('/reports/inventory-valuation', { query: { branchId: b } }),
+      z: () => api('/reports/z-report', { query: { date: new Date(to).toISOString(), branchId: b } }),
     };
     setData(null); // avoid rendering a view with the previous tab's (mismatched) data
     endpoints[tab]().then(setData).catch(() => setData(null));
-  }, [tab, from, to]);
+  }, [tab, from, to, branchId]);
 
   return (
     <ReportMeta.Provider value={{ store, range: `${from} – ${to}` }}>
@@ -60,6 +64,12 @@ export default function Reports() {
         icon="📊"
         actions={
           <div className="flex items-center gap-2">
+            {branches.length > 1 && (
+              <select className="input w-auto" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                <option value="">ทุกสาขา</option>
+                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            )}
             <input type="date" className="input w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
             <span className="text-slate-400">→</span>
             <input type="date" className="input w-auto" value={to} onChange={(e) => setTo(e.target.value)} />

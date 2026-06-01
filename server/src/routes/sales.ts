@@ -118,17 +118,19 @@ salesRouter.post(
       }
       const changeDue = data.paymentMethod === 'CASH' ? round2(data.cashReceived - total) : 0;
 
-      // PromptPay QR payload for transfer payments.
+      // PromptPay QR payload for transfer payments (uses the branch's PromptPay if set).
       let qrPayload = '';
       if (data.paymentMethod === 'TRANSFER') {
-        if (!setting.promptPayId) {
+        let ppId = setting.promptPayId;
+        let ppType = setting.promptPayType as PromptPayType;
+        if (branchId) {
+          const bb = await tx.branch.findUnique({ where: { id: branchId }, select: { promptPayId: true, promptPayType: true } });
+          if (bb?.promptPayId) { ppId = bb.promptPayId; ppType = (bb.promptPayType || ppType) as PromptPayType; }
+        }
+        if (!ppId) {
           throw Object.assign(new Error('PromptPay ID not configured in Settings'), { status: 400 });
         }
-        qrPayload = buildPromptPayPayload({
-          id: setting.promptPayId,
-          type: setting.promptPayType as PromptPayType,
-          amount: total,
-        });
+        qrPayload = buildPromptPayPayload({ id: ppId, type: ppType, amount: total });
       }
 
       const seq = await nextSeq(tx, 'sale');

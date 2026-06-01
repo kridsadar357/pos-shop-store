@@ -3,15 +3,20 @@ import { api } from '../../api/client';
 import { PageHeader } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import { toast } from '../../components/Toast';
+import { useBranch } from '../../store/branch';
 
-interface CountListItem { id: number; refNo: string; status: string; note: string; createdAt: string; _count: { items: number }; }
+interface CountListItem { id: number; refNo: string; status: string; note: string; createdAt: string; _count: { items: number }; branch?: { name: string } | null; }
 interface CountItem { id: number; productId: number; systemQty: number; countedQty: number; product: { name: string; sku: string; unit: string }; }
-interface CountDetail { id: number; refNo: string; status: string; items: CountItem[]; }
+interface CountDetail { id: number; refNo: string; status: string; items: CountItem[]; branch?: { name: string } | null; }
 
 export default function StockCount() {
+  const branches = useBranch((s) => s.branches);
+  const activeBranchId = useBranch((s) => s.activeId);
   const [list, setList] = useState<CountListItem[]>([]);
   const [active, setActive] = useState<CountDetail | null>(null);
   const [counted, setCounted] = useState<Record<number, number>>({});
+  const [newBranch, setNewBranch] = useState<number | ''>('');
+  useEffect(() => { if (!newBranch && activeBranchId) setNewBranch(activeBranchId); }, [activeBranchId]);
 
   async function loadList() {
     setList(await api<CountListItem[]>('/stock-counts'));
@@ -25,7 +30,7 @@ export default function StockCount() {
   }
 
   async function startNew() {
-    const c = await api<{ id: number }>('/stock-counts', { method: 'POST', body: { note: 'Full count' } });
+    const c = await api<{ id: number }>('/stock-counts', { method: 'POST', body: { note: 'Full count', branchId: newBranch || null } });
     toast.success('เปิดรอบนับแล้ว');
     await loadList();
     openCount(c.id);
@@ -59,8 +64,8 @@ export default function StockCount() {
         <button className="text-sm font-semibold text-brand-600" onClick={() => setActive(null)}>← กลับไปรายการนับ</button>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{active.refNo}</h1>
-            <p className="text-sm text-slate-500">กรอกจำนวนที่นับได้จริง · ส่วนต่างจะถูกบันทึกเป็นความเคลื่อนไหว 'นับสต็อก'</p>
+            <h1 className="text-2xl font-bold">{active.refNo} {active.branch && <span className="ml-1 align-middle text-sm font-semibold text-brand-600">· {active.branch.name}</span>}</h1>
+            <p className="text-sm text-slate-500">กรอกจำนวนที่นับได้จริง (เทียบกับยอดของสาขานี้) · ส่วนต่างจะถูกบันทึกเป็นความเคลื่อนไหว 'นับสต็อก'</p>
           </div>
           {active.status === 'OPEN' && (
             <div className="flex gap-2">
@@ -110,8 +115,17 @@ export default function StockCount() {
       <PageHeader
         title="นับสต็อก"
         subtitle="การนับสต็อกแบบมืออาชีพ — ปรับยอดในระบบให้ตรงกับการนับจริง"
-        icon="✓"
-        actions={<button className="btn-primary" onClick={startNew}>+ เปิดรอบนับใหม่</button>}
+        icon={<i className="fa-solid fa-clipboard-check" />}
+        actions={
+          <div className="flex items-center gap-2">
+            {branches.length > 1 && (
+              <select className="input py-2" value={newBranch} onChange={(e) => setNewBranch(e.target.value ? Number(e.target.value) : '')}>
+                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            )}
+            <button className="btn-primary" onClick={startNew}><i className="fa-solid fa-plus mr-1.5" />เปิดรอบนับใหม่</button>
+          </div>
+        }
       />
 
       <DataTable
@@ -121,7 +135,7 @@ export default function StockCount() {
         head={<tr><th className="px-4 py-3">เลขที่</th><th className="px-4 py-3">จำนวนรายการ</th><th className="px-4 py-3">สถานะ</th><th className="px-4 py-3">สร้างเมื่อ</th><th /></tr>}
         renderRow={(c) => (
           <tr key={c.id} className="hover:bg-slate-50">
-            <td className="px-4 py-3 font-semibold">{c.refNo}</td>
+            <td className="px-4 py-3 font-semibold">{c.refNo}{c.branch && <div className="text-xs font-normal text-slate-400">{c.branch.name}</div>}</td>
             <td className="px-4 py-3">{c._count.items}</td>
             <td className="px-4 py-3"><span className={`chip ${c.status === 'POSTED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{c.status === 'POSTED' ? 'โพสต์แล้ว' : 'เปิดอยู่'}</span></td>
             <td className="px-4 py-3 text-slate-500">{new Date(c.createdAt).toLocaleString()}</td>

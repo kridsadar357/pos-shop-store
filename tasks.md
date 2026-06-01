@@ -22,11 +22,17 @@ Legend: ⬜ not started · 🟨 partial (notes)
   picker; defaults to the active branch)
 - ✅ POS reads **branch** stock for availability — products, out-of-stock KPIs and
   badges are scoped to the terminal's active branch (branch selector in the header)
-- ✅ Branch filter on **Dashboard, Movements, Shifts** (+ Sales); the no-branch
-  view is the consolidated all-branch dashboard
-- ⬜ Branch-scoped **stock count** (counts still compare against head-office on-hand)
-- ⬜ Per-branch settings (printer, PromptPay, receipt)
-- ⬜ Branch filter on the **Reports page** report types (dashboard/movements/shifts/sales done)
+- ✅ Branch filter on **Dashboard, Movements, Shifts, Sales, and the Reports page**
+  (all report types); the no-branch view is the consolidated all-branch report
+- ✅ Branch-scoped **stock count** — counts snapshot & reconcile the chosen branch's
+  on-hand and post COUNT movements to that branch
+- ✅ Per-branch settings — PromptPay, printer (type/address/paper) and receipt
+  header/footer overrides per branch (empty = inherit global); resolved in
+  checkout QR, network printing and the POS receipt
+
+**Multi-branch (§1) is complete.** Possible future polish: per-branch logo, and
+branch-scoped POS reprint header/footer in the back office (Sales reprint footer QR
+is already branch-correct).
 
 ## 2. Hardware & printing
 - 🟨 ESC/POS **USB** printing — only network (port 9100) is implemented; USB needs a local print agent/bridge

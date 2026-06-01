@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { buildPromptPayPayload, type PromptPayType } from '../lib/promptpay.js';
+import { resolvedSettings } from '../lib/branchSettings.js';
 import { uploadsDir } from './products.js';
 
 export const settingsRouter = Router();
@@ -25,6 +26,15 @@ settingsRouter.get(
   ah(async (_req, res) => {
     const setting = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
     res.json(setting);
+  })
+);
+
+// Global settings merged with a branch's per-branch overrides.
+settingsRouter.get(
+  '/resolved',
+  ah(async (req, res) => {
+    const branchId = req.query.branchId ? Number(req.query.branchId) : null;
+    res.json(await resolvedSettings(branchId));
   })
 );
 
@@ -92,7 +102,8 @@ settingsRouter.get(
   '/promptpay',
   ah(async (req, res) => {
     const amount = req.query.amount ? Number(req.query.amount) : undefined;
-    const setting = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
+    const branchId = req.query.branchId ? Number(req.query.branchId) : null;
+    const setting = await resolvedSettings(branchId);
     if (!setting.promptPayId) return res.status(400).json({ error: 'PromptPay ID not configured' });
     const payload = buildPromptPayPayload({
       id: setting.promptPayId,

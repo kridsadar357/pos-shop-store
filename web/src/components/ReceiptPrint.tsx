@@ -21,7 +21,7 @@ export function ReceiptPrint({ sale, setting, onDone }: { sale: Sale; setting: S
   useEffect(() => {
     if (!needQR) return;
     if (qr) { setReady(true); return; }
-    api<{ payload: string }>('/settings/promptpay', { query: { amount: num(sale.total).toFixed(2) } })
+    api<{ payload: string }>('/settings/promptpay', { query: { amount: num(sale.total).toFixed(2), branchId: sale.branchId ?? undefined } })
       .then((r) => { setQr(r.payload); })
       .catch(() => {})
       .finally(() => setReady(true));

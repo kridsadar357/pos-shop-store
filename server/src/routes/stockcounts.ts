@@ -13,7 +13,7 @@ stockCountsRouter.get(
     res.json(
       await prisma.stockCount.findMany({
         orderBy: { createdAt: 'desc' },
-        include: { _count: { select: { items: true } } },
+        include: { _count: { select: { items: true } }, branch: { select: { name: true } } },
       })
     );
   })
@@ -24,7 +24,7 @@ stockCountsRouter.get(
   ah(async (req, res) => {
     const count = await prisma.stockCount.findUnique({
       where: { id: Number(req.params.id) },
-      include: { items: { include: { product: { select: { name: true, sku: true, unit: true } } } } },
+      include: { items: { include: { product: { select: { name: true, sku: true, unit: true } } } }, branch: { select: { name: true } } },
     });
     if (!count) return res.status(404).json({ error: 'Not found' });
     res.json(count);
@@ -36,17 +36,24 @@ stockCountsRouter.get(
 const openSchema = z.object({
   note: z.string().default(''),
   productIds: z.array(z.number().int()).optional(),
+  branchId: z.number().int().nullable().optional(),
 });
 
 stockCountsRouter.post(
   '/',
   requireRole('ADMIN', 'MANAGER'),
   ah(async (req, res) => {
-    const { note, productIds } = openSchema.parse(req.body);
+    const { note, productIds, branchId: rawBranch } = openSchema.parse(req.body);
+    const branchId = rawBranch ?? (await prisma.branch.findFirst({ where: { isDefault: true }, select: { id: true } }))?.id ?? null;
+
     const products = await prisma.product.findMany({
       where: { isActive: true, ...(productIds?.length ? { id: { in: productIds } } : {}) },
       select: { id: true, stockQty: true },
     });
+    // System qty is the branch's on-hand (falls back to the all-branch total only if unbranched).
+    const bsRows = branchId ? await prisma.branchStock.findMany({ where: { branchId, productId: { in: products.map((p) => p.id) } } }) : [];
+    const branchQty = new Map(bsRows.map((b) => [b.productId, b.qty]));
+    const sysOf = (p: { id: number; stockQty: number }) => (branchId ? (branchQty.get(p.id) ?? 0) : p.stockQty);
 
     const count = await prisma.$transaction(async (tx) => {
       const seq = await nextSeq(tx, 'stock_count');
@@ -54,13 +61,10 @@ stockCountsRouter.post(
         data: {
           refNo: `SC-${String(seq).padStart(5, '0')}`,
           note,
+          branchId,
           userId: req.user!.id,
           items: {
-            create: products.map((p) => ({
-              productId: p.id,
-              systemQty: p.stockQty,
-              countedQty: p.stockQty,
-            })),
+            create: products.map((p) => ({ productId: p.id, systemQty: sysOf(p), countedQty: sysOf(p) })),
           },
         },
       });
@@ -110,10 +114,16 @@ stockCountsRouter.post(
 
       let adjustments = 0;
       for (const item of count.items) {
-        // Re-read live system qty so we apply the true delta even if stock moved
-        // between opening and posting the count.
-        const product = await tx.product.findUniqueOrThrow({ where: { id: item.productId }, select: { stockQty: true } });
-        const delta = item.countedQty - product.stockQty;
+        // Re-read the live on-hand (branch-scoped) so we apply the true delta even
+        // if stock moved between opening and posting the count.
+        let live: number;
+        if (count.branchId != null) {
+          const bs = await tx.branchStock.findUnique({ where: { productId_branchId: { productId: item.productId, branchId: count.branchId } } });
+          live = bs?.qty ?? 0;
+        } else {
+          live = (await tx.product.findUniqueOrThrow({ where: { id: item.productId }, select: { stockQty: true } })).stockQty;
+        }
+        const delta = item.countedQty - live;
         if (delta !== 0) {
           adjustments++;
           await postMovement(tx, {
@@ -124,6 +134,7 @@ stockCountsRouter.post(
             refId: countId,
             note: `${count.refNo} reconcile`,
             userId,
+            branchId: count.branchId,
           });
         }
       }

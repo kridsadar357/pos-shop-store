@@ -28,6 +28,14 @@ const schema = z.object({
   phone: z.string().default(''),
   isActive: z.boolean().default(true),
   isDefault: z.boolean().default(false),
+  // Per-branch overrides (empty = inherit global Setting).
+  promptPayId: z.string().default(''),
+  promptPayType: z.string().default(''),
+  printerType: z.string().default(''),
+  printerAddress: z.string().default(''),
+  printerPaper: z.string().default(''),
+  receiptHeader: z.string().default(''),
+  receiptFooter: z.string().default(''),
 });
 
 branchesRouter.post(

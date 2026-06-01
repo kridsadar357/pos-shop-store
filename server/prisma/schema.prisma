@@ -116,10 +116,20 @@ model Branch {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
 
+  // Per-branch overrides (empty string = inherit the global Setting).
+  promptPayId    String @default("")
+  promptPayType  String @default("") // MSISDN | NATID | EWALLET
+  printerType    String @default("") // BROWSER | ESCPOS_NET | ESCPOS_USB
+  printerAddress String @default("")
+  printerPaper   String @default("") // 58mm | 80mm
+  receiptHeader  String @default("")
+  receiptFooter  String @default("")
+
   sales         Sale[]
   shifts        Shift[]
   movements     StockMovement[]
   branchStock   BranchStock[]
+  stockCounts   StockCount[]
   transfersFrom StockTransfer[] @relation("TransferFrom")
   transfersTo   StockTransfer[] @relation("TransferTo")
 }
@@ -474,10 +484,12 @@ model StockCount {
   status    String    @default("OPEN") // OPEN | POSTED
   note      String    @default("")
   userId    Int?
+  branchId  Int?
   createdAt DateTime  @default(now())
   postedAt  DateTime?
 
-  items StockCountItem[]
+  branch Branch?          @relation(fields: [branchId], references: [id])
+  items  StockCountItem[]
 }
 
 model StockCountItem {

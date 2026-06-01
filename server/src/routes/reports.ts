@@ -8,7 +8,8 @@ reportsRouter.use(requireAuth, requireRole('ADMIN', 'MANAGER'));
 function range(req: { query: Record<string, unknown> }) {
   const from = req.query.from ? new Date(String(req.query.from)) : new Date(Date.now() - 30 * 864e5);
   const to = req.query.to ? new Date(String(req.query.to)) : new Date();
-  return { from, to };
+  const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+  return { from, to, branchId };
 }
 
 const num = (d: unknown) => Number(d ?? 0);
@@ -17,9 +18,9 @@ const num = (d: unknown) => Number(d ?? 0);
 reportsRouter.get(
   '/summary',
   ah(async (req, res) => {
-    const { from, to } = range(req);
+    const { from, to, branchId } = range(req);
     const sales = await prisma.sale.findMany({
-      where: { status: 'PAID', createdAt: { gte: from, lte: to } },
+      where: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } },
       include: { items: true },
     });
 
@@ -65,10 +66,10 @@ reportsRouter.get(
 reportsRouter.get(
   '/payment-methods',
   ah(async (req, res) => {
-    const { from, to } = range(req);
+    const { from, to, branchId } = range(req);
     const grouped = await prisma.sale.groupBy({
       by: ['paymentMethod'],
-      where: { status: 'PAID', createdAt: { gte: from, lte: to } },
+      where: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } },
       _sum: { total: true },
       _count: { _all: true },
     });
@@ -80,10 +81,10 @@ reportsRouter.get(
 reportsRouter.get(
   '/top-products',
   ah(async (req, res) => {
-    const { from, to } = range(req);
+    const { from, to, branchId } = range(req);
     const limit = Number(req.query.limit || 20);
     const items = await prisma.saleItem.findMany({
-      where: { sale: { status: 'PAID', createdAt: { gte: from, lte: to } } },
+      where: { sale: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } } },
       select: { productId: true, nameSnapshot: true, qty: true, lineTotal: true, unitCost: true },
     });
     const map = new Map<number, { productId: number; name: string; qty: number; revenue: number; profit: number }>();
@@ -105,21 +106,23 @@ reportsRouter.get(
 // --- Low stock / reorder report ---
 reportsRouter.get(
   '/low-stock',
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
     const products = await prisma.product.findMany({
       where: { isActive: true },
-      include: { category: { select: { name: true } } },
+      include: { category: { select: { name: true } }, ...(branchId ? { branchStock: { where: { branchId }, select: { qty: true } } } : {}) },
       orderBy: { stockQty: 'asc' },
     });
+    const onHand = (p: any) => (branchId ? (p.branchStock?.[0]?.qty ?? 0) : p.stockQty);
     res.json(
       products
-        .filter((p) => p.stockQty <= p.reorderLevel)
+        .filter((p) => onHand(p) <= p.reorderLevel)
         .map((p) => ({
           id: p.id,
           sku: p.sku,
           name: p.name,
           category: p.category?.name ?? '',
-          stockQty: p.stockQty,
+          stockQty: onHand(p),
           reorderLevel: p.reorderLevel,
           unit: p.unit,
         }))
@@ -130,24 +133,27 @@ reportsRouter.get(
 // --- Inventory valuation (qty * cost) ---
 reportsRouter.get(
   '/inventory-valuation',
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
     const products = await prisma.product.findMany({
       where: { isActive: true },
-      include: { category: { select: { name: true } } },
+      include: { category: { select: { name: true } }, ...(branchId ? { branchStock: { where: { branchId }, select: { qty: true } } } : {}) },
       orderBy: { name: 'asc' },
     });
+    const onHand = (p: any) => (branchId ? (p.branchStock?.[0]?.qty ?? 0) : p.stockQty);
     let totalCost = 0;
     let totalRetail = 0;
     const rows = products.map((p) => {
-      const costValue = round2(num(p.cost) * p.stockQty);
-      const retailValue = round2(num(p.retailPrice) * p.stockQty);
+      const qty = onHand(p);
+      const costValue = round2(num(p.cost) * qty);
+      const retailValue = round2(num(p.retailPrice) * qty);
       totalCost += costValue;
       totalRetail += retailValue;
       return {
         sku: p.sku,
         name: p.name,
         category: p.category?.name ?? '',
-        stockQty: p.stockQty,
+        stockQty: qty,
         cost: num(p.cost),
         costValue,
         retailValue,
@@ -171,9 +177,10 @@ reportsRouter.get(
     start.setHours(0, 0, 0, 0);
     const end = new Date(day);
     end.setHours(23, 59, 59, 999);
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
 
     const sales = await prisma.sale.findMany({
-      where: { createdAt: { gte: start, lte: end } },
+      where: { branchId, createdAt: { gte: start, lte: end } },
       include: { cashier: { select: { name: true } } },
     });
 
@@ -221,9 +228,9 @@ reportsRouter.get(
 reportsRouter.get(
   '/profit-by-category',
   ah(async (req, res) => {
-    const { from, to } = range(req);
+    const { from, to, branchId } = range(req);
     const items = await prisma.saleItem.findMany({
-      where: { sale: { status: 'PAID', createdAt: { gte: from, lte: to } } },
+      where: { sale: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } } },
       select: { qty: true, lineTotal: true, unitCost: true, product: { select: { category: { select: { name: true } } } } },
     });
     const map = new Map<string, { category: string; qty: number; revenue: number; cost: number }>();
@@ -254,9 +261,9 @@ reportsRouter.get(
 reportsRouter.get(
   '/sales-by-hour',
   ah(async (req, res) => {
-    const { from, to } = range(req);
+    const { from, to, branchId } = range(req);
     const sales = await prisma.sale.findMany({
-      where: { status: 'PAID', createdAt: { gte: from, lte: to } },
+      where: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } },
       select: { total: true, createdAt: true },
     });
     const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, label: `${String(h).padStart(2, '0')}:00`, revenue: 0, orders: 0 }));
@@ -273,10 +280,10 @@ reportsRouter.get(
 reportsRouter.get(
   '/tax-summary',
   ah(async (req, res) => {
-    const { from, to } = range(req);
+    const { from, to, branchId } = range(req);
     const setting = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
     const sales = await prisma.sale.findMany({
-      where: { status: 'PAID', createdAt: { gte: from, lte: to } },
+      where: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } },
       select: { total: true, taxAmount: true, createdAt: true },
     });
     let gross = 0;

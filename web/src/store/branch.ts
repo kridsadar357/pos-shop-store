@@ -9,6 +9,14 @@ export interface Branch {
   phone: string;
   isActive: boolean;
   isDefault: boolean;
+  // Per-branch overrides (empty = inherit global Setting)
+  promptPayId?: string;
+  promptPayType?: string;
+  printerType?: string;
+  printerAddress?: string;
+  printerPaper?: string;
+  receiptHeader?: string;
+  receiptFooter?: string;
 }
 
 interface BranchState {
