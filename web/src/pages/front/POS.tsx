@@ -229,7 +229,7 @@ export default function POS() {
   }, [lines, member, setting, totals.count]);
 
   // ---- checkout ----
-  async function completeSale(method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT', ref = '', payments?: { method: string; amount: number; reference?: string }[]) {
+  async function completeSale(method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT' | 'GIFT', ref = '', payments?: { method: string; amount: number; reference?: string }[]) {
     try {
       const sale = await api<Sale>('/sales', {
         method: 'POST',
@@ -1000,9 +1000,9 @@ function TransferModal({ amount, currency, onQR, onConfirm, onCancel }: { amount
   );
 }
 
-type Tender = { method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT'; amount: number; reference: string };
+type Tender = { method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT' | 'GIFT'; amount: number; reference: string };
 const TENDER_LABELS: { k: Tender['method']; label: string }[] = [
-  { k: 'CASH', label: 'เงินสด' }, { k: 'TRANSFER', label: 'โอน/พร้อมเพย์' }, { k: 'CARD', label: 'บัตร' }, { k: 'CREDIT', label: 'เงินเชื่อ' },
+  { k: 'CASH', label: 'เงินสด' }, { k: 'TRANSFER', label: 'โอน/พร้อมเพย์' }, { k: 'CARD', label: 'บัตร' }, { k: 'CREDIT', label: 'เงินเชื่อ' }, { k: 'GIFT', label: 'บัตรของขวัญ' },
 ];
 
 /** Split / multi-tender payment: add several tenders that together cover the bill. */
@@ -1013,7 +1013,7 @@ function SplitPaymentModal({ total, currency, onConfirm, onCancel }: { total: nu
   const remaining = Math.round((total - paid) * 100) / 100;
   const change = Math.max(0, Math.round((paid - total) * 100) / 100);
   const nonCashOver = nonCash > total + 0.001;
-  const valid = paid >= total - 0.001 && !nonCashOver && rows.every((r) => r.amount > 0);
+  const valid = paid >= total - 0.001 && !nonCashOver && rows.every((r) => r.amount > 0 && (r.method !== 'GIFT' || r.reference.trim().length > 0));
 
   function setRow(i: number, patch: Partial<Tender>) { setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r))); }
   function addRow() {
@@ -1032,12 +1032,17 @@ function SplitPaymentModal({ total, currency, onConfirm, onCancel }: { total: nu
 
         <div className="mt-3 space-y-2">
           {rows.map((r, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <select className="input w-36" value={r.method} onChange={(e) => setRow(i, { method: e.target.value as Tender['method'] })}>
-                {TENDER_LABELS.map((t) => <option key={t.k} value={t.k}>{t.label}</option>)}
-              </select>
-              <input type="number" className="input flex-1 text-right" value={r.amount || ''} onChange={(e) => setRow(i, { amount: Math.max(0, Number(e.target.value)) })} placeholder="0.00" />
-              {rows.length > 1 && <button className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-500" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}><i className="fa-solid fa-xmark" /></button>}
+            <div key={i} className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <select className="input w-36" value={r.method} onChange={(e) => setRow(i, { method: e.target.value as Tender['method'] })}>
+                  {TENDER_LABELS.map((t) => <option key={t.k} value={t.k}>{t.label}</option>)}
+                </select>
+                <input type="number" className="input flex-1 text-right" value={r.amount || ''} onChange={(e) => setRow(i, { amount: Math.max(0, Number(e.target.value)) })} placeholder="0.00" />
+                {rows.length > 1 && <button className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-500" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}><i className="fa-solid fa-xmark" /></button>}
+              </div>
+              {r.method === 'GIFT' && (
+                <input className="input font-mono uppercase" value={r.reference} onChange={(e) => setRow(i, { reference: e.target.value.toUpperCase() })} placeholder="รหัสบัตรของขวัญ (เช่น GC-XXXX)" />
+              )}
             </div>
           ))}
         </div>

@@ -53,6 +53,7 @@ export function ShiftReport({ shift, setting, mode, onDone }: { shift: Shift; se
         <div className="r-row"><span>โอน/พร้อมเพย์</span><span>{money(bm?.TRANSFER ?? t?.transferSales ?? 0, currency)}</span></div>
         {(bm?.CARD ?? 0) > 0 && <div className="r-row"><span>บัตรเครดิต</span><span>{money(bm?.CARD ?? 0, currency)}</span></div>}
         {(bm?.CREDIT ?? 0) > 0 && <div className="r-row"><span>เงินเชื่อ</span><span>{money(bm?.CREDIT ?? 0, currency)}</span></div>}
+        {(bm?.GIFT ?? 0) > 0 && <div className="r-row"><span>บัตรของขวัญ</span><span>{money(bm?.GIFT ?? 0, currency)}</span></div>}
 
         <div className="r-hr" />
         <div className="r-row" style={{ fontWeight: 700 }}><span>ลิ้นชักเงินสด</span><span /></div>

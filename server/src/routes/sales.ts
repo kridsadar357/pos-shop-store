@@ -4,6 +4,7 @@ import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
 import { postPoints } from '../lib/loyalty.js';
+import { postGift } from '../lib/giftcard.js';
 import { buildPromptPayPayload, type PromptPayType } from '../lib/promptpay.js';
 import { evaluatePromotions, type PromoCartLine } from '../lib/promotions.js';
 
@@ -12,7 +13,7 @@ salesRouter.use(requireAuth);
 
 const checkoutSchema = z.object({
   type: z.enum(['RETAIL', 'WHOLESALE']).default('RETAIL'),
-  paymentMethod: z.enum(['CASH', 'TRANSFER', 'CARD', 'CREDIT']),
+  paymentMethod: z.enum(['CASH', 'TRANSFER', 'CARD', 'CREDIT', 'GIFT']),
   discount: z.number().nonnegative().default(0), // manual bill discount
   couponCode: z.string().optional(),
   cashReceived: z.number().nonnegative().default(0),
@@ -23,7 +24,7 @@ const checkoutSchema = z.object({
   // Optional split / multi-tender payments. When omitted, the single paymentMethod
   // (+ cashReceived) is used as today.
   payments: z
-    .array(z.object({ method: z.enum(['CASH', 'TRANSFER', 'CARD', 'CREDIT']), amount: z.number().positive(), reference: z.string().default('') }))
+    .array(z.object({ method: z.enum(['CASH', 'TRANSFER', 'CARD', 'CREDIT', 'GIFT']), amount: z.number().positive(), reference: z.string().default('') }))
     .optional(),
   items: z
     .array(z.object({ productId: z.number().int(), qty: z.number().int().positive() }))
@@ -142,7 +143,7 @@ salesRouter.post(
       }
 
       // ---- Tender plan: single payment, or split / multi-tender ----
-      type Tender = { method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT'; amount: number; reference: string };
+      type Tender = { method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT' | 'GIFT'; amount: number; reference: string };
       const tenders: Tender[] = data.payments?.length
         ? data.payments.map((p) => ({ method: p.method, amount: round2(p.amount), reference: p.reference }))
         : [{ method: data.paymentMethod, amount: data.paymentMethod === 'CASH' ? round2(data.cashReceived || total) : total, reference: data.paymentRef }];
@@ -221,6 +222,17 @@ salesRouter.post(
           userId: cashierId,
           branchId,
         });
+      }
+
+      // Gift-card tenders: validate the card and deduct its balance (the GIFT row's
+      // reference carries the card code). Throws → whole checkout rolls back.
+      for (const row of paymentRows) {
+        if (row.method !== 'GIFT') continue;
+        const code = (row.reference || '').trim().toUpperCase();
+        const card = code ? await tx.giftCard.findUnique({ where: { code } }) : null;
+        if (!card || !card.isActive) throw Object.assign(new Error('บัตรของขวัญไม่ถูกต้องหรือถูกระงับ'), { status: 400 });
+        if (card.expiresAt && card.expiresAt < new Date()) throw Object.assign(new Error('บัตรของขวัญหมดอายุแล้ว'), { status: 400 });
+        await postGift(tx, { giftCardId: card.id, type: 'REDEEM', amount: -row.amount, saleId: created.id, note: orderNo, userId: cashierId });
       }
 
       // Record the tender(s) — the per-method source of truth.
@@ -331,7 +343,7 @@ salesRouter.post(
     const id = Number(req.params.id);
     const userId = req.user!.id;
     const result = await prisma.$transaction(async (tx) => {
-      const sale = await tx.sale.findUniqueOrThrow({ where: { id }, include: { items: true } });
+      const sale = await tx.sale.findUniqueOrThrow({ where: { id }, include: { items: true, payments: true } });
       if (sale.status === 'VOID') throw Object.assign(new Error('Already voided'), { status: 400 });
 
       for (const item of sale.items) {
@@ -361,6 +373,14 @@ salesRouter.post(
             await postPoints(tx, { memberId: sale.memberId, saleId: sale.id, type: 'ADJUST', points: -clawback, note: `ยกเลิกแต้มจากบิล ${sale.orderNo}`, userId });
           }
         }
+      }
+
+      // Refund any gift-card tenders back onto their cards.
+      for (const p of sale.payments) {
+        if (p.method !== 'GIFT') continue;
+        const code = (p.reference || '').trim().toUpperCase();
+        const card = code ? await tx.giftCard.findUnique({ where: { code } }) : null;
+        if (card) await postGift(tx, { giftCardId: card.id, type: 'REFUND', amount: Number(p.amount), saleId: sale.id, note: `คืนเงินจากการยกเลิก ${sale.orderNo}`, userId });
       }
 
       return tx.sale.update({

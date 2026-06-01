@@ -89,7 +89,7 @@ export interface ShiftTotals {
   cashSales: number;
   transferSales: number;
   totalSales: number;
-  byMethod?: { CASH: number; TRANSFER: number; CARD: number; CREDIT: number };
+  byMethod?: { CASH: number; TRANSFER: number; CARD: number; CREDIT: number; GIFT: number };
   voids: number;
   payIn?: number;
   payOut?: number;
@@ -213,9 +213,29 @@ export interface Expense {
 
 export interface SaleTender {
   id?: number;
-  method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT';
+  method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT' | 'GIFT';
   amount: string | number;
   reference?: string;
+}
+
+export interface GiftCard {
+  id: number;
+  code: string;
+  initialBalance: string;
+  balance: string;
+  isActive: boolean;
+  note: string;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface GiftCardTxn {
+  id: number;
+  type: 'ISSUE' | 'RELOAD' | 'REDEEM' | 'REFUND';
+  amount: string;
+  balance: string;
+  note: string;
+  createdAt: string;
 }
 
 export interface HeldBill {

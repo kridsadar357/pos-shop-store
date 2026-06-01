@@ -26,6 +26,7 @@ import { transfersRouter } from './routes/transfers.js';
 import { expensesRouter } from './routes/expenses.js';
 import { auditRouter } from './routes/audit.js';
 import { payablesRouter } from './routes/payables.js';
+import { giftCardsRouter } from './routes/giftcards.js';
 import { auditLogger } from './middleware/audit.js';
 
 export function createApp() {
@@ -65,6 +66,7 @@ export function createApp() {
   app.use('/api/expenses', expensesRouter);
   app.use('/api/audit', auditRouter);
   app.use('/api/payables', payablesRouter);
+  app.use('/api/gift-cards', giftCardsRouter);
 
   // Central error handler.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

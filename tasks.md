@@ -75,7 +75,11 @@ is already branch-correct).
 - ✅ Promotion **scheduling UI** — `startsAt`/`endsAt` editable in the Promotions
   form (datetime-local), with scheduled/active/expired status chips + date range in
   the list; the POS already enforces the window via `activePromotions()`
-- ⬜ Gift cards / store credit (esp. as a refund option)
+- ✅ Gift cards / store credit — `GiftCard` + `GiftCardTxn` ledger (via a single
+  `postGift()` chokepoint); admin page to issue / reload / enable-disable / view
+  history. New `GIFT` PaymentMethod: redeemed at POS as a tender in the split-payment
+  modal (code + amount, validated & deducted server-side); voids refund the card.
+  Split-aware everywhere (byMethod, reports, receipt)
 - ⬜ Email / SMS / LINE receipt delivery
 
 ## 5. Finance & accounting

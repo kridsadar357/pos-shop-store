@@ -4,7 +4,7 @@ import { QRCanvas } from './QRCode';
 import { money, num, dateTime } from '../lib/format';
 import type { Sale, Setting } from '../types';
 
-const PM: Record<string, string> = { CASH: 'เงินสด', TRANSFER: 'โอนเงิน/พร้อมเพย์', CARD: 'บัตรเครดิต', CREDIT: 'เงินเชื่อ' };
+const PM: Record<string, string> = { CASH: 'เงินสด', TRANSFER: 'โอนเงิน/พร้อมเพย์', CARD: 'บัตรเครดิต', CREDIT: 'เงินเชื่อ', GIFT: 'บัตรของขวัญ' };
 
 /**
  * Off-screen 80mm thermal receipt. When mounted it triggers the browser print

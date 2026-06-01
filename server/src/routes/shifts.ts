@@ -12,12 +12,12 @@ const num = (d: unknown) => Number(d ?? 0);
 async function shiftTotals(shiftId: number) {
   // Per-method money comes from SalePayment (handles split / multi-tender bills).
   const payments = await prisma.salePayment.findMany({ where: { sale: { shiftId, status: 'PAID' } }, select: { method: true, amount: true } });
-  const byMethod = { CASH: 0, TRANSFER: 0, CARD: 0, CREDIT: 0 };
+  const byMethod = { CASH: 0, TRANSFER: 0, CARD: 0, CREDIT: 0, GIFT: 0 };
   for (const p of payments) {
     byMethod[p.method as keyof typeof byMethod] += num(p.amount);
   }
   const cash = byMethod.CASH;
-  const transfer = byMethod.TRANSFER + byMethod.CARD + byMethod.CREDIT; // non-cash, for compat
+  const transfer = byMethod.TRANSFER + byMethod.CARD + byMethod.CREDIT + byMethod.GIFT; // non-cash, for compat
   for (const k of Object.keys(byMethod) as (keyof typeof byMethod)[]) byMethod[k] = round2(byMethod[k]);
   const orders = await prisma.sale.count({ where: { shiftId, status: 'PAID' } });
   const voids = await prisma.sale.count({ where: { shiftId, status: 'VOID' } });
