@@ -37,6 +37,7 @@ export default function Products() {
   const [stockFilter, setStockFilter] = useState('');
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  const [costHistory, setCostHistory] = useState<{ refNo: string; date: string; supplier: string; qty: number; unitCost: string }[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -54,11 +55,14 @@ export default function Products() {
   function openNew() {
     setEditing(null);
     setImageFile(null);
+    setCostHistory([]);
     setForm({ ...empty });
   }
   function openEdit(p: Product) {
     setEditing(p);
     setImageFile(null);
+    setCostHistory([]);
+    api<typeof costHistory>(`/products/${p.id}/cost-history`).then(setCostHistory).catch(() => {});
     setForm({
       sku: p.sku,
       barcode: p.barcode ?? '',
@@ -256,6 +260,22 @@ export default function Products() {
             <NumField label="จุดสั่งซื้อซ้ำ" v={form.reorderLevel} set={(v) => setForm({ ...form, reorderLevel: v })} />
           </div>
           {editing && <p className="mt-3 text-xs text-slate-400">การปรับสต็อกทำผ่าน รับสินค้า / นับสต็อก / บัญชีสต็อก — สต็อกควบคุมด้วยบัญชีเดินสินค้า</p>}
+
+          {editing && costHistory.length > 0 && (
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="mb-2 text-sm font-bold text-ink-900"><i className="fa-solid fa-clock-rotate-left mr-1.5 text-brand-600" />ประวัติราคาทุน (จากการรับสินค้า)</div>
+              <div className="max-h-40 overflow-auto rounded-xl ring-1 ring-slate-200">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-3 py-2">วันที่</th><th className="px-3 py-2">ผู้จำหน่าย</th><th className="px-3 py-2 text-right">จำนวน</th><th className="px-3 py-2 text-right">ทุน/หน่วย</th></tr></thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {costHistory.map((h, i) => (
+                      <tr key={i}><td className="px-3 py-1.5 text-slate-500">{new Date(h.date).toLocaleDateString('th-TH')}</td><td className="px-3 py-1.5">{h.supplier}</td><td className="px-3 py-1.5 text-right">{h.qty}</td><td className="px-3 py-1.5 text-right font-medium">{money(h.unitCost)}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           <div className="mt-5 flex gap-2">
             <button className="btn-ghost flex-1" onClick={() => setForm(null)}>ยกเลิก</button>
             <button className="btn-primary flex-1" onClick={save}>บันทึก</button>

@@ -122,6 +122,23 @@ productsRouter.get(
   })
 );
 
+// Per-supplier purchase cost history (from goods receipts) for a product.
+productsRouter.get(
+  '/:id/cost-history',
+  ah(async (req, res) => {
+    const rows = await prisma.goodsReceiptItem.findMany({
+      where: { productId: Number(req.params.id) },
+      include: { receipt: { select: { refNo: true, createdAt: true, supplier: { select: { name: true } } } } },
+      orderBy: { id: 'desc' },
+      take: 20,
+    });
+    res.json(rows.map((r) => ({
+      refNo: r.receipt.refNo, date: r.receipt.createdAt, supplier: r.receipt.supplier?.name ?? '—',
+      qty: r.qty, unitCost: r.unitCost,
+    })));
+  })
+);
+
 const productSchema = z.object({
   sku: z.string().min(1),
   barcode: z.string().trim().optional().nullable(),

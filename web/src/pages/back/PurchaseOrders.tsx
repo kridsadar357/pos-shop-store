@@ -31,6 +31,7 @@ export default function PurchaseOrders() {
   const [to, setTo] = useState(today());
   const [form, setForm] = useState<{ id?: number; supplierId: number | ''; note: string; expectedDate: string; lines: FormLine[] } | null>(null);
   const [detail, setDetail] = useState<PODetail | null>(null);
+  const [suggest, setSuggest] = useState(false);
 
   async function load() {
     setRows(await api<POListItem[]>('/purchase-orders', { query: { from: `${from}T00:00:00`, to: `${to}T23:59:59` } }));
@@ -72,7 +73,12 @@ export default function PurchaseOrders() {
             <input type="date" className="bg-transparent text-sm outline-none" value={to} min={from} max={today()} onChange={(e) => setTo(e.target.value)} />
           </div>
         }
-        primary={<button className="btn-primary" onClick={() => setForm({ supplierId: '', note: '', expectedDate: '', lines: [] })}><i className="fa-solid fa-plus mr-1.5" />สร้างใบสั่งซื้อ</button>}
+        primary={
+          <div className="flex gap-2">
+            <button className="btn-ghost" onClick={() => setSuggest(true)}><i className="fa-solid fa-wand-magic-sparkles mr-1.5" />คำแนะนำสั่งซื้อ</button>
+            <button className="btn-primary" onClick={() => setForm({ supplierId: '', note: '', expectedDate: '', lines: [] })}><i className="fa-solid fa-plus mr-1.5" />สร้างใบสั่งซื้อ</button>
+          </div>
+        }
         exports={exporters}
         filterCount={status ? 1 : 0}
         onResetFilter={() => setStatus('')}
@@ -105,6 +111,7 @@ export default function PurchaseOrders() {
         )}
       />
 
+      {suggest && <SuggestModal onClose={() => setSuggest(false)} onDone={() => { setSuggest(false); load(); }} />}
       {form && (
         <POForm
           form={form} setForm={setForm} suppliers={suppliers}
@@ -315,4 +322,82 @@ function PODetailModal({ po, onClose, onChanged, onEdit }: {
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div><div className="text-[11px] uppercase tracking-wide text-slate-400">{label}</div><div className="font-medium text-ink-900">{value}</div></div>;
+}
+
+/* ── Reorder suggestions → auto-PO ── */
+interface Suggestion { productId: number; sku: string; name: string; onHand: number; reorderLevel: number; unit: string; suggestedQty: number; unitCost: number; supplierId: number | null; supplierName: string | null; }
+
+function SuggestModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const activeId = useBranch((s) => s.activeId);
+  const [rows, setRows] = useState<Suggestion[]>([]);
+  const [sel, setSel] = useState<Record<number, { on: boolean; qty: number; cost: number }>>({});
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api<Suggestion[]>('/purchase-orders/suggestions', { query: { branchId: activeId ?? undefined } })
+      .then((s) => { setRows(s); setSel(Object.fromEntries(s.map((x) => [x.productId, { on: true, qty: x.suggestedQty, cost: x.unitCost }]))); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const chosen = rows.filter((r) => sel[r.productId]?.on);
+  const groupCount = new Set(chosen.map((r) => r.supplierId)).size;
+
+  async function create() {
+    if (!chosen.length) return;
+    const groups = new Map<number | null, Suggestion[]>();
+    for (const r of chosen) { const k = r.supplierId; if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(r); }
+    setBusy(true);
+    try {
+      for (const [supplierId, items] of groups) {
+        await api('/purchase-orders', { method: 'POST', body: { supplierId: supplierId ?? null, note: 'สร้างจากคำแนะนำเติมสต็อก', items: items.map((i) => ({ productId: i.productId, qty: sel[i.productId].qty, unitCost: sel[i.productId].cost })) } });
+      }
+      toast.success(`สร้างใบสั่งซื้อ ${groups.size} ใบจากคำแนะนำ`);
+      onDone();
+    } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
+
+  return (
+    <Modal title="คำแนะนำการสั่งซื้อ (เติมสต็อก)" wide onClose={onClose}>
+      <p className="mb-3 text-sm text-slate-500">สินค้าที่ถึง/ต่ำกว่าจุดสั่งซื้อ พร้อมจำนวนแนะนำ ราคาทุนล่าสุด และผู้จำหน่ายเดิม — สร้างใบสั่งซื้อแยกตามผู้จำหน่ายอัตโนมัติ</p>
+      {loading ? (
+        <div className="py-12 text-center text-slate-400"><i className="fa-solid fa-spinner fa-spin mr-2" />กำลังคำนวณ…</div>
+      ) : rows.length === 0 ? (
+        <div className="py-12 text-center text-slate-400"><i className="fa-solid fa-circle-check mb-2 block text-2xl text-emerald-500" />สต็อกเพียงพอ ไม่มีรายการที่ต้องสั่งซื้อ</div>
+      ) : (
+        <>
+          <div className="max-h-[55vh] overflow-auto rounded-xl ring-1 ring-slate-200">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr><th className="px-3 py-2.5 w-8"></th><th className="px-3 py-2.5">สินค้า</th><th className="px-3 py-2.5 text-right">คงเหลือ/จุดสั่ง</th><th className="px-3 py-2.5">ผู้จำหน่าย</th><th className="px-3 py-2.5 w-24 text-right">สั่ง</th><th className="px-3 py-2.5 w-28 text-right">ทุน/หน่วย</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((r) => {
+                  const s = sel[r.productId];
+                  return (
+                    <tr key={r.productId} className={s?.on ? '' : 'opacity-50'}>
+                      <td className="px-3 py-2"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={s?.on ?? false} onChange={(e) => setSel({ ...sel, [r.productId]: { ...s, on: e.target.checked } })} /></td>
+                      <td className="px-3 py-2"><div className="font-medium">{r.name}</div><div className="text-xs text-slate-400">{r.sku}</div></td>
+                      <td className="px-3 py-2 text-right"><span className={r.onHand <= 0 ? 'font-semibold text-rose-500' : 'text-amber-600'}>{r.onHand}</span> <span className="text-slate-400">/ {r.reorderLevel}</span></td>
+                      <td className="px-3 py-2 text-slate-500">{r.supplierName ?? '—'}</td>
+                      <td className="px-3 py-2 text-right"><input type="number" min={1} className="input w-20 py-1 text-right" value={s?.qty ?? 0} onChange={(e) => setSel({ ...sel, [r.productId]: { ...s, qty: Math.max(1, Number(e.target.value)) } })} /></td>
+                      <td className="px-3 py-2 text-right"><input type="number" min={0} className="input w-24 py-1 text-right" value={s?.cost ?? 0} onChange={(e) => setSel({ ...sel, [r.productId]: { ...s, cost: Number(e.target.value) } })} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-sm text-slate-500">เลือก {chosen.length} รายการ · จะสร้าง {groupCount} ใบสั่งซื้อ (แยกตามผู้จำหน่าย)</div>
+            <div className="flex gap-2">
+              <button className="btn-ghost" onClick={onClose}>ยกเลิก</button>
+              <button className="btn-primary" disabled={busy || !chosen.length} onClick={create}><i className="fa-solid fa-file-circle-plus mr-1.5" />สร้างใบสั่งซื้อ</button>
+            </div>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
 }

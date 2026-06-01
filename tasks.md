@@ -42,11 +42,18 @@ is already branch-correct).
 - ⬜ Customer pole display (VFD) support
 
 ## 3. Inventory depth
-- ⬜ Batch / lot & expiry-date tracking
-- ⬜ Serial-number tracking
-- ⬜ Units-of-measure conversion (e.g. buy by box, sell by piece)
-- ⬜ Reorder suggestions / auto-PO generation from low-stock
-- ⬜ Supplier price lists / per-supplier product cost history
+- ✅ Reorder suggestions / **auto-PO generation** from low-stock (branch-aware;
+  suggested qty + last cost + preferred supplier; one-click creates POs grouped
+  by supplier) — on the Purchase Orders page
+- ✅ Per-supplier product **cost history** (from goods receipts; shown in the
+  product editor) — feeds the reorder suggestions
+- 🟨 Editable **supplier price lists** (a `SupplierProduct` catalogue) — only the
+  derived cost *history* exists; no maintained price list yet
+- ⬜ Units-of-measure conversion (buy by box, sell by piece) — add purchase unit +
+  units-per-pack to Product; convert on receiving/PO
+- ⬜ Batch / lot & expiry-date tracking — **large**: needs batch-level balances
+  layered on the per-branch stock model + FEFO picking
+- ⬜ Serial-number tracking — **large**: per-unit records + scan-in/scan-out
 
 ## 4. Sales & customer features
 - ⬜ Loyalty points: accrual + redemption (members exist, points do not)

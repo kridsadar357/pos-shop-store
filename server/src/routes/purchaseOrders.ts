@@ -41,6 +41,51 @@ purchaseOrdersRouter.get(
   })
 );
 
+// --- Reorder suggestions: products at/below reorder, with a suggested qty,
+//     last purchase cost and preferred supplier (from the most recent receipt). ---
+purchaseOrdersRouter.get(
+  '/suggestions',
+  ah(async (req, res) => {
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+    const products = await prisma.product.findMany({
+      where: { isActive: true },
+      include: { category: { select: { name: true } }, ...(branchId ? { branchStock: { where: { branchId }, select: { qty: true } } } : {}) } as any,
+    });
+    const onHand = (p: any) => (branchId ? (p.branchStock?.[0]?.qty ?? 0) : p.stockQty);
+    const need = products.filter((p) => onHand(p) <= p.reorderLevel);
+    if (!need.length) return res.json([]);
+
+    // Latest goods-receipt cost + supplier per product.
+    const grItems = await prisma.goodsReceiptItem.findMany({
+      where: { productId: { in: need.map((p) => p.id) } },
+      include: { receipt: { select: { supplierId: true, createdAt: true, supplier: { select: { name: true } } } } },
+      orderBy: { id: 'desc' },
+    });
+    const lastBuy = new Map<number, { unitCost: number; supplierId: number | null; supplierName: string | null }>();
+    for (const it of grItems) {
+      if (lastBuy.has(it.productId)) continue;
+      lastBuy.set(it.productId, { unitCost: Number(it.unitCost), supplierId: it.receipt.supplierId, supplierName: it.receipt.supplier?.name ?? null });
+    }
+
+    res.json(
+      need
+        .map((p) => {
+          const oh = onHand(p);
+          const target = p.reorderLevel > 0 ? p.reorderLevel * 3 : 50; // restock to ~3× the reorder point
+          const lb = lastBuy.get(p.id);
+          return {
+            productId: p.id, sku: p.sku, name: p.name, category: (p as any).category?.name ?? '',
+            onHand: oh, reorderLevel: p.reorderLevel, unit: p.unit,
+            suggestedQty: Math.max(target - oh, 1),
+            unitCost: lb?.unitCost ?? Number(p.cost),
+            supplierId: lb?.supplierId ?? null, supplierName: lb?.supplierName ?? null,
+          };
+        })
+        .sort((a, b) => a.onHand - b.onHand)
+    );
+  })
+);
+
 // --- Detail ---
 purchaseOrdersRouter.get(
   '/:id',
