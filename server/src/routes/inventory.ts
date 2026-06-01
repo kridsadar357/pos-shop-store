@@ -30,6 +30,25 @@ inventoryRouter.get(
   })
 );
 
+// --- Goods receipt history ---
+inventoryRouter.get(
+  '/receipts',
+  ah(async (req, res) => {
+    const from = req.query.from ? new Date(String(req.query.from)) : undefined;
+    const to = req.query.to ? new Date(String(req.query.to)) : undefined;
+    const receipts = await prisma.goodsReceipt.findMany({
+      where: { createdAt: { gte: from, lte: to } },
+      include: {
+        supplier: { select: { name: true } },
+        _count: { select: { items: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    res.json(receipts);
+  })
+);
+
 // --- Receive goods from a supplier (RECEIVE movements) ---
 const receiveSchema = z.object({
   supplierId: z.number().int().nullable().optional(),

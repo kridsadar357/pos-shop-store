@@ -37,6 +37,23 @@ export interface Setting {
   taxInclusive: boolean;
   receiptFooter: string;
   memberGetsWholesale: boolean;
+  receiptLogoUrl: string | null;
+  receiptHeader: string;
+  receiptShowQR: boolean;
+  printerType: 'BROWSER' | 'ESCPOS_NET' | 'ESCPOS_USB';
+  printerAddress: string;
+  printerPaper: '58mm' | '80mm';
+  setupCompleted: boolean;
+}
+
+export interface LicenseState {
+  status: 'INACTIVE' | 'DEMO' | 'ACTIVE' | 'EXPIRED';
+  valid: boolean;
+  daysLeft: number;
+  expiresAt: string | null;
+  plan: string;
+  key: string;
+  demoDays: number;
 }
 
 export interface Member {

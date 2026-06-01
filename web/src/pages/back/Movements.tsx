@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
-import { PageHeader } from '../../components/ui';
-import { dateTime, downloadCSV } from '../../lib/format';
+import { DataTable } from '../../components/DataTable';
+import { ListToolbar } from '../../components/ListToolbar';
+import { makeExporters, type Column } from '../../lib/export';
+import { dateTime } from '../../lib/format';
 import type { Movement } from '../../types';
 
 const TYPES = ['', 'RECEIVE', 'SALE', 'RETURN', 'ADJUST', 'COUNT', 'VOID'];
@@ -15,61 +17,94 @@ const COLOR: Record<string, string> = {
   VOID: 'bg-rose-50 text-rose-600',
 };
 
+function today() { return new Date().toISOString().slice(0, 10); }
+function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
+
 export default function Movements() {
   const [rows, setRows] = useState<Movement[]>([]);
   const [type, setType] = useState('');
   const [q, setQ] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
   async function load() {
     setRows(await api<Movement[]>('/inventory/movements', { query: { type } }));
   }
   useEffect(() => { load(); }, [type]);
 
-  const filtered = rows.filter((r) =>
-    !q || r.product?.name.toLowerCase().includes(q.toLowerCase()) || r.product?.sku.toLowerCase().includes(q.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : -Infinity;
+    const toTs = to ? new Date(`${to}T23:59:59`).getTime() : Infinity;
+    return rows.filter((r) => {
+      if (term && !(r.product?.name.toLowerCase().includes(term) || r.product?.sku.toLowerCase().includes(term))) return false;
+      const ts = new Date(r.createdAt).getTime();
+      return ts >= fromTs && ts <= toTs;
+    });
+  }, [rows, q, from, to]);
+
+  const filterCount = [type, from, to].filter(Boolean).length;
+
+  const columns: Column<Movement>[] = [
+    { label: 'วันที่', value: (r) => dateTime(r.createdAt) },
+    { label: 'สินค้า', value: (r) => r.product?.name ?? '' },
+    { label: 'SKU', value: (r) => r.product?.sku ?? '' },
+    { label: 'ประเภท', value: (r) => TYPE_TH[r.type] ?? r.type },
+    { label: 'เปลี่ยนแปลง', value: (r) => r.qtyDelta, right: true },
+    { label: 'คงเหลือ', value: (r) => r.balanceAfter, right: true },
+    { label: 'อ้างอิง/หมายเหตุ', value: (r) => r.note || r.refType },
+    { label: 'ผู้ทำรายการ', value: (r) => r.user?.name ?? '' },
+  ];
+  const exporters = makeExporters({ filename: 'stock-ledger', title: 'บัญชีเดินสินค้า (คลังสินค้า)', columns, rows: () => filtered });
 
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <div className="flex h-full flex-col gap-4">
+      <ListToolbar
         title="บัญชีสต็อก (คลังสินค้า)"
         subtitle="บันทึกความเคลื่อนไหวสต็อกทุกรายการ — ตรวจสอบย้อนหลังได้ทั้งหมด"
-        icon="↺"
-        actions={
-          <button className="btn-ghost" onClick={() => downloadCSV('stock-ledger.csv', filtered.map((r) => ({
-            date: r.createdAt, product: r.product?.name, sku: r.product?.sku, type: r.type, qty: r.qtyDelta, balance: r.balanceAfter, ref: r.refType, note: r.note, user: r.user?.name ?? '',
-          })))}>ส่งออก CSV</button>
+        icon={<i className="fa-solid fa-warehouse" />}
+        q={q} setQ={setQ} placeholder="กรองตามสินค้า / SKU…"
+        exports={exporters}
+        filterCount={filterCount}
+        onResetFilter={() => { setType(''); setFrom(''); setTo(''); }}
+        filter={
+          <>
+            <div>
+              <label className="label">ประเภทความเคลื่อนไหว</label>
+              <select className="input" value={type} onChange={(e) => setType(e.target.value)}>
+                {TYPES.map((t) => <option key={t} value={t}>{TYPE_TH[t]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">ช่วงวันที่</label>
+              <div className="flex items-center gap-2">
+                <input type="date" className="input" value={from} max={to || today()} onChange={(e) => setFrom(e.target.value)} />
+                <span className="text-slate-300">—</span>
+                <input type="date" className="input" value={to} min={from} max={today()} onChange={(e) => setTo(e.target.value)} />
+              </div>
+            </div>
+          </>
         }
       />
 
-      <div className="flex flex-wrap gap-2">
-        <input className="input max-w-xs" placeholder="กรองตามสินค้า…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="input max-w-[160px]" value={type} onChange={(e) => setType(e.target.value)}>
-          {TYPES.map((t) => <option key={t} value={t}>{TYPE_TH[t]}</option>)}
-        </select>
-      </div>
-
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
-            <tr><th className="px-4 py-3">วันที่</th><th className="px-4 py-3">สินค้า</th><th className="px-4 py-3">ประเภท</th><th className="px-4 py-3 text-right">เปลี่ยนแปลง</th><th className="px-4 py-3 text-right">คงเหลือ</th><th className="px-4 py-3">อ้างอิง / หมายเหตุ</th><th className="px-4 py-3">ผู้ทำรายการ</th></tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filtered.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-50">
-                <td className="px-4 py-2.5 text-slate-500">{dateTime(r.createdAt)}</td>
-                <td className="px-4 py-2.5"><div className="font-medium">{r.product?.name}</div><div className="text-xs text-slate-400">{r.product?.sku}</div></td>
-                <td className="px-4 py-2.5"><span className={`chip ${COLOR[r.type] ?? 'bg-slate-100 text-slate-600'}`}>{TYPE_TH[r.type] ?? r.type}</span></td>
-                <td className={`px-4 py-2.5 text-right font-semibold ${r.qtyDelta >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{r.qtyDelta > 0 ? `+${r.qtyDelta}` : r.qtyDelta}</td>
-                <td className="px-4 py-2.5 text-right font-semibold">{r.balanceAfter}</td>
-                <td className="px-4 py-2.5 text-slate-500">{r.note || r.refType}</td>
-                <td className="px-4 py-2.5 text-slate-500">{r.user?.name ?? '—'}</td>
-              </tr>
-            ))}
-            {filtered.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">ยังไม่มีรายการเคลื่อนไหว</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        rows={filtered}
+        colCount={7}
+        reserve={370}
+        empty="ยังไม่มีรายการเคลื่อนไหว"
+        head={<tr><th className="px-4 py-3">วันที่</th><th className="px-4 py-3">สินค้า</th><th className="px-4 py-3">ประเภท</th><th className="px-4 py-3 text-right">เปลี่ยนแปลง</th><th className="px-4 py-3 text-right">คงเหลือ</th><th className="px-4 py-3">อ้างอิง / หมายเหตุ</th><th className="px-4 py-3">ผู้ทำรายการ</th></tr>}
+        renderRow={(r) => (
+          <tr key={r.id} className="hover:bg-slate-50">
+            <td className="px-4 py-2.5 text-slate-500">{dateTime(r.createdAt)}</td>
+            <td className="px-4 py-2.5"><div className="font-medium">{r.product?.name}</div><div className="text-xs text-slate-400">{r.product?.sku}</div></td>
+            <td className="px-4 py-2.5"><span className={`chip ${COLOR[r.type] ?? 'bg-slate-100 text-slate-600'}`}>{TYPE_TH[r.type] ?? r.type}</span></td>
+            <td className={`px-4 py-2.5 text-right font-semibold ${r.qtyDelta >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{r.qtyDelta > 0 ? `+${r.qtyDelta}` : r.qtyDelta}</td>
+            <td className="px-4 py-2.5 text-right font-semibold">{r.balanceAfter}</td>
+            <td className="px-4 py-2.5 text-slate-500">{r.note || r.refType}</td>
+            <td className="px-4 py-2.5 text-slate-500">{r.user?.name ?? '—'}</td>
+          </tr>
+        )}
+      />
     </div>
   );
 }

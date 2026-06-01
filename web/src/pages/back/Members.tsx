@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { Modal } from '../../components/Modal';
-import { PageHeader } from '../../components/ui';
+import { DataTable } from '../../components/DataTable';
+import { ListToolbar } from '../../components/ListToolbar';
+import { makeExporters, type Column } from '../../lib/export';
 import { toast } from '../../components/Toast';
 import type { Member } from '../../types';
 
@@ -11,6 +13,8 @@ type Form = typeof empty;
 export default function Members() {
   const [members, setMembers] = useState<Member[]>([]);
   const [q, setQ] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [emailFilter, setEmailFilter] = useState('');
   const [editing, setEditing] = useState<Member | null>(null);
   const [form, setForm] = useState<Form | null>(null);
 
@@ -45,37 +49,75 @@ export default function Members() {
     }
   }
 
+  const filtered = useMemo(() => members.filter((m) => {
+    if (statusFilter === 'active' && !m.isActive) return false;
+    if (statusFilter === 'inactive' && m.isActive) return false;
+    if (emailFilter === 'with' && !m.email) return false;
+    if (emailFilter === 'without' && m.email) return false;
+    return true;
+  }), [members, statusFilter, emailFilter]);
+
+  const filterCount = [statusFilter, emailFilter].filter(Boolean).length;
+
+  const columns: Column<Member>[] = [
+    { label: 'รหัส', value: (m) => m.code ?? '' },
+    { label: 'ชื่อ', value: (m) => m.name },
+    { label: 'เบอร์โทร', value: (m) => m.phone },
+    { label: 'อีเมล', value: (m) => m.email || '' },
+    { label: 'หมายเหตุ', value: (m) => m.note || '' },
+    { label: 'สถานะ', value: (m) => (m.isActive ? 'ใช้งาน' : 'ปิดใช้งาน') },
+  ];
+  const exporters = makeExporters({ filename: 'members', title: 'รายชื่อลูกค้า / สมาชิก', columns, rows: () => filtered });
+
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <div className="flex h-full flex-col gap-4">
+      <ListToolbar
         title="ลูกค้า / สมาชิก"
         subtitle="สมาชิกสะสมแต้ม · มีสิทธิ์ได้ราคาส่ง (ตั้งค่าได้ในหน้าตั้งค่า)"
-        icon="🪪"
-        actions={<button className="btn-primary" onClick={openNew}>+ เพิ่มสมาชิก</button>}
+        icon={<i className="fa-solid fa-users" />}
+        q={q} setQ={setQ} placeholder="ค้นหาชื่อ / เบอร์โทร / รหัส…"
+        primary={<button className="btn-primary" onClick={openNew}><i className="fa-solid fa-plus mr-1.5" />เพิ่มสมาชิก</button>}
+        exports={exporters}
+        filterCount={filterCount}
+        onResetFilter={() => { setStatusFilter(''); setEmailFilter(''); }}
+        filter={
+          <>
+            <div>
+              <label className="label">สถานะ</label>
+              <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">ทั้งหมด</option>
+                <option value="active">ใช้งาน</option>
+                <option value="inactive">ปิดใช้งาน</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">อีเมล</label>
+              <select className="input" value={emailFilter} onChange={(e) => setEmailFilter(e.target.value)}>
+                <option value="">ทั้งหมด</option>
+                <option value="with">มีอีเมล</option>
+                <option value="without">ไม่มีอีเมล</option>
+              </select>
+            </div>
+          </>
+        }
       />
 
-      <input className="input max-w-md" placeholder="ค้นหาชื่อ / เบอร์โทร / รหัส…" value={q} onChange={(e) => setQ(e.target.value)} />
-
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
-            <tr><th className="px-4 py-3">รหัส</th><th className="px-4 py-3">ชื่อ</th><th className="px-4 py-3">เบอร์โทร</th><th className="px-4 py-3">อีเมล</th><th className="px-4 py-3">สถานะ</th><th /></tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {members.map((m) => (
-              <tr key={m.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-mono text-xs text-slate-500">{m.code ?? '—'}</td>
-                <td className="px-4 py-3 font-semibold">{m.name}</td>
-                <td className="px-4 py-3">{m.phone}</td>
-                <td className="px-4 py-3 text-slate-500">{m.email || '—'}</td>
-                <td className="px-4 py-3"><span className={`chip ${m.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{m.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
-                <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(m)}>แก้ไข</button></td>
-              </tr>
-            ))}
-            {members.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">ยังไม่มีสมาชิก</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        rows={filtered}
+        colCount={6}
+        empty="ยังไม่มีสมาชิก"
+        head={<tr><th className="px-4 py-3">รหัส</th><th className="px-4 py-3">ชื่อ</th><th className="px-4 py-3">เบอร์โทร</th><th className="px-4 py-3">อีเมล</th><th className="px-4 py-3">สถานะ</th><th /></tr>}
+        renderRow={(m) => (
+          <tr key={m.id} className="hover:bg-slate-50">
+            <td className="px-4 py-3 font-mono text-xs text-slate-500">{m.code ?? '—'}</td>
+            <td className="px-4 py-3 font-semibold">{m.name}</td>
+            <td className="px-4 py-3">{m.phone}</td>
+            <td className="px-4 py-3 text-slate-500">{m.email || '—'}</td>
+            <td className="px-4 py-3"><span className={`chip ${m.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{m.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
+            <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(m)}>แก้ไข</button></td>
+          </tr>
+        )}
+      />
 
       {form && (
         <Modal title={editing ? 'แก้ไขสมาชิก' : 'เพิ่มสมาชิก'} onClose={() => setForm(null)}>

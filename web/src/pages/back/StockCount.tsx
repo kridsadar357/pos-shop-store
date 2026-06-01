@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { PageHeader } from '../../components/ui';
+import { DataTable } from '../../components/DataTable';
 import { toast } from '../../components/Toast';
 
 interface CountListItem { id: number; refNo: string; status: string; note: string; createdAt: string; _count: { items: number }; }
@@ -105,7 +106,7 @@ export default function StockCount() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full flex-col gap-4">
       <PageHeader
         title="นับสต็อก"
         subtitle="การนับสต็อกแบบมืออาชีพ — ปรับยอดในระบบให้ตรงกับการนับจริง"
@@ -113,25 +114,21 @@ export default function StockCount() {
         actions={<button className="btn-primary" onClick={startNew}>+ เปิดรอบนับใหม่</button>}
       />
 
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
-            <tr><th className="px-4 py-3">เลขที่</th><th className="px-4 py-3">จำนวนรายการ</th><th className="px-4 py-3">สถานะ</th><th className="px-4 py-3">สร้างเมื่อ</th><th /></tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {list.map((c) => (
-              <tr key={c.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-semibold">{c.refNo}</td>
-                <td className="px-4 py-3">{c._count.items}</td>
-                <td className="px-4 py-3"><span className={`chip ${c.status === 'POSTED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{c.status === 'POSTED' ? 'โพสต์แล้ว' : 'เปิดอยู่'}</span></td>
-                <td className="px-4 py-3 text-slate-500">{new Date(c.createdAt).toLocaleString()}</td>
-                <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openCount(c.id)}>เปิด</button></td>
-              </tr>
-            ))}
-            {list.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">ยังไม่มีรอบนับ</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        rows={list}
+        colCount={5}
+        empty="ยังไม่มีรอบนับ"
+        head={<tr><th className="px-4 py-3">เลขที่</th><th className="px-4 py-3">จำนวนรายการ</th><th className="px-4 py-3">สถานะ</th><th className="px-4 py-3">สร้างเมื่อ</th><th /></tr>}
+        renderRow={(c) => (
+          <tr key={c.id} className="hover:bg-slate-50">
+            <td className="px-4 py-3 font-semibold">{c.refNo}</td>
+            <td className="px-4 py-3">{c._count.items}</td>
+            <td className="px-4 py-3"><span className={`chip ${c.status === 'POSTED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{c.status === 'POSTED' ? 'โพสต์แล้ว' : 'เปิดอยู่'}</span></td>
+            <td className="px-4 py-3 text-slate-500">{new Date(c.createdAt).toLocaleString()}</td>
+            <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openCount(c.id)}>เปิด</button></td>
+          </tr>
+        )}
+      />
     </div>
   );
 }

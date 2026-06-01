@@ -16,6 +16,9 @@ import { membersRouter } from './routes/members.js';
 import { shiftsRouter } from './routes/shifts.js';
 import { promotionsRouter } from './routes/promotions.js';
 import { heldBillsRouter } from './routes/heldBills.js';
+import { licenseRouter } from './routes/license.js';
+import { setupRouter } from './routes/setup.js';
+import { printRouter } from './routes/print.js';
 
 export function createApp() {
   const app = express();
@@ -41,6 +44,9 @@ export function createApp() {
   app.use('/api/shifts', shiftsRouter);
   app.use('/api/promotions', promotionsRouter);
   app.use('/api/held-bills', heldBillsRouter);
+  app.use('/api/license', licenseRouter);
+  app.use('/api/setup', setupRouter);
+  app.use('/api/print', printRouter);
 
   // Central error handler.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

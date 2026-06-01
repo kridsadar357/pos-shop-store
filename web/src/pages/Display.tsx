@@ -12,14 +12,32 @@ import { th } from '../lib/th';
  */
 export default function Display() {
   const [s, setS] = useState<DisplayState | null>(null);
+  const [installer, setInstaller] = useState<any>(null);
 
   useEffect(() => subscribe(setS), []);
+
+  // Capture the PWA install prompt so we can offer "ติดตั้งแอป" on the device.
+  useEffect(() => {
+    const onPrompt = (e: Event) => { e.preventDefault(); setInstaller(e); };
+    const onInstalled = () => setInstaller(null);
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => { window.removeEventListener('beforeinstallprompt', onPrompt); window.removeEventListener('appinstalled', onInstalled); };
+  }, []);
 
   const currency = s?.currency || 'THB';
   const status = s?.status || 'IDLE';
 
   return (
     <div className="flex h-screen flex-col bg-gradient-to-br from-ink-900 via-ink-900 to-brand-900 text-white">
+      {installer && (
+        <button
+          onClick={async () => { installer.prompt?.(); try { await installer.userChoice; } catch { /* ignore */ } setInstaller(null); }}
+          className="fixed right-4 top-4 z-50 flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-bold backdrop-blur transition hover:bg-white/25"
+        >
+          <i className="fa-solid fa-download" /> ติดตั้งแอป
+        </button>
+      )}
       <header className="flex items-center justify-between px-8 py-5">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-xl font-extrabold backdrop-blur">P</div>

@@ -1,4 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { api, resolveUrl } from '../api/client';
+import { QRCanvas } from './QRCode';
 import { money, num, dateTime } from '../lib/format';
 import type { Sale, Setting } from '../types';
 
@@ -8,14 +10,30 @@ const PM: Record<string, string> = { CASH: 'เงินสด', TRANSFER: 'โ�
  * Off-screen 80mm thermal receipt. When mounted it triggers the browser print
  * dialog and calls onDone once printing finishes (or is cancelled). Only this
  * element is visible during printing (see .receipt-print rules in index.css).
+ * Honours the receipt design settings (logo, header, footer PromptPay QR).
  */
 export function ReceiptPrint({ sale, setting, onDone }: { sale: Sale; setting: Setting | null; onDone: () => void }) {
+  const needQR = !!(setting?.receiptShowQR && setting?.promptPayId);
+  const [qr, setQr] = useState(sale.qrPayload || '');
+  const [ready, setReady] = useState(!needQR);
+
+  // Fetch a PromptPay payload (with this bill's amount) for the footer QR.
   useEffect(() => {
+    if (!needQR) return;
+    if (qr) { setReady(true); return; }
+    api<{ payload: string }>('/settings/promptpay', { query: { amount: num(sale.total).toFixed(2) } })
+      .then((r) => { setQr(r.payload); })
+      .catch(() => {})
+      .finally(() => setReady(true));
+  }, [needQR]);
+
+  useEffect(() => {
+    if (!ready) return;
     const done = () => { window.removeEventListener('afterprint', done); onDone(); };
     window.addEventListener('afterprint', done);
-    const t = setTimeout(() => window.print(), 80); // let layout settle
+    const t = setTimeout(() => window.print(), 120); // let layout + QR settle
     return () => { clearTimeout(t); window.removeEventListener('afterprint', done); };
-  }, []);
+  }, [ready]);
 
   const currency = setting?.currency || 'THB';
   const discount = num(sale.discount);
@@ -26,10 +44,12 @@ export function ReceiptPrint({ sale, setting, onDone }: { sale: Sale; setting: S
     <div className="receipt-print">
       <div className="receipt-paper">
         <div className="r-center">
+          {setting?.receiptLogoUrl && <img src={resolveUrl(setting.receiptLogoUrl)} alt="" style={{ maxHeight: 56, margin: '0 auto 4px', objectFit: 'contain' }} />}
           <div style={{ fontSize: 15, fontWeight: 800 }}>{setting?.storeName || 'POS Store'}</div>
           {setting?.address && <div>{setting.address}</div>}
           {setting?.phone && <div>โทร. {setting.phone}</div>}
           {setting?.taxId && <div>เลขผู้เสียภาษี {setting.taxId}</div>}
+          {setting?.receiptHeader && <div style={{ marginTop: 3, whiteSpace: 'pre-line' }}>{setting.receiptHeader}</div>}
         </div>
 
         <div className="r-hr" />
@@ -65,6 +85,17 @@ export function ReceiptPrint({ sale, setting, onDone }: { sale: Sale; setting: S
           </>
         )}
         {sale.paymentMethod === 'TRANSFER' && <div className="r-center" style={{ marginTop: 4 }}>ชำระผ่าน PromptPay</div>}
+
+        {needQR && qr && (
+          <>
+            <div className="r-hr" />
+            <div className="r-center" style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>สแกนเพื่อชำระ (PromptPay)</div>
+              <div style={{ margin: '4px auto 0', width: 'fit-content' }}><QRCanvas value={qr} size={120} /></div>
+              <div style={{ fontSize: 11 }}>{money(sale.total, currency)}</div>
+            </div>
+          </>
+        )}
 
         <div className="r-hr" />
         <div className="r-center" style={{ marginTop: 4 }}>{setting?.receiptFooter || 'ขอบคุณที่ใช้บริการ'}</div>

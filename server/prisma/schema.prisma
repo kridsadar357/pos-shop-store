@@ -86,7 +86,36 @@ model Setting {
   receiptFooter String        @default("Thank you!")
   // When true, attaching a member to a sale applies wholesale pricing to all lines.
   memberGetsWholesale Boolean  @default(true)
+
+  // Receipt design
+  receiptLogoUrl String?
+  receiptHeader  String       @default("")
+  receiptShowQR  Boolean      @default(true)  // footer PromptPay QR (with amount)
+
+  // Printer connection
+  printerType    String       @default("BROWSER")  // BROWSER | ESCPOS_NET | ESCPOS_USB
+  printerAddress String       @default("")          // e.g. 192.168.1.50:9100
+  printerPaper   String       @default("80mm")      // 58mm | 80mm
+
+  // First-run setup wizard
+  setupCompleted Boolean      @default(false)
+
   updatedAt     DateTime      @updatedAt
+}
+
+/// Licensing / 14-day demo (singleton, id = 1).
+model License {
+  id            Int       @id @default(1)
+  key           String    @default("")
+  status        String    @default("INACTIVE") // INACTIVE | DEMO | ACTIVE | EXPIRED
+  plan          String    @default("")
+  customer      String    @default("")
+  activatedAt   DateTime?
+  expiresAt     DateTime?
+  demoStartedAt DateTime?
+  lastCheckedAt DateTime?
+  raw           String    @default("")
+  updatedAt     DateTime  @updatedAt
 }
 
 model Member {

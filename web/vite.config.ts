@@ -13,4 +13,22 @@ export default defineConfig({
       '/uploads': 'http://localhost:4000',
     },
   },
+  build: {
+    // Split heavy, route-specific vendors into their own chunks so the POS /
+    // customer-display / login shell (the PWA-installed surfaces) stay lean.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          // Only isolate the heavy, route-specific libs; let the rest (incl. the
+          // React runtime) share one 'vendor' chunk to avoid circular splits.
+          if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor')) return 'charts';
+          if (id.includes('xlsx') || id.includes('jszip')) return 'exporters';
+          if (id.includes('html5-qrcode')) return 'scanner';
+          if (id.includes('qrcode')) return 'qrcode';
+          return 'vendor';
+        },
+      },
+    },
+  },
 });

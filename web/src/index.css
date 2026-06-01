@@ -13,7 +13,10 @@ body,
 }
 
 body {
-  @apply bg-slate-50 text-ink-900 antialiased;
+  @apply text-ink-900 antialiased;
+  /* Palette "Slate Mist → Emerald": soft tinted backdrop so white cards pop. */
+  background: linear-gradient(160deg, #eef2f7 0%, #e9f0ee 55%, #e6f2ec 100%);
+  background-attachment: fixed;
   font-feature-settings: 'cv11', 'ss01';
 }
 

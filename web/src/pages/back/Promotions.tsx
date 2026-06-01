@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { Modal } from '../../components/Modal';
-import { PageHeader } from '../../components/ui';
+import { DataTable } from '../../components/DataTable';
+import { ListToolbar } from '../../components/ListToolbar';
+import { makeExporters, type Column } from '../../lib/export';
 import { toast } from '../../components/Toast';
 import { money } from '../../lib/format';
 import type { Category, Product } from '../../types';
@@ -40,6 +42,10 @@ export default function Promotions() {
   const [promos, setPromos] = useState<Promotion[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [q, setQ] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [applyFilter, setApplyFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [editing, setEditing] = useState<Promotion | null>(null);
   const [form, setForm] = useState<Form | null>(null);
 
@@ -85,39 +91,92 @@ export default function Promotions() {
     return `ลด ${v} · ${tgt ?? ''}`;
   }
 
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return promos.filter((p) => {
+      if (term && !(p.name.toLowerCase().includes(term) || (p.code || '').toLowerCase().includes(term))) return false;
+      if (typeFilter && p.type !== typeFilter) return false;
+      if (applyFilter === 'auto' && !p.autoApply) return false;
+      if (applyFilter === 'coupon' && p.autoApply) return false;
+      if (statusFilter === 'active' && !p.isActive) return false;
+      if (statusFilter === 'inactive' && p.isActive) return false;
+      return true;
+    });
+  }, [promos, q, typeFilter, applyFilter, statusFilter]);
+
+  const filterCount = [typeFilter, applyFilter, statusFilter].filter(Boolean).length;
+
+  const columns: Column<Promotion>[] = [
+    { label: 'ชื่อ', value: (p) => p.name },
+    { label: 'ประเภท', value: (p) => TYPE_LABEL[p.type] },
+    { label: 'ขอบเขต', value: (p) => SCOPE_LABEL[p.scope] },
+    { label: 'รายละเอียด', value: (p) => describe(p) },
+    { label: 'คูปอง', value: (p) => (p.autoApply ? 'อัตโนมัติ' : p.code ?? '') },
+    { label: 'ซื้อขั้นต่ำ', value: (p) => Number(p.minSpend) || 0, right: true },
+    { label: 'สถานะ', value: (p) => (p.isActive ? 'ใช้งาน' : 'ปิด') },
+  ];
+  const exporters = makeExporters({ filename: 'promotions', title: 'รายการโปรโมชั่น', columns, rows: () => filtered });
+
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <div className="flex h-full flex-col gap-4">
+      <ListToolbar
         title="การตลาด / โปรโมชั่น"
         subtitle="ส่วนลด/โปรโมชั่น · เปอร์เซ็นต์ จำนวนเงิน และซื้อ X แถม Y (อัตโนมัติหรือคูปอง)"
-        icon="🎯"
-        actions={<button className="btn-primary" onClick={openNew}>+ เพิ่มโปรโมชั่น</button>}
+        icon={<i className="fa-solid fa-bullhorn" />}
+        q={q} setQ={setQ} placeholder="ค้นหาชื่อโปรโมชั่น / รหัสคูปอง…"
+        primary={<button className="btn-primary" onClick={openNew}><i className="fa-solid fa-plus mr-1.5" />เพิ่มโปรโมชั่น</button>}
+        exports={exporters}
+        filterCount={filterCount}
+        onResetFilter={() => { setTypeFilter(''); setApplyFilter(''); setStatusFilter(''); }}
+        filter={
+          <>
+            <div>
+              <label className="label">ประเภท</label>
+              <select className="input" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <option value="">ทั้งหมด</option>
+                {(['PERCENT', 'FIXED', 'BXGY'] as const).map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">การใช้งาน</label>
+              <select className="input" value={applyFilter} onChange={(e) => setApplyFilter(e.target.value)}>
+                <option value="">ทั้งหมด</option>
+                <option value="auto">อัตโนมัติ</option>
+                <option value="coupon">คูปอง</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">สถานะ</label>
+              <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">ทั้งหมด</option>
+                <option value="active">ใช้งาน</option>
+                <option value="inactive">ปิด</option>
+              </select>
+            </div>
+          </>
+        }
       />
 
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
-            <tr><th className="px-4 py-3">ชื่อ</th><th className="px-4 py-3">ประเภท</th><th className="px-4 py-3">รายละเอียด</th><th className="px-4 py-3">คูปอง</th><th className="px-4 py-3">ซื้อขั้นต่ำ</th><th className="px-4 py-3">สถานะ</th><th /></tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {promos.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-semibold">{p.name}</td>
-                <td className="px-4 py-3"><span className="chip bg-violet-50 text-violet-700">{TYPE_LABEL[p.type]}</span></td>
-                <td className="px-4 py-3 text-slate-500">{describe(p)}</td>
-                <td className="px-4 py-3">{p.autoApply ? <span className="chip bg-emerald-50 text-emerald-700">อัตโนมัติ</span> : <span className="chip bg-amber-50 text-amber-700 font-mono">{p.code}</span>}</td>
-                <td className="px-4 py-3 text-right">{Number(p.minSpend) ? money(p.minSpend) : '—'}</td>
-                <td className="px-4 py-3"><span className={`chip ${p.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{p.isActive ? 'ใช้งาน' : 'ปิด'}</span></td>
-                <td className="px-4 py-3 text-right">
-                  <button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(p)}>แก้ไข</button>
-                  <button className="ml-3 text-sm font-semibold text-rose-600" onClick={() => remove(p)}>ลบ</button>
-                </td>
-              </tr>
-            ))}
-            {promos.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">ยังไม่มีโปรโมชั่น</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        rows={filtered}
+        colCount={7}
+        empty="ยังไม่มีโปรโมชั่น"
+        head={<tr><th className="px-4 py-3">ชื่อ</th><th className="px-4 py-3">ประเภท</th><th className="px-4 py-3">รายละเอียด</th><th className="px-4 py-3">คูปอง</th><th className="px-4 py-3">ซื้อขั้นต่ำ</th><th className="px-4 py-3">สถานะ</th><th /></tr>}
+        renderRow={(p) => (
+          <tr key={p.id} className="hover:bg-slate-50">
+            <td className="px-4 py-3 font-semibold">{p.name}</td>
+            <td className="px-4 py-3"><span className="chip bg-violet-50 text-violet-700">{TYPE_LABEL[p.type]}</span></td>
+            <td className="px-4 py-3 text-slate-500">{describe(p)}</td>
+            <td className="px-4 py-3">{p.autoApply ? <span className="chip bg-emerald-50 text-emerald-700">อัตโนมัติ</span> : <span className="chip bg-amber-50 text-amber-700 font-mono">{p.code}</span>}</td>
+            <td className="px-4 py-3 text-right">{Number(p.minSpend) ? money(p.minSpend) : '—'}</td>
+            <td className="px-4 py-3"><span className={`chip ${p.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{p.isActive ? 'ใช้งาน' : 'ปิด'}</span></td>
+            <td className="px-4 py-3 text-right">
+              <button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(p)}>แก้ไข</button>
+              <button className="ml-3 text-sm font-semibold text-rose-600" onClick={() => remove(p)}>ลบ</button>
+            </td>
+          </tr>
+        )}
+      />
 
       {form && (
         <Modal title={editing ? 'แก้ไขโปรโมชั่น' : 'เพิ่มโปรโมชั่น'} wide onClose={() => setForm(null)}>

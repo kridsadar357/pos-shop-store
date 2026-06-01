@@ -1,12 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { PageHeader } from '../../components/ui';
+import { DataTable } from '../../components/DataTable';
+import { ListToolbar } from '../../components/ListToolbar';
 import { toast } from '../../components/Toast';
-import { money, num } from '../../lib/format';
+import { makeExporters, type Column } from '../../lib/export';
+import { dateTime, money, num } from '../../lib/format';
 import type { Product } from '../../types';
 
 interface Supplier { id: number; name: string; }
 interface Line { product: Product; qty: number; unitCost: number; }
+interface Receipt { id: number; refNo: string; total: string; note: string; createdAt: string; supplier?: { name: string } | null; _count: { items: number }; }
+
+function today() { return new Date().toISOString().slice(0, 10); }
+function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
 export default function Receive() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -16,6 +23,18 @@ export default function Receive() {
   const [results, setResults] = useState<Product[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [busy, setBusy] = useState(false);
+
+  // Receipt history + filters
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [hq, setHq] = useState('');
+  const [hSupplier, setHSupplier] = useState('');
+  const [hFrom, setHFrom] = useState(daysAgo(30));
+  const [hTo, setHTo] = useState(today());
+
+  async function loadReceipts() {
+    setReceipts(await api<Receipt[]>('/inventory/receipts', { query: { from: `${hFrom}T00:00:00`, to: `${hTo}T23:59:59` } }));
+  }
+  useEffect(() => { loadReceipts(); }, [hFrom, hTo]);
 
   useEffect(() => {
     api<Supplier[]>('/suppliers').then(setSuppliers);
@@ -52,6 +71,7 @@ export default function Receive() {
       toast.success(`รับสินค้า ${res.refNo} — อัปเดตสต็อกแล้ว`);
       setLines([]);
       setNote('');
+      loadReceipts();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -59,9 +79,30 @@ export default function Receive() {
     }
   }
 
+  const filteredReceipts = useMemo(() => {
+    const term = hq.trim().toLowerCase();
+    return receipts.filter((r) => {
+      if (term && !(r.refNo.toLowerCase().includes(term) || (r.supplier?.name || '').toLowerCase().includes(term) || (r.note || '').toLowerCase().includes(term))) return false;
+      if (hSupplier && (r.supplier?.name || '') !== hSupplier) return false;
+      return true;
+    });
+  }, [receipts, hq, hSupplier]);
+
+  const supplierNames = useMemo(() => Array.from(new Set(receipts.map((r) => r.supplier?.name).filter(Boolean) as string[])), [receipts]);
+
+  const receiptColumns: Column<Receipt>[] = [
+    { label: 'เลขที่', value: (r) => r.refNo },
+    { label: 'วันที่', value: (r) => dateTime(r.createdAt) },
+    { label: 'ผู้จำหน่าย', value: (r) => r.supplier?.name ?? '' },
+    { label: 'จำนวนรายการ', value: (r) => r._count.items, right: true },
+    { label: 'ต้นทุนรวม', value: (r) => num(r.total), right: true },
+    { label: 'หมายเหตุ', value: (r) => r.note || '' },
+  ];
+  const exporters = makeExporters({ filename: `receipts_${hFrom}_${hTo}`, title: 'ประวัติการรับสินค้า', subtitle: `ช่วงวันที่ ${hFrom} ถึง ${hTo}`, columns: receiptColumns, rows: () => filteredReceipts });
+
   return (
     <div className="space-y-4">
-      <PageHeader title="จัดซื้อ / รับสินค้า" subtitle="บันทึกสินค้าเข้าจากผู้จำหน่าย · แต่ละรายการจะสร้างความเคลื่อนไหว 'รับเข้า'" icon="⬇" />
+      <PageHeader title="จัดซื้อ / รับสินค้า" subtitle="บันทึกสินค้าเข้าจากผู้จำหน่าย · แต่ละรายการจะสร้างความเคลื่อนไหว 'รับเข้า'" icon={<i className="fa-solid fa-truck-ramp-box" />} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
@@ -120,6 +161,53 @@ export default function Receive() {
           <button className="btn-primary w-full" disabled={busy || !lines.length} onClick={submit}>
             {busy ? 'กำลังบันทึก…' : 'รับสินค้าเข้าสต็อก'}
           </button>
+        </div>
+      </div>
+
+      {/* Goods-receipt history */}
+      <div className="pt-2">
+        <ListToolbar
+          title="ประวัติการรับสินค้า"
+          icon={<i className="fa-solid fa-clock-rotate-left" />}
+          q={hq} setQ={setHq} placeholder="ค้นหาเลขที่ / ผู้จำหน่าย…"
+          dateRange={
+            <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
+              <i className="fa-regular fa-calendar text-slate-400" />
+              <input type="date" className="bg-transparent text-sm outline-none" value={hFrom} max={hTo} onChange={(e) => setHFrom(e.target.value)} />
+              <span className="text-slate-300">—</span>
+              <input type="date" className="bg-transparent text-sm outline-none" value={hTo} min={hFrom} max={today()} onChange={(e) => setHTo(e.target.value)} />
+            </div>
+          }
+          exports={exporters}
+          filterCount={hSupplier ? 1 : 0}
+          onResetFilter={() => setHSupplier('')}
+          filter={
+            <div>
+              <label className="label">ผู้จำหน่าย</label>
+              <select className="input" value={hSupplier} onChange={(e) => setHSupplier(e.target.value)}>
+                <option value="">ทั้งหมด</option>
+                {supplierNames.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+          }
+        />
+        <div className="mt-3 flex h-[360px] flex-col">
+          <DataTable
+            rows={filteredReceipts}
+            colCount={6}
+            empty="ยังไม่มีประวัติการรับสินค้าในช่วงที่เลือก"
+            head={<tr><th className="px-4 py-3">เลขที่</th><th className="px-4 py-3">วันที่</th><th className="px-4 py-3">ผู้จำหน่าย</th><th className="px-4 py-3 text-right">รายการ</th><th className="px-4 py-3 text-right">ต้นทุนรวม</th><th className="px-4 py-3">หมายเหตุ</th></tr>}
+            renderRow={(r) => (
+              <tr key={r.id} className="hover:bg-slate-50">
+                <td className="px-4 py-3 font-semibold">{r.refNo}</td>
+                <td className="px-4 py-3 text-slate-500">{dateTime(r.createdAt)}</td>
+                <td className="px-4 py-3">{r.supplier?.name ?? '—'}</td>
+                <td className="px-4 py-3 text-right">{r._count.items}</td>
+                <td className="px-4 py-3 text-right font-semibold">{money(r.total)}</td>
+                <td className="px-4 py-3 text-slate-500">{r.note || '—'}</td>
+              </tr>
+            )}
+          />
         </div>
       </div>
     </div>

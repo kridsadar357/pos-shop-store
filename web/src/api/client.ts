@@ -1,5 +1,11 @@
 const BASE = import.meta.env.VITE_API_URL || '';
 
+/** Resolve a server-relative path (e.g. an /uploads/… image) to a fetchable URL. */
+export function resolveUrl(path: string): string {
+  if (/^https?:\/\//.test(path)) return path;
+  return `${BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
 let authToken: string | null = localStorage.getItem('pos_token');
 let onUnauthorized: (() => void) | null = null;
 

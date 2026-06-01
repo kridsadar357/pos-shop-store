@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Modal } from '../../components/Modal';
 import { PageHeader } from '../../components/ui';
+import { DataTable } from '../../components/DataTable';
 import { toast } from '../../components/Toast';
 
 interface U { id: number; username: string; name: string; role: string; isActive: boolean; }
@@ -31,7 +32,7 @@ export default function Users() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full flex-col gap-4">
       <PageHeader
         title="ระบบ / ผู้ใช้งาน"
         subtitle="จัดการพนักงานและสิทธิ์การใช้งาน"
@@ -39,24 +40,21 @@ export default function Users() {
         actions={<button className="btn-primary" onClick={() => setForm({ username: '', name: '', password: '', role: 'CASHIER' })}>+ เพิ่มผู้ใช้</button>}
       />
 
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
-            <tr><th className="px-4 py-3">ชื่อ</th><th className="px-4 py-3">ชื่อผู้ใช้</th><th className="px-4 py-3">สิทธิ์</th><th className="px-4 py-3">สถานะ</th><th /></tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {users.map((u) => (
-              <tr key={u.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-semibold">{u.name}</td>
-                <td className="px-4 py-3 text-slate-500">{u.username}</td>
-                <td className="px-4 py-3"><span className="chip bg-brand-50 text-brand-700">{({ ADMIN: 'ผู้ดูแลระบบ', MANAGER: 'ผู้จัดการ', CASHIER: 'แคชเชียร์' } as Record<string, string>)[u.role] ?? u.role}</span></td>
-                <td className="px-4 py-3"><span className={`chip ${u.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{u.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
-                <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => toggle(u)}>{u.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        rows={users}
+        colCount={5}
+        empty="ยังไม่มีผู้ใช้"
+        head={<tr><th className="px-4 py-3">ชื่อ</th><th className="px-4 py-3">ชื่อผู้ใช้</th><th className="px-4 py-3">สิทธิ์</th><th className="px-4 py-3">สถานะ</th><th /></tr>}
+        renderRow={(u) => (
+          <tr key={u.id} className="hover:bg-slate-50">
+            <td className="px-4 py-3 font-semibold">{u.name}</td>
+            <td className="px-4 py-3 text-slate-500">{u.username}</td>
+            <td className="px-4 py-3"><span className="chip bg-brand-50 text-brand-700">{({ ADMIN: 'ผู้ดูแลระบบ', MANAGER: 'ผู้จัดการ', CASHIER: 'แคชเชียร์' } as Record<string, string>)[u.role] ?? u.role}</span></td>
+            <td className="px-4 py-3"><span className={`chip ${u.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{u.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
+            <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => toggle(u)}>{u.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</button></td>
+          </tr>
+        )}
+      />
 
       {form && (
         <Modal title="เพิ่มผู้ใช้" onClose={() => setForm(null)}>

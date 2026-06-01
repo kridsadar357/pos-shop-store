@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth, isBackStore } from '../../store/auth';
 import { useShift } from '../../store/shift';
-import { useScanner } from '../../hooks/useScanner';
-import { CameraScanner } from '../../components/CameraScanner';
+// Camera scanner pulls in html5-qrcode (~330 kB) — load it only when opened.
+const CameraScanner = lazy(() => import('../../components/CameraScanner').then((m) => ({ default: m.CameraScanner })));
 import { ProductImage } from '../../components/ProductImage';
 import { QRCanvas } from '../../components/QRCode';
 import { ReceiptPrint } from '../../components/ReceiptPrint';
+import { printReceipt } from '../../lib/printing';
 import { ShiftGate, CloseShiftModal } from './ShiftModals';
 import { MemberPicker } from './MemberWidget';
 import { PosSidebar } from './PosSidebar';
@@ -20,14 +21,14 @@ import type { Category, HeldBill, Member, Product, Sale, Setting } from '../../t
 interface Line { product: Product; qty: number; }
 type PayKey = 'CASH' | 'TRANSFER' | 'CARD' | 'QR' | 'CREDIT';
 
-const PAGE_SIZE = 18;
+const PAGE_SIZE = 24;
 
 const PAYMENTS: { key: PayKey; label: string; icon: string; cls: string }[] = [
-  { key: 'CASH', label: th.pmCash, icon: '💵', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  { key: 'TRANSFER', label: th.pmTransfer, icon: '🏦', cls: 'bg-blue-50 text-blue-700 ring-blue-200' },
-  { key: 'CARD', label: th.pmCard, icon: '💳', cls: 'bg-violet-50 text-violet-700 ring-violet-200' },
-  { key: 'QR', label: th.pmQR, icon: '▦', cls: 'bg-cyan-50 text-cyan-700 ring-cyan-200' },
-  { key: 'CREDIT', label: th.pmCredit, icon: '🪙', cls: 'bg-orange-50 text-orange-700 ring-orange-200' },
+  { key: 'CASH', label: th.pmCash, icon: 'fa-money-bill-wave', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  { key: 'TRANSFER', label: th.pmTransfer, icon: 'fa-building-columns', cls: 'bg-blue-50 text-blue-700 ring-blue-200' },
+  { key: 'CARD', label: th.pmCard, icon: 'fa-credit-card', cls: 'bg-violet-50 text-violet-700 ring-violet-200' },
+  { key: 'QR', label: th.pmQR, icon: 'fa-qrcode', cls: 'bg-cyan-50 text-cyan-700 ring-cyan-200' },
+  { key: 'CREDIT', label: th.pmCredit, icon: 'fa-coins', cls: 'bg-orange-50 text-orange-700 ring-orange-200' },
 ];
 
 interface Stats {
@@ -62,6 +63,8 @@ export default function POS() {
   const [payKey, setPayKey] = useState<PayKey>('CASH');
   const [cashReceived, setCashReceived] = useState(0);
   const [cartTab, setCartTab] = useState<'bill' | 'customer'>('bill');
+  const [priceCheck, setPriceCheck] = useState(false);
+  const [priceProduct, setPriceProduct] = useState<Product | null>(null);
 
   const [showCam, setShowCam] = useState(false);
   const [pickMember, setPickMember] = useState(false);
@@ -70,12 +73,15 @@ export default function POS() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [printSale, setPrintSale] = useState<Sale | null>(null);
+  const doPrint = (sale: Sale) => printReceipt(sale, setting, () => setPrintSale(sale));
   const [autoPrint, setAutoPrint] = useState(localStorage.getItem('pos_autoprint') === '1');
   const [held, setHeld] = useState<HeldBill[]>([]);
   const [showHeld, setShowHeld] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
+  const scanRef = useRef<HTMLInputElement>(null);
+  const [showSearch, setShowSearch] = useState(false);
   const publisher = useRef<ReturnType<typeof createPublisher> | null>(null);
 
   function loadHeld() { api<HeldBill[]>('/held-bills').then(setHeld).catch(() => setHeld([])); }
@@ -151,16 +157,19 @@ export default function POS() {
     return () => clearTimeout(t);
   }, [lines, mode, member, coupon, setting]);
 
-  async function handleScan(code: string) {
+  async function resolveProduct(code: string): Promise<Product | null> {
     const local = activeProducts.find((p) => p.barcode === code || p.sku === code);
-    if (local) return addProduct(local);
-    try {
-      addProduct(await api<Product>('/products/lookup', { query: { code } }));
-    } catch {
-      toast.error(th.notFound(code));
-    }
+    if (local) return local;
+    return api<Product>('/products/lookup', { query: { code } }).catch(() => null);
   }
-  useScanner(handleScan);
+  // A scan / Enter adds to cart — unless price-check mode is on, then it shows the price.
+  async function handleScan(code: string) {
+    const p = await resolveProduct(code);
+    if (!p) return toast.error(th.notFound(code));
+    if (priceCheck) { setPriceProduct(p); return; }
+    addProduct(p);
+    toast.success(th.added(p.name));
+  }
 
   const totals = useMemo(() => {
     const inc = setting?.taxInclusive ?? true;
@@ -212,7 +221,7 @@ export default function POS() {
       });
       publisher.current?.publish({ ...baseDisplay(), status: 'PAID', orderNo: sale.orderNo, paymentMethod: method === 'CASH' ? 'CASH' : 'TRANSFER', change: num(sale.changeDue), cashReceived: num(sale.cashReceived) });
       setLastSale(sale);
-      if (autoPrint) setPrintSale(sale);
+      if (autoPrint) doPrint(sale);
       clearCart();
       setTransfer(false);
       setPayKey('CASH');
@@ -270,7 +279,7 @@ export default function POS() {
   // F-key shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus(); }
+      if (e.key === 'F2') { e.preventDefault(); setShowSearch(true); }
       else if (e.key === 'F3') { e.preventDefault(); setPickMember(true); }
       else if (e.key === 'F4') { e.preventDefault(); setShowPromo(true); }
       else if (e.key === 'F6') { e.preventDefault(); holdBill(); }
@@ -279,6 +288,23 @@ export default function POS() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
+
+  // Intelligent auto-focus: keep the invisible barcode reader focused so a scan
+  // is always captured — unless the cashier is typing in a field or a modal is open.
+  useEffect(() => {
+    const overlay = priceCheck || pickMember || transfer || closing || showHeld || showPromo || !!lastSale || showCam || showSearch || showNotif || moreOpen;
+    const focusScan = () => {
+      if (overlay) return;
+      const a = document.activeElement as HTMLElement | null;
+      if (a && a !== scanRef.current && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return;
+      scanRef.current?.focus();
+    };
+    focusScan();
+    const id = window.setInterval(focusScan, 1200);
+    document.addEventListener('click', focusScan);
+    window.addEventListener('focus', focusScan);
+    return () => { clearInterval(id); document.removeEventListener('click', focusScan); window.removeEventListener('focus', focusScan); };
+  }, [priceCheck, pickMember, transfer, closing, showHeld, showPromo, lastSale, showCam, showSearch, showNotif, moreOpen]);
 
   function toggleFullscreen() {
     if (document.fullscreenElement) document.exitFullscreen();
@@ -302,35 +328,42 @@ export default function POS() {
     return products.filter((p) => p.isActive && p.stockQty <= p.reorderLevel);
   }
   const notifications = [
-    ...(held.length ? [{ icon: '📋', tone: 'amber', text: `มีบิลพักไว้ ${held.length} บิล`, onClick: () => { setShowNotif(false); setShowHeld(true); } }] : []),
-    ...lowStock.slice(0, 8).map((p) => ({ icon: p.stockQty <= 0 ? '⛔' : '📦', tone: p.stockQty <= 0 ? 'rose' : 'amber', text: `${p.name} ${p.stockQty <= 0 ? 'หมดสต็อก' : `เหลือ ${p.stockQty} ${p.unit}`}`, onClick: () => {} })),
+    ...(held.length ? [{ icon: 'fa-clipboard-list', tone: 'amber', text: `มีบิลพักไว้ ${held.length} บิล`, onClick: () => { setShowNotif(false); setShowHeld(true); } }] : []),
+    ...lowStock.slice(0, 8).map((p) => ({ icon: p.stockQty <= 0 ? 'fa-circle-exclamation' : 'fa-box', tone: p.stockQty <= 0 ? 'rose' : 'amber', text: `${p.name} ${p.stockQty <= 0 ? 'หมดสต็อก' : `เหลือ ${p.stockQty} ${p.unit}`}`, onClick: () => {} })),
   ];
 
   if (!shift) return <ShiftGate />;
 
+  // Shift / stock KPI values.
+  const outOfStock = lowStock.filter((p) => p.stockQty <= 0).length;
+  const nearOut = lowStock.length - outOfStock;
+  const shiftOrders = shift.totals?.orders ?? 0;
+  const shiftSales = shift.totals?.totalSales ?? 0;
+  const drawerCash = num(shift.expectedCash ?? shift.openingFloat ?? 0);
+
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-100">
+    <div className="flex h-screen overflow-hidden bg-transparent">
       {isBackStore(user?.role) && <PosSidebar branch={setting?.storeName} />}
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Topbar */}
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-2.5">
+        <header className="flex items-center justify-between bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 px-5 py-2.5 text-white shadow-glow">
           <div className="flex items-center gap-3">
-            <span className="text-lg text-slate-400">☰</span>
-            <h1 className="text-lg font-extrabold text-ink-900">{th.posTitle}</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> {th.online}
+            <i className="fa-solid fa-bars text-lg text-white/70" />
+            <h1 className="text-lg font-extrabold">{th.posTitle}</h1>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/20">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-200" /> {th.online}
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="text-right text-xs leading-tight text-slate-500">
+            <div className="text-right text-xs leading-tight text-white/80">
               <NowClock />
             </div>
             <div className="flex items-center gap-1.5">
-              <IconBtn title={th.customerDisplay} onClick={() => window.open('/display', 'pos-customer-display', 'width=1100,height=720')}>🖥️</IconBtn>
+              <IconBtn title={th.customerDisplay} onClick={() => window.open('/display', 'pos-customer-display', 'width=1100,height=720')}><i className="fa-solid fa-desktop" /></IconBtn>
               <div className="relative">
-                <button onClick={() => setShowNotif((v) => !v)} className="grid h-9 w-9 place-items-center rounded-xl text-base text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50" title="แจ้งเตือน">
-                  <span className="relative">🔔{notifications.length > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[9px] font-bold text-white">{notifications.length}</span>}</span>
+                <button onClick={() => setShowNotif((v) => !v)} className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-base text-white ring-1 ring-white/20 hover:bg-white/20" title="แจ้งเตือน">
+                  <span className="relative"><i className="fa-solid fa-bell" />{notifications.length > 0 && <span className="absolute -right-2 -top-2 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[9px] font-bold text-white">{notifications.length}</span>}</span>
                 </button>
                 {showNotif && (
                   <div className="absolute right-0 z-40 mt-1 w-72 overflow-hidden rounded-xl bg-white shadow-pop ring-1 ring-slate-200" onMouseLeave={() => setShowNotif(false)}>
@@ -340,7 +373,7 @@ export default function POS() {
                         <div className="px-4 py-6 text-center text-sm text-slate-400">ไม่มีการแจ้งเตือน</div>
                       ) : notifications.map((n, i) => (
                         <button key={i} onClick={n.onClick} className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm hover:bg-slate-50">
-                          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${n.tone === 'rose' ? 'bg-rose-50' : 'bg-amber-50'}`}>{n.icon}</span>
+                          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${n.tone === 'rose' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}><i className={`fa-solid ${n.icon}`} /></span>
                           <span className="text-slate-700">{n.text}</span>
                         </button>
                       ))}
@@ -348,34 +381,62 @@ export default function POS() {
                   </div>
                 )}
               </div>
-              <IconBtn title="พิมพ์ใบเสร็จล่าสุด" onClick={() => lastSale ? setPrintSale(lastSale) : openLastBill()}>🖨️</IconBtn>
-              <IconBtn title="ออนไลน์">📶</IconBtn>
-              <IconBtn title="เต็มจอ" onClick={toggleFullscreen}>⛶</IconBtn>
-              <button onClick={() => { logout(); navigate('/login'); }} className="ml-1 inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600 ring-1 ring-rose-200 hover:bg-rose-100" title="ออกจากระบบ">⎋ ออกจากระบบ</button>
+              <IconBtn title="พิมพ์ใบเสร็จล่าสุด" onClick={() => lastSale ? doPrint(lastSale) : openLastBill()}><i className="fa-solid fa-print" /></IconBtn>
+              <IconBtn title="ออนไลน์"><i className="fa-solid fa-wifi text-emerald-500" /></IconBtn>
+              <IconBtn title="เต็มจอ" onClick={toggleFullscreen}><i className="fa-solid fa-expand" /></IconBtn>
+              <button onClick={() => { logout(); navigate('/login'); }} className="ml-1 inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25" title="ออกจากระบบ"><i className="fa-solid fa-right-from-bracket" /> ออกจากระบบ</button>
             </div>
           </div>
         </header>
 
+        {/* Hidden, always-focused barcode reader (no visible input) */}
+        <input
+          ref={scanRef}
+          aria-hidden
+          tabIndex={-1}
+          className="pointer-events-none fixed left-[-9999px] top-0 h-0 w-0 opacity-0"
+          onKeyDown={(e) => { if (e.key === 'Enter') { const v = e.currentTarget.value.trim(); e.currentTarget.value = ''; if (v) handleScan(v); } }}
+        />
+
         {/* Search + actions */}
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-5 py-3">
-          <div className="flex min-w-[280px] flex-1 items-center gap-2 rounded-xl bg-slate-50 px-3 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-brand-500">
-            <span className="text-slate-400">🔍</span>
-            <input ref={searchRef} data-scan="true" className="w-full bg-transparent py-2.5 text-sm outline-none" placeholder={th.searchFull} value={search} onChange={(e) => setSearch(e.target.value)} />
-            <span className="kbd">F2</span>
-            <button className="grid h-8 w-8 place-items-center rounded-lg bg-white ring-1 ring-slate-200" title={th.camera} onClick={() => setShowCam(true)}>▥</button>
-          </div>
-          <ActionBtn icon="👤" label={th.aCustomer} k="F3" tone="brand" onClick={() => setPickMember(true)} />
-          <ActionBtn icon="🏷️" label={th.aPromotion} k="F4" tone="rose" onClick={() => setShowPromo(true)} />
-          <ActionBtn icon="🧮" label={th.aDiscount} k="F5" tone="amber" onClick={() => { setCartTab('bill'); setShowDiscount(true); }} />
-          <ActionBtn icon="📥" label={th.aHold} k="F6" tone="sky" onClick={holdBill} />
-          <ActionBtn icon="📋" label={`พักไว้${held.length ? ` (${held.length})` : ''}`} tone="amber" onClick={() => held.length ? setShowHeld(true) : toast.info('ไม่มีบิลที่พักไว้')} />
-          <ActionBtn icon="🧾" label={th.aLastBill} k="F7" tone="violet" onClick={openLastBill} />
+          {showSearch ? (
+            <div className="flex min-w-[280px] flex-1 items-center gap-2 rounded-xl bg-slate-50 px-3 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-brand-500">
+              <i className="fa-solid fa-magnifying-glass text-slate-400" />
+              <input
+                ref={searchRef}
+                autoFocus
+                className="w-full bg-transparent py-2.5 text-sm outline-none"
+                placeholder="ค้นหาสินค้าตามชื่อ / SKU…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <button className="text-slate-400 hover:text-slate-600" onClick={() => { setSearch(''); setShowSearch(false); }}><i className="fa-solid fa-xmark" /></button>
+            </div>
+          ) : (
+            <>
+              <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3.5 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-200">
+                <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" /></span>
+                <i className="fa-solid fa-barcode" /> พร้อมสแกน
+              </span>
+              <button className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-ink-700 ring-1 ring-slate-200 hover:bg-slate-50" onClick={() => setShowSearch(true)}><i className="fa-solid fa-magnifying-glass text-slate-400" /> ค้นหา</button>
+              <button className="grid h-9 w-9 place-items-center rounded-xl bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50" title={th.camera} onClick={() => setShowCam(true)}><i className="fa-solid fa-camera" /></button>
+              <div className="flex-1" />
+            </>
+          )}
+          <ActionBtn icon="fa-user" label={th.aCustomer} k="F3" tone="brand" onClick={() => setPickMember(true)} />
+          <ActionBtn icon="fa-tag" label={th.aPromotion} k="F4" tone="rose" onClick={() => setShowPromo(true)} />
+          <ActionBtn icon="fa-tags" label="เช็คราคา" tone="sky" onClick={() => { setPriceProduct(null); setPriceCheck(true); }} />
+          <ActionBtn icon="fa-percent" label={th.aDiscount} k="F5" tone="amber" onClick={() => { setCartTab('bill'); setShowDiscount(true); }} />
+          <ActionBtn icon="fa-inbox" label={th.aHold} k="F6" tone="sky" onClick={holdBill} />
+          <ActionBtn icon="fa-clipboard-list" label={`พักไว้${held.length ? ` (${held.length})` : ''}`} tone="amber" onClick={() => held.length ? setShowHeld(true) : toast.info('ไม่มีบิลที่พักไว้')} />
+          <ActionBtn icon="fa-receipt" label={th.aLastBill} k="F7" tone="violet" onClick={openLastBill} />
           <div className="relative">
-            <ActionBtn icon="•••" label={th.aMore} tone="slate" onClick={() => setMoreOpen((v) => !v)} />
+            <ActionBtn icon="fa-ellipsis" label={th.aMore} tone="slate" onClick={() => setMoreOpen((v) => !v)} />
             {moreOpen && (
               <div className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl bg-white py-1 shadow-pop ring-1 ring-slate-200" onMouseLeave={() => setMoreOpen(false)}>
-                <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setClosing(true); }}>🕒 {th.closeShift}</button>
-                <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); window.open('/display', 'pos-customer-display', 'width=1100,height=720'); }}>🖥️ {th.customerDisplay}</button>
+                <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setClosing(true); }}><i className="fa-solid fa-clock mr-2 text-slate-400" />{th.closeShift}</button>
+                <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); window.open('/display', 'pos-customer-display', 'width=1100,height=720'); }}><i className="fa-solid fa-desktop mr-2 text-slate-400" />{th.customerDisplay}</button>
               </div>
             )}
           </div>
@@ -386,10 +447,10 @@ export default function POS() {
           <div className="flex flex-1 flex-col overflow-hidden p-4">
             {/* KPI cards */}
             <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Kpi tone="violet" icon="🛒" label={th.kSalesToday} value={money(stats?.today.revenue ?? 0, currency)} sub={`${stats?.today.orders ?? 0} ${th.kBills}`} />
-              <Kpi tone="emerald" icon="📈" label={th.kSalesMonth} value={money(stats?.month.revenue ?? 0, currency)} sub={stats?.month.deltaPct != null ? `+${stats.month.deltaPct}% ${th.kFromLastMonth}` : ''} subGreen />
-              <Kpi tone="orange" icon="💹" label={th.kProfitToday} value={money(stats?.today.grossProfit ?? 0, currency)} sub={`${stats?.today.marginPct ?? 0}%`} subGreen />
-              <Kpi tone="blue" icon="👥" label={th.kCustomersToday} value={`${stats?.today.customers ?? 0} ราย`} sub={`${th.kAvgPurchase} ${money(stats?.today.avgOrder ?? 0, currency)}`} />
+              <Kpi tone={outOfStock ? 'rose' : 'amber'} icon="fa-triangle-exclamation" label="ความเสี่ยงสต็อก" value={`${lowStock.length} รายการ`} sub={`หมด ${outOfStock} · ใกล้หมด ${nearOut}`} />
+              <Kpi tone="blue" icon="fa-receipt" label="จำนวนบิล (กะนี้)" value={`${shiftOrders} บิล`} sub={`กะ #${shift.id}`} />
+              <Kpi tone="emerald" icon="fa-sack-dollar" label="ยอดขาย (กะนี้)" value={money(shiftSales, currency)} sub={`เปิดกะ ${money(shift.openingFloat, currency)}`} />
+              <Kpi tone="violet" icon="fa-cash-register" label="เงินในลิ้นชัก" value={money(drawerCash, currency)} sub="คาดว่าควรมี" />
             </div>
 
             {/* products region */}
@@ -397,19 +458,19 @@ export default function POS() {
               {/* category rail */}
               <div className="flex w-48 shrink-0 flex-col overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-slate-200/70">
                 <div className="flex-1 overflow-auto p-2">
-                  <CatRow active={catId == null} icon="🛒" name={th.cAll} count={activeProducts.length} onClick={() => setCatId(null)} highlight />
+                  <CatRow active={catId == null} icon="fa-store" name={th.cAll} count={activeProducts.length} onClick={() => setCatId(null)} highlight />
                   {categories.map((c) => (
-                    <CatRow key={c.id} active={catId === c.id} icon="📦" name={c.name} count={c._count?.products ?? 0} onClick={() => setCatId(c.id)} />
+                    <CatRow key={c.id} active={catId === c.id} icon="fa-box" name={c.name} count={c._count?.products ?? 0} onClick={() => setCatId(c.id)} />
                   ))}
                 </div>
-                <button className="m-2 rounded-xl bg-slate-50 py-2 text-xs font-semibold text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100" onClick={() => toast.info(th.comingSoon)}>⚙ {th.manageCategories}</button>
+                <button className="m-2 rounded-xl bg-slate-50 py-2 text-xs font-semibold text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100" onClick={() => toast.info(th.comingSoon)}><i className="fa-solid fa-gear mr-1" /> {th.manageCategories}</button>
               </div>
 
               {/* products */}
               <div className="flex flex-1 flex-col overflow-hidden">
                 {/* filter row */}
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <select className="rounded-xl bg-brand-600 px-3 py-2 text-sm font-bold text-white" value={sort} onChange={(e) => setSort(e.target.value as any)}>
+                  <select className="rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 px-3 py-2 text-sm font-bold text-white shadow-glow" value={sort} onChange={(e) => setSort(e.target.value as any)}>
                     <option value="best">{th.fBestSeller} ▾</option>
                     <option value="priceAsc">ราคา น้อย→มาก</option>
                     <option value="priceDesc">ราคา มาก→น้อย</option>
@@ -429,7 +490,7 @@ export default function POS() {
                   {pageItems.length === 0 ? (
                     <div className="flex h-full items-center justify-center text-slate-400">{th.noProducts}</div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                    <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                       {pageItems.map((p) => <ProductCard key={p.id} p={p} price={unitPriceOf(p, mode === 'WHOLESALE' ? p.wholesaleMinQty : 1)} currency={currency} best={favIds.has(p.id)} onClick={() => addProduct(p)} />)}
                     </div>
                   )}
@@ -453,7 +514,7 @@ export default function POS() {
             {/* tabs */}
             <div className="flex gap-2 px-4 pt-3">
               {(['bill', 'customer'] as const).map((t) => (
-                <button key={t} onClick={() => setCartTab(t)} className={`flex-1 rounded-t-xl py-2 text-sm font-bold ${cartTab === t ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                <button key={t} onClick={() => setCartTab(t)} className={`flex-1 rounded-t-xl py-2 text-sm font-bold ${cartTab === t ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
                   {t === 'bill' ? `${th.currentBill} (${lines.length})` : th.customerInfo}
                 </button>
               ))}
@@ -463,13 +524,13 @@ export default function POS() {
             <div className="border-b border-slate-100 px-4 py-3">
               <div className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-200">
                 <div className="flex items-center gap-2.5">
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white">{member ? member.name.charAt(0) : '👤'}</div>
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white">{member ? member.name.charAt(0) : <i className="fa-solid fa-user" />}</div>
                   <div className="leading-tight">
                     <div className="text-sm font-bold text-ink-900">{member ? member.name : th.generalCustomer}</div>
                     <div className="text-[11px] text-slate-400">{member ? `${member.phone} · ${th.memberPrice}` : th.posTitle}</div>
                   </div>
                 </div>
-                <button className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50" onClick={() => setPickMember(true)}>✎ {th.changeCustomer}</button>
+                <button className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50" onClick={() => setPickMember(true)}><i className="fa-solid fa-pen mr-1" /> {th.changeCustomer}</button>
               </div>
             </div>
 
@@ -479,7 +540,7 @@ export default function POS() {
                 <CustomerInfoPanel member={member} memberWholesale={memberWholesale} onPick={() => setPickMember(true)} onClear={() => setMember(null)} />
               ) : lines.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center text-slate-400">
-                  <div className="text-4xl">🧺</div>
+                  <i className="fa-solid fa-basket-shopping text-4xl text-slate-300" />
                   <p className="mt-2 text-sm font-semibold text-slate-500">{th.emptyBill}</p>
                   <p className="text-xs">{th.scanToStart}</p>
                 </div>
@@ -530,7 +591,7 @@ export default function POS() {
             {cartTab === 'bill' && (
             <div className="border-t border-slate-200 px-4 py-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">🏷️ {th.discountCoupon}</span>
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"><i className="fa-solid fa-tag text-brand-500" /> {th.discountCoupon}</span>
                 {showDiscount ? (
                   <input type="number" autoFocus className="w-28 rounded-lg bg-slate-50 px-2 py-1 text-right text-sm ring-1 ring-slate-200 outline-none focus:ring-brand-500" value={discount || ''} onChange={(e) => setDiscount(Math.max(0, Number(e.target.value)))} onBlur={() => setShowDiscount(false)} placeholder="0.00" />
                 ) : (
@@ -543,7 +604,7 @@ export default function POS() {
                 {totals.manualDisc > 0 && <div className="flex justify-between text-rose-500"><span>{th.billDiscount}</span><span>-{totals.manualDisc.toFixed(2)}</span></div>}
                 {totals.promoDisc > 0 && (
                   <div className="flex justify-between text-rose-500">
-                    <span className="flex items-center gap-1">🏷️ {th.aPromotion}{promo.applied.length ? ` · ${promo.applied[0].name}${promo.applied.length > 1 ? ` +${promo.applied.length - 1}` : ''}` : ''}</span>
+                    <span className="flex items-center gap-1"><i className="fa-solid fa-tag mr-1" /> {th.aPromotion}{promo.applied.length ? ` · ${promo.applied[0].name}${promo.applied.length > 1 ? ` +${promo.applied.length - 1}` : ''}` : ''}</span>
                     <span>-{totals.promoDisc.toFixed(2)}</span>
                   </div>
                 )}
@@ -571,18 +632,18 @@ export default function POS() {
               <div className="mt-3 grid grid-cols-5 gap-1.5">
                 {PAYMENTS.map((pm) => (
                   <button key={pm.key} onClick={() => setPayKey(pm.key)} className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-bold ring-1 transition ${payKey === pm.key ? `${pm.cls} ring-2` : 'bg-slate-50 text-slate-500 ring-slate-200'}`}>
-                    <span className="text-base">{pm.icon}</span>{pm.label}
+                    <i className={`fa-solid ${pm.icon} text-base`} />{pm.label}
                   </button>
                 ))}
               </div>
 
               <button className="btn-primary mt-3 w-full py-3.5 text-base" disabled={lines.length === 0} onClick={onPay}>
-                💳 {th.pay} (F9)
+                <i className="fa-solid fa-money-check-dollar mr-1.5" />{th.pay} (F9)
               </button>
 
               {held.length > 0 && (
                 <button onClick={() => setShowHeld(true)} className="mt-2 w-full rounded-xl bg-amber-50 py-2 text-xs font-bold text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100">
-                  📋 มีบิลพักไว้ {held.length} บิล — แตะเพื่อเปิด
+                  <i className="fa-solid fa-clipboard-list mr-1.5" />มีบิลพักไว้ {held.length} บิล — แตะเพื่อเปิด
                 </button>
               )}
             </div>
@@ -593,7 +654,16 @@ export default function POS() {
 
       {/* modals */}
       {showHeld && <HeldBillsModal held={held} products={products} currency={currency} onResume={resumeHeld} onDelete={async (id) => { await api(`/held-bills/${id}`, { method: 'DELETE' }).catch(() => {}); loadHeld(); }} onClose={() => setShowHeld(false)} />}
-      {showCam && <CameraScanner onScan={(c) => { setShowCam(false); handleScan(c); }} onClose={() => setShowCam(false)} />}
+      {priceCheck && (
+        <PriceCheckModal
+          product={priceProduct}
+          currency={currency}
+          memberGetsWholesale={!!setting?.memberGetsWholesale}
+          onLookup={async (code) => { const p = await resolveProduct(code); if (p) setPriceProduct(p); else toast.error(th.notFound(code)); }}
+          onClose={() => { setPriceCheck(false); setPriceProduct(null); }}
+        />
+      )}
+      {showCam && <Suspense fallback={null}><CameraScanner onScan={(c) => { setShowCam(false); handleScan(c); }} onClose={() => setShowCam(false)} /></Suspense>}
       {pickMember && <MemberPicker onPick={(m) => { setMember(m); setPickMember(false); }} onClose={() => setPickMember(false)} />}
       {showPromo && (
         <PromoDialog
@@ -622,7 +692,7 @@ export default function POS() {
           currency={currency}
           autoPrint={autoPrint}
           onToggleAuto={(v) => { setAutoPrint(v); localStorage.setItem('pos_autoprint', v ? '1' : '0'); }}
-          onPrint={() => setPrintSale(lastSale)}
+          onPrint={() => doPrint(lastSale)}
           onClose={() => { setLastSale(null); publisher.current?.publish({ ...baseDisplay(), status: 'IDLE', items: [], count: 0, subtotal: 0, tax: 0, total: 0 }); }}
         />
       )}
@@ -637,7 +707,7 @@ function CustomerInfoPanel({ member, memberWholesale, onPick, onClear }: { membe
   if (!member) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center text-slate-400">
-        <div className="text-4xl">👤</div>
+        <i className="fa-solid fa-user text-4xl text-slate-300" />
         <p className="mt-2 text-sm font-semibold text-slate-500">{th.generalCustomer}</p>
         <p className="mb-3 text-xs">ยังไม่ได้เลือกสมาชิก</p>
         <button className="btn-primary" onClick={onPick}>+ {th.selectMember}</button>
@@ -661,7 +731,7 @@ function CustomerInfoPanel({ member, memberWholesale, onPick, onClear }: { membe
         <Row label="สิทธิ์ราคา" value={memberWholesale ? th.memberPrice : th.retail} />
       </div>
       <div className="mt-4 flex gap-2">
-        <button className="btn-ghost flex-1" onClick={onPick}>✎ {th.changeCustomer}</button>
+        <button className="btn-ghost flex-1" onClick={onPick}><i className="fa-solid fa-pen mr-1" /> {th.changeCustomer}</button>
         <button className="btn-danger flex-1" onClick={onClear}>{th.remove}</button>
       </div>
     </div>
@@ -673,14 +743,14 @@ function HeldBillsModal({ held, products, currency, onResume, onDelete, onClose 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
       <div className="card w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-bold">📋 บิลที่พักไว้ ({held.length})</h3><button className="text-slate-400 hover:text-slate-700" onClick={onClose}>✕</button></div>
+        <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-bold"><i className="fa-solid fa-clipboard-list mr-2" />บิลที่พักไว้ ({held.length})</h3><button className="text-slate-400 hover:text-slate-700" onClick={onClose}>✕</button></div>
         {held.length === 0 ? (
           <div className="py-10 text-center text-sm text-slate-400">ไม่มีบิลที่พักไว้</div>
         ) : (
           <div className="max-h-[60vh] space-y-2 overflow-auto">
             {held.map((b) => (
               <div key={b.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-lg">🧾</div>
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-lg text-amber-600"><i className="fa-solid fa-receipt" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-bold">{b.member?.name || th.generalCustomer} · {b.items.reduce((s, i) => s + i.qty, 0)} ชิ้น</div>
                   <div className="text-xs text-slate-400">{new Date(b.createdAt).toLocaleString('th-TH')} · ~{money(estimate(b), currency)}</div>
@@ -696,16 +766,68 @@ function HeldBillsModal({ held, products, currency, onResume, onDelete, onClose 
   );
 }
 
+function PriceCheckModal({ product, currency, memberGetsWholesale, onLookup, onClose }: { product: Product | null; currency: string; memberGetsWholesale: boolean; onLookup: (code: string) => void; onClose: () => void }) {
+  const [code, setCode] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
+      <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-lg font-bold"><i className="fa-solid fa-tags mr-2 text-brand-600" />เช็คราคาสินค้า</h3>
+          <button className="text-slate-400 hover:text-slate-700" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-brand-500">
+          <i className="fa-solid fa-barcode text-slate-400" />
+          <input
+            data-scan="true"
+            autoFocus
+            className="w-full bg-transparent py-2.5 text-sm outline-none"
+            placeholder="สแกนหรือพิมพ์บาร์โค้ด / SKU"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && code.trim()) { onLookup(code.trim()); setCode(''); } }}
+          />
+        </div>
+
+        {product ? (
+          <div className="mt-4">
+            <div className="flex items-center gap-3">
+              <ProductImage src={product.imageUrl} name={product.name} className="h-16 w-16 rounded-xl ring-1 ring-slate-200" />
+              <div>
+                <div className="font-bold text-ink-900">{product.name}</div>
+                <div className="text-xs text-slate-400">{product.barcode || product.sku} · {th.stock} {product.stockQty} {product.unit}</div>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
+                <span className="text-sm text-slate-500">ราคาปกติ</span>
+                <span className="text-xl font-extrabold text-ink-900">{money(product.retailPrice, currency)}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-brand-50 px-4 py-3 ring-1 ring-brand-200">
+                <span className="text-sm font-semibold text-brand-700">{memberGetsWholesale ? 'ราคาสมาชิก / ส่ง' : 'ราคาส่ง'}</span>
+                <span className="text-xl font-extrabold text-brand-700">{money(product.wholesalePrice, currency)} <span className="text-xs font-normal text-brand-500">≥{product.wholesaleMinQty}</span></span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-6 mb-2 text-center text-sm text-slate-400"><i className="fa-solid fa-barcode mb-2 block text-3xl text-slate-300" />สแกนสินค้าเพื่อดูราคา</div>
+        )}
+
+        <button className="btn-ghost mt-5 w-full" onClick={onClose}>เสร็จสิ้น</button>
+      </div>
+    </div>
+  );
+}
+
 function NowClock() {
   const [now, setNow] = useState(new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
   const date = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
   const time = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-  return (<><div className="font-semibold text-ink-800">{date}</div><div>{time} น.</div></>);
+  return (<><div className="font-semibold">{date}</div><div>{time} น.</div></>);
 }
 
 function IconBtn({ children, title, onClick }: { children: React.ReactNode; title?: string; onClick?: () => void }) {
-  return <button title={title} onClick={onClick} className="grid h-9 w-9 place-items-center rounded-xl text-base text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50">{children}</button>;
+  return <button title={title} onClick={onClick} className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-base text-white ring-1 ring-white/20 transition hover:bg-white/20">{children}</button>;
 }
 
 const TONES: Record<string, string> = {
@@ -714,7 +836,7 @@ const TONES: Record<string, string> = {
 function ActionBtn({ icon, label, k, tone, onClick }: { icon: string; label: string; k?: string; tone: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200 transition hover:bg-slate-50">
-      <span className={`text-base ${TONES[tone]}`}>{icon}</span>
+      <i className={`fa-solid ${icon} w-4 text-center text-base ${TONES[tone]}`} />
       <span className="text-left leading-tight">
         <span className="block text-[13px] font-bold text-ink-800">{label}</span>
         {k && <span className="block text-[10px] font-semibold text-slate-400">{k}</span>}
@@ -724,16 +846,27 @@ function ActionBtn({ icon, label, k, tone, onClick }: { icon: string; label: str
 }
 
 const KPI_TONE: Record<string, string> = {
-  violet: 'bg-violet-100 text-violet-600', emerald: 'bg-emerald-100 text-emerald-600', orange: 'bg-orange-100 text-orange-600', blue: 'bg-blue-100 text-blue-600',
+  violet: 'bg-gradient-to-br from-violet-500 to-violet-600 text-white',
+  emerald: 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white',
+  orange: 'bg-gradient-to-br from-orange-400 to-orange-500 text-white',
+  blue: 'bg-gradient-to-br from-blue-500 to-blue-600 text-white',
+  rose: 'bg-gradient-to-br from-rose-500 to-rose-600 text-white',
+  amber: 'bg-gradient-to-br from-amber-400 to-amber-500 text-white',
 };
-function Kpi({ tone, icon, label, value, sub, subGreen }: { tone: string; icon: string; label: string; value: string; sub?: string; subGreen?: boolean }) {
+const KPI_BAR: Record<string, string> = {
+  violet: 'bg-violet-500', emerald: 'bg-emerald-500', orange: 'bg-orange-400', blue: 'bg-blue-500', rose: 'bg-rose-500', amber: 'bg-amber-400',
+};
+function Kpi({ tone, icon, label, value, sub }: { tone: string; icon: string; label: string; value: string; sub?: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-white p-3.5 shadow-card ring-1 ring-slate-200/70">
-      <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-lg ${KPI_TONE[tone]}`}>{icon}</div>
-      <div className="min-w-0">
-        <div className="truncate text-[11px] font-semibold text-slate-400">{label}</div>
-        <div className="text-lg font-extrabold tracking-tight text-ink-900">{value}</div>
-        {sub && <div className={`truncate text-[11px] ${subGreen ? 'font-semibold text-emerald-600' : 'text-slate-400'}`}>{sub}</div>}
+    <div className="relative overflow-hidden rounded-2xl bg-white/90 p-4 shadow-card ring-1 ring-slate-200/70 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-pop">
+      <span className={`absolute inset-y-3 left-0 w-1 rounded-full ${KPI_BAR[tone]}`} />
+      <div className="flex items-start justify-between pl-2">
+        <div className="min-w-0">
+          <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+          <div className="mt-1 truncate text-2xl font-extrabold tracking-tight text-ink-900">{value}</div>
+          {sub && <div className="mt-0.5 truncate text-[11px] text-slate-400">{sub}</div>}
+        </div>
+        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-base ${KPI_TONE[tone]}`}><i className={`fa-solid ${icon}`} /></span>
       </div>
     </div>
   );
@@ -741,8 +874,8 @@ function Kpi({ tone, icon, label, value, sub, subGreen }: { tone: string; icon: 
 
 function CatRow({ active, icon, name, count, onClick, highlight }: { active: boolean; icon: string; name: string; count: number; onClick: () => void; highlight?: boolean }) {
   return (
-    <button onClick={onClick} className={`mb-1 flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition ${active ? (highlight ? 'bg-brand-600 text-white' : 'bg-brand-50 font-semibold text-brand-700') : 'text-slate-600 hover:bg-slate-50'}`}>
-      <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-sm ${active ? 'bg-white/20' : 'bg-slate-100'}`}>{icon}</span>
+    <button onClick={onClick} className={`mb-1 flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition ${active ? (highlight ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-glow' : 'bg-brand-50 font-semibold text-brand-700') : 'text-slate-600 hover:bg-slate-50'}`}>
+      <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs ${active ? 'bg-white/20' : 'bg-slate-100'}`}><i className={`fa-solid ${icon}`} /></span>
       <span className="flex-1 truncate font-medium">{name}</span>
       <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
     </button>
@@ -754,17 +887,17 @@ function ProductCard({ p, price, currency, best, onClick }: { p: Product; price:
   const low = !out && p.stockQty <= p.reorderLevel;
   const badge = out ? { t: th.bOut, c: 'bg-rose-500 text-white' } : low ? { t: th.bLow, c: 'bg-orange-400 text-white' } : best ? { t: th.bBestSeller, c: 'bg-emerald-500 text-white' } : null;
   return (
-    <button disabled={out} onClick={onClick} className="group flex flex-col overflow-hidden rounded-2xl bg-white text-left shadow-card ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-pop hover:ring-brand-300 disabled:opacity-50">
-      <div className="relative aspect-square w-full overflow-hidden bg-slate-50 p-3">
-        <ProductImage src={p.imageUrl} name={p.name} className="h-full w-full rounded-lg transition group-hover:scale-105" />
-        {badge && <span className={`absolute right-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${badge.c}`}>{badge.t}</span>}
+    <button disabled={out} onClick={onClick} className="group flex flex-col overflow-hidden rounded-xl bg-white text-left shadow-card ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-pop hover:ring-brand-300 disabled:opacity-50">
+      <div className="relative aspect-square w-full overflow-hidden bg-slate-50 p-2">
+        <ProductImage src={p.imageUrl} name={p.name} className="h-full w-full rounded-md transition group-hover:scale-105" />
+        {badge && <span className={`absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold ${badge.c}`}>{badge.t}</span>}
       </div>
-      <div className="flex flex-1 flex-col px-3 pb-3">
-        <div className="text-[10px] text-slate-400">{p.barcode || p.sku}</div>
-        <div className="line-clamp-1 text-[13px] font-semibold text-ink-900">{p.name}</div>
-        <div className="mt-1 text-lg font-extrabold text-ink-900">{num(price).toFixed(2)}</div>
-        <div className="mt-0.5 flex items-center justify-between text-[11px] text-slate-400">
-          <span>{th.stock} {p.stockQty}</span><span>⋯</span>
+      <div className="flex flex-1 flex-col px-2 pb-2">
+        <div className="truncate text-[9px] text-slate-400">{p.barcode || p.sku}</div>
+        <div className="line-clamp-1 text-[12px] font-semibold leading-tight text-ink-900">{p.name}</div>
+        <div className="mt-0.5 flex items-end justify-between">
+          <span className="text-[15px] font-extrabold text-ink-900">{num(price).toFixed(2)}</span>
+          <span className="text-[10px] text-slate-400">{th.stock} {p.stockQty}</span>
         </div>
       </div>
     </button>
@@ -807,7 +940,7 @@ function PromoDialog({ applied, coupon, onCoupon, totalOff, currency, onClose }:
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
       <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">🏷️ {th.aPromotion}</h3>
+          <h3 className="text-lg font-bold"><i className="fa-solid fa-tag mr-1" /> {th.aPromotion}</h3>
           <button className="text-slate-400 hover:text-slate-700" onClick={onClose}>✕</button>
         </div>
 
@@ -826,7 +959,7 @@ function PromoDialog({ applied, coupon, onCoupon, totalOff, currency, onClose }:
             <div className="space-y-2">
               {applied.map((a) => (
                 <div key={a.id} className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2.5 ring-1 ring-emerald-200">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-emerald-800">✓ {a.name}</span>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-emerald-800"><i className="fa-solid fa-check" /> {a.name}</span>
                   <span className="text-sm font-bold text-emerald-700">-{money(a.amount, currency)}</span>
                 </div>
               ))}
@@ -849,10 +982,10 @@ function ReceiptModal({ sale, setting, currency, autoPrint, onToggleAuto, onPrin
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
       <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
         <div className="text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-3xl text-emerald-600">✓</div>
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-3xl text-emerald-600"><i className="fa-solid fa-check" /></div>
           <h3 className="mt-3 text-lg font-bold">{th.paymentComplete}</h3>
           <p className="text-sm text-slate-500">{sale.orderNo} • {labels[sale.paymentMethod] ?? sale.paymentMethod}</p>
-          {sale.member && <p className="text-xs text-brand-600">👤 {sale.member.name}</p>}
+          {sale.member && <p className="text-xs text-brand-600"><i className="fa-solid fa-user mr-1" /> {sale.member.name}</p>}
         </div>
         <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm">
           {sale.items.map((i) => (<div key={i.id} className="flex justify-between py-0.5"><span>{i.qty}× {i.nameSnapshot}</span><span>{money(i.lineTotal, currency)}</span></div>))}
@@ -870,7 +1003,7 @@ function ReceiptModal({ sale, setting, currency, autoPrint, onToggleAuto, onPrin
           พิมพ์ใบเสร็จอัตโนมัติ
         </label>
         <div className="mt-3 flex gap-2">
-          <button className="btn-ghost flex-1" onClick={onPrint}>🖨️ พิมพ์ใบเสร็จ</button>
+          <button className="btn-ghost flex-1" onClick={onPrint}><i className="fa-solid fa-print mr-1.5" />พิมพ์ใบเสร็จ</button>
           <button className="btn-primary flex-1" onClick={onClose}>{th.newOrder}</button>
         </div>
       </div>

@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { Modal } from '../../components/Modal';
-import { PageHeader } from '../../components/ui';
+import { DataTable } from '../../components/DataTable';
+import { ListToolbar } from '../../components/ListToolbar';
+import { makeExporters, type Column } from '../../lib/export';
 import { toast } from '../../components/Toast';
 
 interface Supplier { id: number; name: string; phone: string; email: string; note: string; }
@@ -11,6 +13,7 @@ type Form = typeof empty;
 export default function Suppliers() {
   const [items, setItems] = useState<Supplier[]>([]);
   const [q, setQ] = useState('');
+  const [contactFilter, setContactFilter] = useState('');
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState<Form | null>(null);
 
@@ -31,38 +34,64 @@ export default function Suppliers() {
     } catch (e) { toast.error((e as Error).message); }
   }
 
-  const filtered = items.filter((s) => !q || s.name.includes(q) || s.phone.includes(q));
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return items.filter((s) => {
+      if (term && !(s.name.toLowerCase().includes(term) || (s.phone || '').includes(term) || (s.email || '').toLowerCase().includes(term))) return false;
+      if (contactFilter === 'phone' && !s.phone) return false;
+      if (contactFilter === 'email' && !s.email) return false;
+      return true;
+    });
+  }, [items, q, contactFilter]);
+
+  const filterCount = [contactFilter].filter(Boolean).length;
+
+  const columns: Column<Supplier>[] = [
+    { label: 'ชื่อผู้จำหน่าย', value: (s) => s.name },
+    { label: 'เบอร์โทร', value: (s) => s.phone || '' },
+    { label: 'อีเมล', value: (s) => s.email || '' },
+    { label: 'หมายเหตุ', value: (s) => s.note || '' },
+  ];
+  const exporters = makeExporters({ filename: 'suppliers', title: 'รายชื่อผู้จำหน่าย', columns, rows: () => filtered });
 
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <div className="flex h-full flex-col gap-4">
+      <ListToolbar
         title="ผู้จำหน่าย"
         subtitle="จัดการซัพพลายเออร์ที่รับสินค้าเข้า"
-        icon="🚚"
-        actions={<button className="btn-primary" onClick={openNew}>+ เพิ่มผู้จำหน่าย</button>}
+        icon={<i className="fa-solid fa-handshake" />}
+        q={q} setQ={setQ} placeholder="ค้นหาชื่อ / เบอร์โทร / อีเมล…"
+        primary={<button className="btn-primary" onClick={openNew}><i className="fa-solid fa-plus mr-1.5" />เพิ่มผู้จำหน่าย</button>}
+        exports={exporters}
+        filterCount={filterCount}
+        onResetFilter={() => setContactFilter('')}
+        filter={
+          <div>
+            <label className="label">ข้อมูลติดต่อ</label>
+            <select className="input" value={contactFilter} onChange={(e) => setContactFilter(e.target.value)}>
+              <option value="">ทั้งหมด</option>
+              <option value="phone">มีเบอร์โทร</option>
+              <option value="email">มีอีเมล</option>
+            </select>
+          </div>
+        }
       />
 
-      <input className="input max-w-md" placeholder="ค้นหาชื่อ / เบอร์โทร…" value={q} onChange={(e) => setQ(e.target.value)} />
-
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
-            <tr><th className="px-4 py-3">ชื่อผู้จำหน่าย</th><th className="px-4 py-3">เบอร์โทร</th><th className="px-4 py-3">อีเมล</th><th className="px-4 py-3">หมายเหตุ</th><th /></tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filtered.map((s) => (
-              <tr key={s.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-semibold">{s.name}</td>
-                <td className="px-4 py-3">{s.phone || '—'}</td>
-                <td className="px-4 py-3 text-slate-500">{s.email || '—'}</td>
-                <td className="px-4 py-3 text-slate-500">{s.note || '—'}</td>
-                <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(s)}>แก้ไข</button></td>
-              </tr>
-            ))}
-            {filtered.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">ยังไม่มีผู้จำหน่าย</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        rows={filtered}
+        colCount={5}
+        empty="ยังไม่มีผู้จำหน่าย"
+        head={<tr><th className="px-4 py-3">ชื่อผู้จำหน่าย</th><th className="px-4 py-3">เบอร์โทร</th><th className="px-4 py-3">อีเมล</th><th className="px-4 py-3">หมายเหตุ</th><th /></tr>}
+        renderRow={(s) => (
+          <tr key={s.id} className="hover:bg-slate-50">
+            <td className="px-4 py-3 font-semibold">{s.name}</td>
+            <td className="px-4 py-3">{s.phone || '—'}</td>
+            <td className="px-4 py-3 text-slate-500">{s.email || '—'}</td>
+            <td className="px-4 py-3 text-slate-500">{s.note || '—'}</td>
+            <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(s)}>แก้ไข</button></td>
+          </tr>
+        )}
+      />
 
       {form && (
         <Modal title={editing ? 'แก้ไขผู้จำหน่าย' : 'เพิ่มผู้จำหน่าย'} onClose={() => setForm(null)}>
