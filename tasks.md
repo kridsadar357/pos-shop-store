@@ -47,8 +47,9 @@ is already branch-correct).
   by supplier) — on the Purchase Orders page
 - ✅ Per-supplier product **cost history** (from goods receipts; shown in the
   product editor) — feeds the reorder suggestions
-- 🟨 Editable **supplier price lists** (a `SupplierProduct` catalogue) — only the
-  derived cost *history* exists; no maintained price list yet
+- ✅ Editable **supplier price lists** — `SupplierProduct` catalogue (per-product
+  supplier↔cost with a preferred flag), managed in the product editor; reorder
+  suggestions prefer the price list (preferred → cheapest) over last-receipt cost
 - 🟨 Units-of-measure conversion (buy by box, sell by piece) — Product has a
   purchase unit + pack size, and **receiving** converts pack→base (stock stays in
   base units). Follow-up: same pack toggle on the PO line entry

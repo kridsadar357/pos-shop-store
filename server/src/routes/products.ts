@@ -139,6 +139,53 @@ productsRouter.get(
   })
 );
 
+// --- Supplier price list for a product ---
+productsRouter.get(
+  '/:id/suppliers',
+  ah(async (req, res) => {
+    const rows = await prisma.supplierProduct.findMany({
+      where: { productId: Number(req.params.id) },
+      include: { supplier: { select: { name: true } } },
+      orderBy: [{ isPreferred: 'desc' }, { unitCost: 'asc' }],
+    });
+    res.json(rows.map((r) => ({ id: r.id, supplierId: r.supplierId, supplier: r.supplier.name, unitCost: r.unitCost, isPreferred: r.isPreferred, note: r.note })));
+  })
+);
+
+const supplierProductSchema = z.object({
+  supplierId: z.number().int(),
+  unitCost: z.number().nonnegative(),
+  isPreferred: z.boolean().default(false),
+  note: z.string().default(''),
+});
+
+productsRouter.post(
+  '/:id/suppliers',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const productId = Number(req.params.id);
+    const data = supplierProductSchema.parse(req.body);
+    const row = await prisma.$transaction(async (tx) => {
+      if (data.isPreferred) await tx.supplierProduct.updateMany({ where: { productId }, data: { isPreferred: false } });
+      return tx.supplierProduct.upsert({
+        where: { supplierId_productId: { supplierId: data.supplierId, productId } },
+        create: { productId, ...data },
+        update: { unitCost: data.unitCost, isPreferred: data.isPreferred, note: data.note },
+      });
+    });
+    res.status(201).json(row);
+  })
+);
+
+productsRouter.delete(
+  '/:id/suppliers/:supplierId',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    await prisma.supplierProduct.deleteMany({ where: { productId: Number(req.params.id), supplierId: Number(req.params.supplierId) } });
+    res.json({ ok: true });
+  })
+);
+
 const productSchema = z.object({
   sku: z.string().min(1),
   barcode: z.string().trim().optional().nullable(),

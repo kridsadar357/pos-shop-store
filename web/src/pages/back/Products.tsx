@@ -40,6 +40,9 @@ export default function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [costHistory, setCostHistory] = useState<{ refNo: string; date: string; supplier: string; qty: number; unitCost: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: number; name: string }[]>([]);
+  const [priceList, setPriceList] = useState<{ id: number; supplierId: number; supplier: string; unitCost: string; isPreferred: boolean }[]>([]);
+  const [spForm, setSpForm] = useState<{ supplierId: number | ''; unitCost: number; isPreferred: boolean }>({ supplierId: '', unitCost: 0, isPreferred: false });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -48,7 +51,23 @@ export default function Products() {
   }
   useEffect(() => {
     api<Category[]>('/categories').then(setCategories);
+    api<{ id: number; name: string }[]>('/suppliers').then(setSuppliers).catch(() => {});
   }, []);
+
+  async function loadPriceList(id: number) { setPriceList(await api(`/products/${id}/suppliers`)); }
+  async function addSupplierPrice() {
+    if (!editing || !spForm.supplierId) return;
+    try {
+      await api(`/products/${editing.id}/suppliers`, { method: 'POST', body: { supplierId: spForm.supplierId, unitCost: spForm.unitCost, isPreferred: spForm.isPreferred } });
+      setSpForm({ supplierId: '', unitCost: 0, isPreferred: false });
+      loadPriceList(editing.id);
+    } catch (e) { toast.error((e as Error).message); }
+  }
+  async function removeSupplierPrice(supplierId: number) {
+    if (!editing) return;
+    await api(`/products/${editing.id}/suppliers/${supplierId}`, { method: 'DELETE' });
+    loadPriceList(editing.id);
+  }
   useEffect(() => {
     const t = setTimeout(load, 150);
     return () => clearTimeout(t);
@@ -58,13 +77,17 @@ export default function Products() {
     setEditing(null);
     setImageFile(null);
     setCostHistory([]);
+    setPriceList([]);
     setForm({ ...empty });
   }
   function openEdit(p: Product) {
     setEditing(p);
     setImageFile(null);
     setCostHistory([]);
+    setPriceList([]);
+    setSpForm({ supplierId: '', unitCost: 0, isPreferred: false });
     api<typeof costHistory>(`/products/${p.id}/cost-history`).then(setCostHistory).catch(() => {});
+    loadPriceList(p.id).catch(() => {});
     setForm({
       sku: p.sku,
       barcode: p.barcode ?? '',
@@ -268,6 +291,39 @@ export default function Products() {
             <NumField label="จุดสั่งซื้อซ้ำ" v={form.reorderLevel} set={(v) => setForm({ ...form, reorderLevel: v })} />
           </div>
           {editing && <p className="mt-3 text-xs text-slate-400">การปรับสต็อกทำผ่าน รับสินค้า / นับสต็อก / บัญชีสต็อก — สต็อกควบคุมด้วยบัญชีเดินสินค้า</p>}
+
+          {editing && (
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="mb-2 text-sm font-bold text-ink-900"><i className="fa-solid fa-handshake mr-1.5 text-brand-600" />ผู้จำหน่าย & ราคาทุน (ราคาตั้ง)</div>
+              {priceList.length > 0 && (
+                <div className="mb-2 overflow-hidden rounded-xl ring-1 ring-slate-200">
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-slate-100">
+                      {priceList.map((sp) => (
+                        <tr key={sp.id}>
+                          <td className="px-3 py-1.5">{sp.isPreferred && <i className="fa-solid fa-star mr-1 text-amber-400" title="ผู้จำหน่ายหลัก" />}{sp.supplier}</td>
+                          <td className="px-3 py-1.5 text-right font-medium">{money(sp.unitCost)}</td>
+                          <td className="px-3 py-1.5 text-right"><button className="text-slate-300 hover:text-rose-500" onClick={() => removeSupplierPrice(sp.supplierId)}>✕</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="label">ผู้จำหน่าย</label>
+                  <select className="input py-1.5" value={spForm.supplierId} onChange={(e) => setSpForm({ ...spForm, supplierId: e.target.value ? Number(e.target.value) : '' })}>
+                    <option value="">— เลือก —</option>
+                    {suppliers.filter((s) => !priceList.some((p) => p.supplierId === s.id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className="w-28"><label className="label">ราคาทุน</label><input type="number" className="input py-1.5" value={spForm.unitCost} onChange={(e) => setSpForm({ ...spForm, unitCost: Number(e.target.value) })} /></div>
+                <label className="flex items-center gap-1.5 pb-2 text-xs"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={spForm.isPreferred} onChange={(e) => setSpForm({ ...spForm, isPreferred: e.target.checked })} /> หลัก</label>
+                <button type="button" className="btn-ghost mb-0.5" disabled={!spForm.supplierId} onClick={addSupplierPrice}>เพิ่ม</button>
+              </div>
+            </div>
+          )}
 
           {editing && costHistory.length > 0 && (
             <div className="mt-3 border-t border-slate-100 pt-3">

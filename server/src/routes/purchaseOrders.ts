@@ -67,18 +67,32 @@ purchaseOrdersRouter.get(
       lastBuy.set(it.productId, { unitCost: Number(it.unitCost), supplierId: it.receipt.supplierId, supplierName: it.receipt.supplier?.name ?? null });
     }
 
+    // The supplier price list takes precedence (preferred, else cheapest).
+    const sp = await prisma.supplierProduct.findMany({
+      where: { productId: { in: need.map((p) => p.id) } },
+      include: { supplier: { select: { name: true } } },
+      orderBy: [{ isPreferred: 'desc' }, { unitCost: 'asc' }],
+    });
+    const priceList = new Map<number, { unitCost: number; supplierId: number; supplierName: string }>();
+    for (const r of sp) {
+      if (priceList.has(r.productId)) continue;
+      priceList.set(r.productId, { unitCost: Number(r.unitCost), supplierId: r.supplierId, supplierName: r.supplier.name });
+    }
+
     res.json(
       need
         .map((p) => {
           const oh = onHand(p);
           const target = p.reorderLevel > 0 ? p.reorderLevel * 3 : 50; // restock to ~3× the reorder point
+          const pl = priceList.get(p.id);
           const lb = lastBuy.get(p.id);
+          const src = pl ?? lb; // price list wins, else last purchase
           return {
             productId: p.id, sku: p.sku, name: p.name, category: (p as any).category?.name ?? '',
             onHand: oh, reorderLevel: p.reorderLevel, unit: p.unit,
             suggestedQty: Math.max(target - oh, 1),
-            unitCost: lb?.unitCost ?? Number(p.cost),
-            supplierId: lb?.supplierId ?? null, supplierName: lb?.supplierName ?? null,
+            unitCost: src?.unitCost ?? Number(p.cost),
+            supplierId: src?.supplierId ?? null, supplierName: src?.supplierName ?? null,
           };
         })
         .sort((a, b) => a.onHand - b.onHand)

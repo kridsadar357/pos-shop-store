@@ -244,6 +244,22 @@ model Supplier {
   note     String          @default("")
   receipts GoodsReceipt[]
   purchaseOrders PurchaseOrder[]
+  products SupplierProduct[]
+}
+
+/// A supplier's quoted price for a product (the supplier price list).
+model SupplierProduct {
+  id          Int     @id @default(autoincrement())
+  supplierId  Int
+  productId   Int
+  unitCost    Decimal @db.Decimal(12, 2)
+  isPreferred Boolean @default(false)
+  note        String  @default("")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, productId])
 }
 
 /// Purchase order to a supplier; receiving against it drives RECEIVE movements.
@@ -306,6 +322,7 @@ model Product {
   promotions Promotion[]
   poItems    PurchaseOrderItem[]
   branchStock BranchStock[]
+  suppliers  SupplierProduct[]
 
   @@index([name])
 }
