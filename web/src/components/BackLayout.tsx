@@ -23,6 +23,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/back/sales', label: 'รายการขาย', icon: 'fa-receipt' },
       { to: '/back/quotations', label: 'ใบเสนอราคา', icon: 'fa-file-lines' },
+      { to: '/back/layaways', label: 'ออมก่อนรับ / มัดจำ', icon: 'fa-piggy-bank' },
       { to: '/back/returns', label: 'การคืนสินค้า', icon: 'fa-rotate-left' },
       { to: '/back/promotions', label: 'การตลาด', icon: 'fa-bullhorn' },
       { to: '/back/gift-cards', label: 'บัตรของขวัญ', icon: 'fa-gift' },

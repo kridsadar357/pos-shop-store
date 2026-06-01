@@ -70,7 +70,11 @@ is already branch-correct).
   CRUD, status workflow (draft→sent→accepted/expired/cancelled), printable A4
   document, export. One-click **convert** creates a completed sale server-side from
   the quoted prices (default เงินเชื่อ/CREDIT), decrements stock, marks CONVERTED
-- ⬜ Layaway / deposits / partial payment
+- ✅ Layaway / deposits / partial payment — `Layaway` + `LayawayItem` +
+  `LayawayPayment`; create with an opening deposit, record installments (capped at
+  the balance), then **complete** (only when fully paid) builds a sale from the
+  snapshotted lines, tenders = the collected payments by method, and decrements stock.
+  Back-office Layaway page (create + detail with installments/complete/cancel)
 - ✅ Split / multi-tender payments on one bill — `SalePayment` model (per-method
   applied amount, summing to the total) is the source of truth; checkout accepts a
   `payments[]` array (cash may overpay → change, non-cash must fit the bill). POS

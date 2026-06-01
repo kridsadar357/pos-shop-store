@@ -247,6 +247,60 @@ model QuotationItem {
   quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
 }
 
+// Layaway / deposit plan: a customer reserves goods and pays in installments.
+// Stock is decremented only on completion (which creates a sale). Line prices are
+// snapshotted like a quotation. `paid` is the running sum of LayawayPayment rows.
+model Layaway {
+  id              Int       @id @default(autoincrement())
+  refNo           String    @unique // LAY-xxxxx
+  customerName    String    @default("")
+  memberId        Int?
+  type            SaleType  @default(RETAIL)
+  status          String    @default("OPEN") // OPEN | COMPLETED | CANCELLED
+  total           Decimal   @db.Decimal(12, 2)
+  subtotal        Decimal   @db.Decimal(12, 2)
+  discount        Decimal   @default(0) @db.Decimal(12, 2)
+  taxAmount       Decimal   @default(0) @db.Decimal(12, 2)
+  note            String    @default("")
+  dueDate         DateTime?
+  convertedSaleId Int?
+  userId          Int?
+  branchId        Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  items    LayawayItem[]
+  payments LayawayPayment[]
+
+  @@index([status])
+}
+
+model LayawayItem {
+  id           Int     @id @default(autoincrement())
+  layawayId    Int
+  productId    Int
+  nameSnapshot String
+  qty          Int
+  unitPrice    Decimal @db.Decimal(12, 2)
+  lineTotal    Decimal @db.Decimal(12, 2)
+
+  layaway Layaway @relation(fields: [layawayId], references: [id], onDelete: Cascade)
+}
+
+model LayawayPayment {
+  id        Int           @id @default(autoincrement())
+  layawayId Int
+  amount    Decimal       @db.Decimal(12, 2)
+  method    PaymentMethod @default(CASH)
+  reference String        @default("")
+  userId    Int?
+  createdAt DateTime      @default(now())
+
+  layaway Layaway @relation(fields: [layawayId], references: [id], onDelete: Cascade)
+
+  @@index([layawayId])
+}
+
 /// Licensing / 14-day demo (singleton, id = 1).
 model License {
   id            Int       @id @default(1)

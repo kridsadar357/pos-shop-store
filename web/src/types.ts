@@ -186,6 +186,34 @@ export interface Quotation {
   items?: QuotationItem[];
 }
 
+export interface LayawayPayment {
+  id: number;
+  amount: string;
+  method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT';
+  reference: string;
+  createdAt: string;
+}
+
+export interface Layaway {
+  id: number;
+  refNo: string;
+  customerName: string;
+  type: 'RETAIL' | 'WHOLESALE';
+  status: 'OPEN' | 'COMPLETED' | 'CANCELLED';
+  total: string;
+  subtotal: string;
+  discount: string;
+  taxAmount: string;
+  note: string;
+  dueDate: string | null;
+  convertedSaleId: number | null;
+  createdAt: string;
+  paid: number;
+  balance: number;
+  items?: QuotationItem[];
+  payments?: LayawayPayment[];
+}
+
 export interface Supplier { id: number; name: string; phone: string; email: string; note: string; }
 
 export interface Payable {
