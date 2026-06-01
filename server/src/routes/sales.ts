@@ -169,6 +169,7 @@ salesRouter.post(
           refId: created.id,
           note: orderNo,
           userId: cashierId,
+          branchId,
         });
       }
 
@@ -278,6 +279,7 @@ salesRouter.post(
           refId: sale.id,
           note: `Void ${sale.orderNo}`,
           userId,
+          branchId: sale.branchId,
         });
       }
 

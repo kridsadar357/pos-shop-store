@@ -26,6 +26,7 @@ enum MovementType {
   ADJUST
   COUNT
   VOID
+  TRANSFER
 }
 
 enum SaleType {
@@ -115,8 +116,12 @@ model Branch {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  sales  Sale[]
-  shifts Shift[]
+  sales         Sale[]
+  shifts        Shift[]
+  movements     StockMovement[]
+  branchStock   BranchStock[]
+  transfersFrom StockTransfer[] @relation("TransferFrom")
+  transfersTo   StockTransfer[] @relation("TransferTo")
 }
 
 /// Licensing / 14-day demo (singleton, id = 1).
@@ -288,6 +293,7 @@ model Product {
   countItems StockCountItem[]
   promotions Promotion[]
   poItems    PurchaseOrderItem[]
+  branchStock BranchStock[]
 
   @@index([name])
 }
@@ -300,17 +306,59 @@ model StockMovement {
   qtyDelta    Int // signed: + adds stock, - removes
   balanceAfter Int
   unitCost    Decimal      @default(0) @db.Decimal(12, 2)
-  refType     String       @default("") // "SALE" | "GOODS_RECEIPT" | "STOCK_COUNT" | "MANUAL"
+  refType     String       @default("") // "SALE" | "GOODS_RECEIPT" | "STOCK_COUNT" | "TRANSFER" | "MANUAL"
   refId       Int?
   note        String       @default("")
   userId      Int?
+  branchId    Int?
   createdAt   DateTime     @default(now())
 
   product Product @relation(fields: [productId], references: [id])
   user    User?   @relation(fields: [userId], references: [id])
+  branch  Branch? @relation(fields: [branchId], references: [id])
 
   @@index([productId, createdAt])
   @@index([type, createdAt])
+  @@index([branchId])
+}
+
+/// Per-branch cached stock balance (Product.stockQty stays the all-branch total).
+model BranchStock {
+  id        Int @id @default(autoincrement())
+  productId Int
+  branchId  Int
+  qty       Int @default(0)
+
+  product Product @relation(fields: [productId], references: [id])
+  branch  Branch  @relation(fields: [branchId], references: [id])
+
+  @@unique([productId, branchId])
+}
+
+/// Inter-branch stock transfer (moves BranchStock between branches; total unchanged).
+model StockTransfer {
+  id           Int      @id @default(autoincrement())
+  refNo        String   @unique // TR-xxxxx
+  fromBranchId Int
+  toBranchId   Int
+  note         String   @default("")
+  userId       Int?
+  createdAt    DateTime @default(now())
+
+  fromBranch Branch              @relation("TransferFrom", fields: [fromBranchId], references: [id])
+  toBranch   Branch              @relation("TransferTo", fields: [toBranchId], references: [id])
+  items      StockTransferItem[]
+
+  @@index([createdAt])
+}
+
+model StockTransferItem {
+  id         Int @id @default(autoincrement())
+  transferId Int
+  productId  Int
+  qty        Int
+
+  transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
 }
 
 model Sale {

@@ -9,6 +9,16 @@ export interface MovementInput {
   refId?: number;
   note?: string;
   userId?: number;
+  branchId?: number | null; // which branch's stock moved; defaults to the default branch
+}
+
+/** The default branch id (cached per process; branches rarely change). */
+let defaultBranchCache: number | null | undefined;
+export async function defaultBranchId(tx: Prisma.TransactionClient): Promise<number | null> {
+  if (defaultBranchCache !== undefined) return defaultBranchCache;
+  const b = await tx.branch.findFirst({ where: { isDefault: true }, select: { id: true } });
+  defaultBranchCache = b?.id ?? null;
+  return defaultBranchCache;
 }
 
 /**
@@ -23,12 +33,21 @@ export async function postMovement(tx: Prisma.TransactionClient, m: MovementInpu
     select: { stockQty: true, cost: true },
   });
 
-  const balanceAfter = product.stockQty + m.qtyDelta;
+  // Product.stockQty stays the all-branch total (cached aggregate).
+  const newTotal = product.stockQty + m.qtyDelta;
+  await tx.product.update({ where: { id: m.productId }, data: { stockQty: newTotal } });
 
-  await tx.product.update({
-    where: { id: m.productId },
-    data: { stockQty: balanceAfter },
-  });
+  // Per-branch balance is the source of truth for branch availability.
+  const branchId = m.branchId === undefined ? await defaultBranchId(tx) : m.branchId;
+  let balanceAfter = newTotal;
+  if (branchId != null) {
+    const bs = await tx.branchStock.upsert({
+      where: { productId_branchId: { productId: m.productId, branchId } },
+      create: { productId: m.productId, branchId, qty: m.qtyDelta },
+      update: { qty: { increment: m.qtyDelta } },
+    });
+    balanceAfter = bs.qty;
+  }
 
   await tx.stockMovement.create({
     data: {
@@ -41,6 +60,7 @@ export async function postMovement(tx: Prisma.TransactionClient, m: MovementInpu
       refId: m.refId ?? null,
       note: m.note ?? '',
       userId: m.userId ?? null,
+      branchId,
     },
   });
 

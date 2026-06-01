@@ -11,12 +11,17 @@ Legend: ⬜ not started · 🟨 partial (notes)
 ---
 
 ## 1. Multi-branch & warehousing
-- ✅ **Phase 1** — `Branch` model + management page, working branch switcher,
-  sales & shifts attributed to a branch, branch filter on the Sales list
-- ⬜ **Phase 2 — per-branch stock balances** (the hard part): `BranchStock`
-  (product × branch), branch-aware movements/receiving/counts/adjustments, POS
-  reads branch stock
-- ⬜ Stock transfer between branches/warehouses (in-transit + ledger movements)
+- ✅ **Phase 1** — `Branch` model + management page, branch switcher, sales &
+  shifts attributed to a branch, branch filter on the Sales list
+- ✅ **Phase 2 — per-branch stock balances** — `BranchStock` (product × branch),
+  branch-aware ledger via `postMovement` (Product.stockQty kept as the all-branch
+  total), sales decrement the selling branch
+- ✅ **Stock transfer between branches** — `StockTransfer` + page; moves
+  BranchStock between branches (total preserved), with source-availability guard
+- 🟨 Branch selection on **receiving / PO receive / adjust / stock count** — these
+  currently default to the head-office branch (no branch picker yet)
+- 🟨 POS reads **branch** stock for availability — POS still shows the all-branch
+  total; should show/limit by the active branch
 - ⬜ Per-branch settings (printer, PromptPay, receipt)
 - ⬜ Branch filter on Movements, Shifts, Reports & Dashboard (Sales done)
 - ⬜ Consolidated (all-branch) dashboard & reports

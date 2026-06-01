@@ -199,6 +199,26 @@ export interface Returnable {
   items: ReturnableItem[];
 }
 
+export interface TransferListItem {
+  id: number;
+  refNo: string;
+  note: string;
+  createdAt: string;
+  fromBranch: string;
+  toBranch: string;
+  lineCount: number;
+  qty: number;
+}
+
+export interface BranchStockItem {
+  id: number;
+  sku: string;
+  name: string;
+  unit: string;
+  qty: number;
+  totalQty: number;
+}
+
 export interface Movement {
   id: number;
   productId: number;

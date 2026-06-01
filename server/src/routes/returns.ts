@@ -115,7 +115,7 @@ returnsRouter.post(
       for (const l of lines) {
         await postMovement(tx, {
           productId: l.it.productId, type: 'RETURN', qtyDelta: l.qty, unitCost: Number(l.it.unitCost),
-          refType: 'RETURN', refId: ret.id, note: `${ret.refNo} (${sale.orderNo})`, userId,
+          refType: 'RETURN', refId: ret.id, note: `${ret.refNo} (${sale.orderNo})`, userId, branchId: sale.branchId,
         });
       }
       return ret;

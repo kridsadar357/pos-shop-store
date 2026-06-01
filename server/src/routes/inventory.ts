@@ -30,6 +30,24 @@ inventoryRouter.get(
   })
 );
 
+// --- Per-branch stock (Phase 2) ---
+inventoryRouter.get(
+  '/branch-stock',
+  ah(async (req, res) => {
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+    const products = await prisma.product.findMany({
+      where: { isActive: true },
+      include: { branchStock: branchId ? { where: { branchId } } : true },
+      orderBy: { name: 'asc' },
+    });
+    res.json(products.map((p) => ({
+      id: p.id, sku: p.sku, name: p.name, unit: p.unit, totalQty: p.stockQty,
+      qty: branchId ? (p.branchStock[0]?.qty ?? 0) : p.stockQty,
+      byBranch: p.branchStock.map((b) => ({ branchId: b.branchId, qty: b.qty })),
+    })));
+  })
+);
+
 // --- Goods receipt history ---
 inventoryRouter.get(
   '/receipts',
