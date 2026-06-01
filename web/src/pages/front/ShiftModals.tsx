@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useShift } from '../../store/shift';
 import { useAuth } from '../../store/auth';
 import { api } from '../../api/client';
+import { ShiftReport } from '../../components/ShiftReport';
 import { toast } from '../../components/Toast';
 import { money, num } from '../../lib/format';
 import { th } from '../../lib/th';
-import type { CashMovement, Shift } from '../../types';
+import type { CashMovement, Setting, Shift } from '../../types';
 
 /** Full-screen gate shown when the cashier has no open shift. */
 export function ShiftGate() {
@@ -56,12 +57,14 @@ export function ShiftGate() {
 }
 
 /** Close-shift modal with cash reconciliation, then a summary. */
-export function CloseShiftModal({ onClose }: { onClose: () => void }) {
+export function CloseShiftModal({ onClose, setting }: { onClose: () => void; setting?: Setting | null }) {
   const { current, close } = useShift();
+  const { user } = useAuth();
   const [counted, setCounted] = useState(0);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Shift | null>(null);
+  const [printZ, setPrintZ] = useState(false);
 
   if (!current) return null;
   const expected = num(current.expectedCash ?? 0);
@@ -125,10 +128,14 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
                 <Row label={th.difference} value={money(result.cashDiff ?? 0)} bold />
               </div>
             </div>
-            <button className="btn-primary mt-5 w-full" onClick={onClose}>{th.openShift}</button>
+            <button className="mt-4 w-full rounded-xl bg-slate-100 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200" onClick={() => setPrintZ(true)}>
+              <i className="fa-solid fa-print mr-1.5" />{th.zReport}
+            </button>
+            <button className="btn-primary mt-2 w-full" onClick={onClose}>{th.openShift}</button>
           </div>
         )}
       </div>
+      {printZ && result && <ShiftReport shift={{ ...result, user: result.user ?? (user ? { name: user.name } : undefined) }} setting={setting ?? null} mode="Z" onDone={() => setPrintZ(false)} />}
     </div>
   );
 }

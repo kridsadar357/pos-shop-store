@@ -89,6 +89,7 @@ export interface ShiftTotals {
   cashSales: number;
   transferSales: number;
   totalSales: number;
+  byMethod?: { CASH: number; TRANSFER: number; CARD: number; CREDIT: number };
   voids: number;
   payIn?: number;
   payOut?: number;

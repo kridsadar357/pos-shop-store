@@ -4,8 +4,10 @@ import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { makeExporters, type Column } from '../../lib/export';
 import { useBranch } from '../../store/branch';
+import { ShiftReport } from '../../components/ShiftReport';
 import { dateTime, money, num } from '../../lib/format';
-import type { Shift } from '../../types';
+import { toast } from '../../components/Toast';
+import type { Setting, Shift } from '../../types';
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
@@ -17,10 +19,19 @@ export default function Shifts() {
   const [branch, setBranch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [setting, setSetting] = useState<Setting | null>(null);
+  const [report, setReport] = useState<Shift | null>(null);
 
   useEffect(() => {
     api<Shift[]>('/shifts').then(setShifts).catch(() => {});
+    api<Setting>('/settings').then(setSetting).catch(() => {});
   }, []);
+
+  async function openReport(id: number) {
+    try {
+      setReport(await api<Shift>(`/shifts/${id}`));
+    } catch (e) { toast.error((e as Error).message); }
+  }
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -93,7 +104,7 @@ export default function Shifts() {
 
       <DataTable
         rows={filtered}
-        colCount={9}
+        colCount={10}
         empty="ยังไม่มีกะการขาย"
         head={
           <tr>
@@ -106,6 +117,7 @@ export default function Shifts() {
             <th className="px-4 py-3 text-right">นับจริง</th>
             <th className="px-4 py-3 text-right">ส่วนต่าง</th>
             <th className="px-4 py-3">สถานะ</th>
+            <th />
           </tr>
         }
         renderRow={(s) => {
@@ -123,10 +135,17 @@ export default function Shifts() {
                 {diff == null ? '—' : `${diff > 0 ? '+' : ''}${money(diff)}`}
               </td>
               <td className="px-4 py-3"><span className={`chip ${s.status === 'OPEN' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{s.status === 'OPEN' ? 'เปิดอยู่' : 'ปิดแล้ว'}</span></td>
+              <td className="px-4 py-3 text-right whitespace-nowrap">
+                <button className="text-sm font-semibold text-brand-600" onClick={() => openReport(s.id)}>
+                  <i className="fa-solid fa-print mr-1" />{s.status === 'OPEN' ? 'X' : 'Z'}
+                </button>
+              </td>
             </tr>
           );
         }}
       />
+
+      {report && <ShiftReport shift={report} setting={setting} mode={report.status === 'CLOSED' ? 'Z' : 'X'} onDone={() => setReport(null)} />}
     </div>
   );
 }

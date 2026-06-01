@@ -78,6 +78,9 @@ export const th = {
   recordCash: 'บันทึกรายการ',
   cashRecorded: 'บันทึกเงินเข้า-ออกแล้ว',
   noCashMoves: 'ยังไม่มีรายการเงินเข้า-ออก',
+  xReport: 'รายงานยอดขาย (X)',
+  zReport: 'พิมพ์รายงานปิดกะ (Z)',
+  printReport: 'พิมพ์รายงาน',
   // Member
   member: 'สมาชิก',
   selectMember: 'เลือกสมาชิก',

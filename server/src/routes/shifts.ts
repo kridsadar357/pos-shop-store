@@ -11,12 +11,13 @@ const num = (d: unknown) => Number(d ?? 0);
 /** Aggregate the sales totals for a shift (used for live X-report and closing). */
 async function shiftTotals(shiftId: number) {
   const sales = await prisma.sale.findMany({ where: { shiftId, status: 'PAID' }, select: { total: true, paymentMethod: true } });
-  let cash = 0;
-  let transfer = 0;
+  const byMethod = { CASH: 0, TRANSFER: 0, CARD: 0, CREDIT: 0 };
   for (const s of sales) {
-    if (s.paymentMethod === 'CASH') cash += num(s.total);
-    else transfer += num(s.total);
+    byMethod[s.paymentMethod as keyof typeof byMethod] += num(s.total);
   }
+  const cash = byMethod.CASH;
+  const transfer = byMethod.TRANSFER + byMethod.CARD + byMethod.CREDIT; // non-cash, for compat
+  for (const k of Object.keys(byMethod) as (keyof typeof byMethod)[]) byMethod[k] = round2(byMethod[k]);
   const voids = await prisma.sale.count({ where: { shiftId, status: 'VOID' } });
   // Petty cash in/out recorded against the shift.
   const cashMoves = await prisma.cashMovement.findMany({ where: { shiftId }, select: { type: true, amount: true } });
@@ -31,6 +32,7 @@ async function shiftTotals(shiftId: number) {
     cashSales: round2(cash),
     transferSales: round2(transfer),
     totalSales: round2(cash + transfer),
+    byMethod,
     voids,
     payIn: round2(payIn),
     payOut: round2(payOut),
@@ -153,7 +155,7 @@ shiftsRouter.get(
   ah(async (req, res) => {
     const shift = await prisma.shift.findUnique({
       where: { id: Number(req.params.id) },
-      include: { user: { select: { name: true } } },
+      include: { user: { select: { name: true } }, branch: { select: { name: true } } },
     });
     if (!shift) return res.status(404).json({ error: 'Not found' });
     const totals = await shiftTotals(shift.id);

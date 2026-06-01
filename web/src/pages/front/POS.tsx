@@ -8,6 +8,7 @@ const CameraScanner = lazy(() => import('../../components/CameraScanner').then((
 import { ProductImage } from '../../components/ProductImage';
 import { QRCanvas } from '../../components/QRCode';
 import { ReceiptPrint } from '../../components/ReceiptPrint';
+import { ShiftReport } from '../../components/ShiftReport';
 import { printReceipt } from '../../lib/printing';
 import { useBranch } from '../../store/branch';
 import { ShiftGate, CloseShiftModal, CashDrawerModal } from './ShiftModals';
@@ -76,6 +77,7 @@ export default function POS() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [printSale, setPrintSale] = useState<Sale | null>(null);
+  const [printXReport, setPrintXReport] = useState(false);
   const doPrint = (sale: Sale) => printReceipt(sale, setting, () => setPrintSale(sale));
   const [autoPrint, setAutoPrint] = useState(localStorage.getItem('pos_autoprint') === '1');
   const [held, setHeld] = useState<HeldBill[]>([]);
@@ -455,6 +457,7 @@ export default function POS() {
             {moreOpen && (
               <div className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl bg-white py-1 shadow-pop ring-1 ring-slate-200" onMouseLeave={() => setMoreOpen(false)}>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setCashDrawer(true); }}><i className="fa-solid fa-money-bill-transfer mr-2 text-slate-400" />{th.cashInOut}</button>
+                <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setPrintXReport(true); }}><i className="fa-solid fa-file-invoice-dollar mr-2 text-slate-400" />{th.xReport}</button>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setClosing(true); }}><i className="fa-solid fa-clock mr-2 text-slate-400" />{th.closeShift}</button>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); window.open('/display', 'pos-customer-display', 'width=1100,height=720'); }}><i className="fa-solid fa-desktop mr-2 text-slate-400" />{th.customerDisplay}</button>
               </div>
@@ -717,7 +720,7 @@ export default function POS() {
         />
       )}
       {cashDrawer && <CashDrawerModal onClose={() => { setCashDrawer(false); refreshShift(); }} />}
-      {closing && <CloseShiftModal onClose={() => { setClosing(false); refreshShift(); }} />}
+      {closing && <CloseShiftModal setting={setting} onClose={() => { setClosing(false); refreshShift(); }} />}
       {lastSale && (
         <ReceiptModal
           sale={lastSale}
@@ -730,6 +733,7 @@ export default function POS() {
         />
       )}
       {printSale && <ReceiptPrint sale={printSale} setting={setting} onDone={() => setPrintSale(null)} />}
+      {printXReport && shift && <ShiftReport shift={{ ...shift, user: user ? { name: user.name } : undefined }} setting={setting} mode="X" onDone={() => setPrintXReport(false)} />}
     </div>
   );
 }

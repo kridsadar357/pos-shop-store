@@ -83,7 +83,11 @@ is already branch-correct).
 
 ## 6. Reporting & data
 - ⬜ Scheduled / emailed reports
-- ⬜ Z-report / X-report end-of-day printout
+- ✅ Z-report / X-report end-of-day printout — printable `ShiftReport` (80mm, same
+  print path as the receipt): X = mid-shift snapshot from the POS *More* menu, Z =
+  end-of-day close report (offered after closing + reprintable per shift on the
+  back-office Shifts page). Shows orders, per-payment-method breakdown
+  (`shiftTotals.byMethod`), pay-in/out, and the cash-drawer reconciliation
 - ⬜ Data backup & restore (export/import)
 - ⬜ Saved/custom report builder
 
