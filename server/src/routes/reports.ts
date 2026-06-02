@@ -301,6 +301,29 @@ reportsRouter.get(
   })
 );
 
+// --- Cash flow: where the cash drawer money came from / went over a period ---
+reportsRouter.get(
+  '/cash-flow',
+  ah(async (req, res) => {
+    const { from, to, branchId } = range(req);
+    const dateRange = { gte: from, lte: to };
+    const [cashSalesAgg, cm, expAgg, refAgg] = await Promise.all([
+      prisma.salePayment.aggregate({ _sum: { amount: true }, where: { method: 'CASH', sale: { status: 'PAID', branchId, createdAt: dateRange } } }),
+      prisma.cashMovement.groupBy({ by: ['type'], _sum: { amount: true }, where: { createdAt: dateRange, shift: { branchId } } }),
+      prisma.expense.aggregate({ _sum: { amount: true }, where: { paymentMethod: 'CASH', date: dateRange, branchId } }),
+      prisma.return.aggregate({ _sum: { total: true }, where: { refundMethod: 'CASH', createdAt: dateRange, sale: { branchId } } }),
+    ]);
+    const cashSales = round2(num(cashSalesAgg._sum.amount));
+    const payIn = round2(num(cm.find((x) => x.type === 'PAY_IN')?._sum.amount));
+    const payOut = round2(num(cm.find((x) => x.type === 'PAY_OUT')?._sum.amount));
+    const cashExpenses = round2(num(expAgg._sum.amount));
+    const cashRefunds = round2(num(refAgg._sum.total));
+    const inflow = round2(cashSales + payIn);
+    const outflow = round2(payOut + cashExpenses + cashRefunds);
+    res.json({ cashSales, payIn, payOut, cashExpenses, cashRefunds, inflow, outflow, net: round2(inflow - outflow) });
+  })
+);
+
 // --- Sales by hour of day ---
 reportsRouter.get(
   '/sales-by-hour',

@@ -128,6 +128,9 @@ is already branch-correct).
   transactions are still recorded in THB. Full multi-currency accounting still pending.
 
 ## 6. Reporting & data
+- ✅ Cash-flow report — `/reports/cash-flow` (range + branch): cash in (cash sales + petty-cash
+  pay-ins) vs cash out (pay-outs + cash expenses + cash refunds) → net. New "กระแสเงินสด" tab
+  (statement + KPIs + CSV). Synthesizes sales, petty cash, expenses, and returns
 - ✅ Tax-invoice register (รายงานภาษีขาย, สำหรับ ภ.พ.30) — `GET /api/tax-invoices` lists
   issued full tax invoices over a date range with per-invoice VAT base/amount; back-office
   register page (month-default range, period totals base/VAT/total, export)

@@ -9,10 +9,11 @@ import type { Setting } from '../../types';
 // Shared report meta (store name + date range) for PDF headers, avoids prop drilling.
 const ReportMeta = createContext<{ store: string; range: string }>({ store: '', range: '' });
 
-type Tab = 'summary' | 'pnl' | 'payments' | 'top' | 'category' | 'hourly' | 'tax' | 'low' | 'valuation' | 'z';
+type Tab = 'summary' | 'pnl' | 'cashflow' | 'payments' | 'top' | 'category' | 'hourly' | 'tax' | 'low' | 'valuation' | 'z';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'summary', label: 'สรุปยอดขาย' },
   { key: 'pnl', label: 'กำไร-ขาดทุน (P&L)' },
+  { key: 'cashflow', label: 'กระแสเงินสด' },
   { key: 'payments', label: 'ช่องทางชำระเงิน' },
   { key: 'top', label: 'สินค้าขายดี' },
   { key: 'category', label: 'กำไรตามหมวดหมู่' },
@@ -44,6 +45,7 @@ export default function Reports() {
     const endpoints: Record<Tab, () => Promise<any>> = {
       summary: () => api('/reports/summary', { query: range }),
       pnl: () => api('/reports/profit-loss', { query: range }),
+      cashflow: () => api('/reports/cash-flow', { query: range }),
       payments: () => api('/reports/payment-methods', { query: range }),
       top: () => api('/reports/top-products', { query: range }),
       category: () => api('/reports/profit-by-category', { query: range }),
@@ -91,6 +93,7 @@ export default function Reports() {
         <>
           {tab === 'summary' && <SummaryView d={data} />}
           {tab === 'pnl' && <PnlView d={data} />}
+          {tab === 'cashflow' && <CashFlowView d={data} />}
           {tab === 'payments' && <PaymentsView d={data} />}
           {tab === 'top' && <TableView title="สินค้าขายดี" rows={data} cols={[['name', 'สินค้า'], ['qty', 'ขายได้ (ชิ้น)'], ['revenue', 'ยอดขาย', true], ['profit', 'กำไร', true]]} file="top-products.csv" />}
           {tab === 'category' && <CategoryView d={data} />}
@@ -177,6 +180,48 @@ function PnlView({ d }: { d: any }) {
             <span className={`text-2xl font-extrabold ${profitable ? 'text-emerald-600' : 'text-rose-600'}`}>{money(d.netProfit)}</span>
           </div>
           <p className="pt-1 text-center text-[11px] text-slate-400">อิงจาก {d.orders} บิลที่ชำระแล้วในช่วงที่เลือก</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CashFlowView({ d }: { d: any }) {
+  const positive = d.net >= 0;
+  const csv = [
+    { รายการ: 'ขายเงินสด', จำนวน: d.cashSales },
+    { รายการ: 'เงินเข้าลิ้นชัก (pay-in)', จำนวน: d.payIn },
+    { รายการ: 'เงินออกลิ้นชัก (pay-out)', จำนวน: -d.payOut },
+    { รายการ: 'ค่าใช้จ่ายเงินสด', จำนวน: -d.cashExpenses },
+    { รายการ: 'คืนเงินสด', จำนวน: -d.cashRefunds },
+    { รายการ: 'กระแสเงินสดสุทธิ', จำนวน: d.net },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <Stat label="เงินสดเข้า" value={money(d.inflow)} accent="text-emerald-600" />
+        <Stat label="เงินสดออก" value={money(d.outflow)} accent="text-rose-600" />
+        <Stat label="สุทธิ" value={money(d.net)} accent={positive ? 'text-emerald-600' : 'text-rose-600'} />
+      </div>
+      <div className="card p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-bold">กระแสเงินสดในช่วงเวลา</h3>
+          <button className="btn-ghost" onClick={() => downloadCSV('cash-flow.csv', csv)}>ส่งออก CSV</button>
+        </div>
+        <div className="mx-auto max-w-lg space-y-1 text-sm">
+          <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">เงินสดเข้า</div>
+          <PnlRow label="ขายเงินสด" value={d.cashSales} />
+          <PnlRow label="เงินเข้าลิ้นชัก (เติม/รับฝาก)" value={d.payIn} />
+          <PnlRow label="รวมเงินสดเข้า" value={d.inflow} bold border accent="text-emerald-700" />
+          <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">เงินสดออก</div>
+          <PnlRow label="เงินออกลิ้นชัก" value={-d.payOut} muted />
+          <PnlRow label="ค่าใช้จ่ายเงินสด" value={-d.cashExpenses} muted />
+          <PnlRow label="คืนเงินสด (รับคืนสินค้า)" value={-d.cashRefunds} muted />
+          <PnlRow label="รวมเงินสดออก" value={-d.outflow} bold border accent="text-rose-600" />
+          <div className="mt-1 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+            <span className="text-base font-extrabold">กระแสเงินสดสุทธิ</span>
+            <span className={`text-2xl font-extrabold ${positive ? 'text-emerald-600' : 'text-rose-600'}`}>{money(d.net)}</span>
+          </div>
         </div>
       </div>
     </div>
