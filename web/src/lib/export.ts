@@ -1,6 +1,7 @@
-import * as XLSX from 'xlsx';
-import JSZip from 'jszip';
 import { resolveUrl } from '../api/client';
+// xlsx (~400 KB) and jszip are heavy and only needed when an export is actually
+// triggered, so they're dynamically imported inside the functions below (keeps them
+// out of every page chunk that merely renders an export button).
 
 /** A printable/exportable column definition shared by Excel / CSV / PDF. */
 export interface Column<T> {
@@ -14,8 +15,9 @@ function rowsToObjects<T>(columns: Column<T>[], rows: T[]) {
   return rows.map((r) => Object.fromEntries(columns.map((c) => [c.label, c.value(r)])));
 }
 
-/** Real .xlsx workbook (UTF-8 — Thai-safe). */
-export function exportExcel<T>(filename: string, sheetName: string, columns: Column<T>[], rows: T[]) {
+/** Real .xlsx workbook (UTF-8 — Thai-safe). xlsx is loaded on demand. */
+export async function exportExcel<T>(filename: string, sheetName: string, columns: Column<T>[], rows: T[]) {
+  const XLSX = await import('xlsx');
   const ws = XLSX.utils.json_to_sheet(rowsToObjects(columns, rows));
   // auto-ish column widths
   ws['!cols'] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
@@ -117,6 +119,7 @@ export async function exportProductsZip<T extends { sku: string; name: string; i
   columns: Column<T>[],
   rows: T[],
 ) {
+  const JSZip = (await import('jszip')).default;
   const zip = new JSZip();
   // CSV inside the zip (BOM for Excel)
   const esc = (v: unknown) => {

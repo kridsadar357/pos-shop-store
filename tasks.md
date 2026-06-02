@@ -191,6 +191,8 @@ is already branch-correct).
 
 ## 9. Smaller polish / known stubs
 - ⬜ Sidebar "เปลี่ยนสาขา" — currently a "coming soon" toast (see §1)
-- ⬜ Code-split warning long-term: keep heavy libs lazy as features grow
+- 🟨 Code-split — the heavy export libs (xlsx+jszip, ~173 KB gz) are now lazy-loaded
+  (`lib/export.ts` dynamic `import()`), off the initial load of every export-capable page;
+  keep new heavy libs lazy as features grow
 - ⬜ i18n toggle (UI is Thai-only; English option)
-- ⬜ Bundle `tsconfig.tsbuildinfo` into .gitignore (build cache currently tracked)
+- ✅ `*.tsbuildinfo` gitignored + untracked (build cache no longer committed)

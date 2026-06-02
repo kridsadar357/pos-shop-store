@@ -28,3 +28,6 @@ npm-debug.log*
 
 # project-local Claude settings (machine-specific paths)
 .claude/settings.local.json
+
+# TypeScript build cache
+*.tsbuildinfo
