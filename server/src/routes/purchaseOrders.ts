@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
+import { registerSerials } from '../lib/serial.js';
 
 export const purchaseOrdersRouter = Router();
 purchaseOrdersRouter.use(requireAuth);
@@ -108,7 +109,7 @@ purchaseOrdersRouter.get(
       where: { id: Number(req.params.id) },
       include: {
         supplier: { select: { id: true, name: true } },
-        items: { include: { product: { select: { name: true, sku: true, unit: true, stockQty: true, trackBatches: true } } } },
+        items: { include: { product: { select: { name: true, sku: true, unit: true, stockQty: true, trackBatches: true, trackSerials: true } } } },
       },
     });
     if (!po) return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อ' });
@@ -181,7 +182,7 @@ purchaseOrdersRouter.post(
 );
 
 // --- Receive against the PO (full or partial) ---
-const receiveSchema = z.object({ branchId: z.number().int().nullable().optional(), items: z.array(z.object({ productId: z.number().int(), qty: z.number().int().positive(), lotNo: z.string().optional(), expiryDate: z.string().datetime().nullable().optional() })).min(1) });
+const receiveSchema = z.object({ branchId: z.number().int().nullable().optional(), items: z.array(z.object({ productId: z.number().int(), qty: z.number().int().positive(), lotNo: z.string().optional(), expiryDate: z.string().datetime().nullable().optional(), serials: z.array(z.string()).optional() })).min(1) });
 
 purchaseOrdersRouter.post(
   '/:id/receive',
@@ -198,6 +199,7 @@ purchaseOrdersRouter.post(
       // Clamp each receive line to the outstanding quantity.
       const byProduct = new Map(po.items.map((i) => [i.productId, i]));
       const batchByProduct = new Map(body.items.map((r) => [r.productId, { lotNo: r.lotNo, expiryDate: r.expiryDate }]));
+      const serialByProduct = new Map(body.items.map((r) => [r.productId, r.serials]));
       const lines = body.items
         .map((r) => {
           const it = byProduct.get(r.productId);
@@ -228,6 +230,8 @@ purchaseOrdersRouter.post(
           refType: 'GOODS_RECEIPT', refId: receipt.id, note: `${grNo} (${po.refNo})`, userId, branchId: body.branchId ?? undefined,
           batch: b && (b.lotNo || b.expiryDate) ? { lotNo: b.lotNo, expiryDate: b.expiryDate ? new Date(b.expiryDate) : null } : undefined,
         });
+        const serials = serialByProduct.get(l.item.productId);
+        if (serials?.length) await registerSerials(tx, { productId: l.item.productId, branchId: body.branchId ?? null, serials, ref: grNo });
         await tx.purchaseOrderItem.update({ where: { id: l.item.id }, data: { receivedQty: { increment: l.qty } } });
       }
 

@@ -266,6 +266,7 @@ function PODetailModal({ po, onClose, onChanged, onEdit }: {
   const [recvBranch, setRecvBranch] = useState<number | ''>(useBranch.getState().activeId ?? '');
   const [recv, setRecv] = useState<Record<number, number>>(() => Object.fromEntries(po.items.map((i) => [i.productId, Math.max(0, i.qty - i.receivedQty)])));
   const [batchInfo, setBatchInfo] = useState<Record<number, { lotNo?: string; expiryDate?: string }>>({});
+  const [serialInfo, setSerialInfo] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
 
   async function setStatus(status: 'ORDERED' | 'CANCELLED') {
@@ -283,11 +284,15 @@ function PODetailModal({ po, onClose, onChanged, onEdit }: {
   async function doReceive() {
     const items = po.items.map((i) => {
       const b = batchInfo[i.productId];
+      const serials = i.product?.trackSerials
+        ? (serialInfo[i.productId] ?? '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
+        : [];
       return {
         productId: i.productId, qty: recv[i.productId] || 0,
         ...(i.product?.trackBatches && b && (b.lotNo || b.expiryDate)
           ? { lotNo: b.lotNo || undefined, expiryDate: b.expiryDate ? new Date(`${b.expiryDate}T00:00:00`).toISOString() : undefined }
           : {}),
+        ...(serials.length ? { serials } : {}),
       };
     }).filter((x) => x.qty > 0);
     if (!items.length) return toast.error('ไม่มีจำนวนที่จะรับ');
@@ -325,6 +330,12 @@ function PODetailModal({ po, onClose, onChanged, onEdit }: {
                         <span className="text-[11px] font-semibold text-amber-600"><i className="fa-solid fa-flask-vial mr-1" />ล็อต</span>
                         <input className="w-24 rounded-md bg-slate-50 px-2 py-0.5 text-[11px] ring-1 ring-slate-200 outline-none" placeholder="เลขล็อต" value={batchInfo[it.productId]?.lotNo ?? ''} onChange={(e) => setBatchInfo({ ...batchInfo, [it.productId]: { ...batchInfo[it.productId], lotNo: e.target.value } })} />
                         <input type="date" className="rounded-md bg-slate-50 px-2 py-0.5 text-[11px] ring-1 ring-slate-200 outline-none" value={batchInfo[it.productId]?.expiryDate ?? ''} onChange={(e) => setBatchInfo({ ...batchInfo, [it.productId]: { ...batchInfo[it.productId], expiryDate: e.target.value } })} title="วันหมดอายุ" />
+                      </div>
+                    )}
+                    {receiving && it.product?.trackSerials && (recv[it.productId] ?? 0) > 0 && (
+                      <div className="mt-1.5">
+                        <div className="mb-0.5 text-[11px] font-semibold text-indigo-600"><i className="fa-solid fa-barcode mr-1" />ซีเรียล (บรรทัด/คอมมา · {(serialInfo[it.productId] ?? '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean).length}/{recv[it.productId] ?? 0})</div>
+                        <textarea rows={2} className="w-full rounded-md bg-slate-50 px-2 py-1 text-[11px] ring-1 ring-slate-200 outline-none focus:ring-indigo-300" placeholder="SN-001, SN-002 …" value={serialInfo[it.productId] ?? ''} onChange={(e) => setSerialInfo({ ...serialInfo, [it.productId]: e.target.value })} />
                       </div>
                     )}
                   </td>

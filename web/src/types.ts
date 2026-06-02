@@ -367,7 +367,7 @@ export interface POItem {
   qty: number;
   unitCost: string;
   receivedQty: number;
-  product?: { name: string; sku: string; unit: string; stockQty: number; trackBatches?: boolean };
+  product?: { name: string; sku: string; unit: string; stockQty: number; trackBatches?: boolean; trackSerials?: boolean };
 }
 
 export interface PODetail {

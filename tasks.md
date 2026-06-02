@@ -77,7 +77,8 @@ is already branch-correct).
   Verified FEFO + report + opening-count end-to-end
 - 🟨 Serial-number tracking — opt-in per product (`Product.trackSerials`). `ProductSerial`
   (per-unit serialNo + status IN_STOCK/SOLD/RETURNED + receipt ref). **Phase 1**: serials are
-  scanned-in on **receiving** (Receive page serials field per serialized line → `registerSerials`),
+  scanned-in on **both receiving paths** — the inventory Receive page AND PO receiving
+  (PO detail receive modal serials textarea per serialized line → `registerSerials`),
   registered manually for opening stock, looked up + status-managed in the product editor.
   Phase 2 (TODO): auto-consume serials at POS checkout (capture/scan the sold unit) + a serial
   history/warranty lookup report. No checkout changes yet, so nothing breaks.
