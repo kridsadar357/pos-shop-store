@@ -265,6 +265,7 @@ function PODetailModal({ po, onClose, onChanged, onEdit }: {
   const [receiving, setReceiving] = useState(false);
   const [recvBranch, setRecvBranch] = useState<number | ''>(useBranch.getState().activeId ?? '');
   const [recv, setRecv] = useState<Record<number, number>>(() => Object.fromEntries(po.items.map((i) => [i.productId, Math.max(0, i.qty - i.receivedQty)])));
+  const [batchInfo, setBatchInfo] = useState<Record<number, { lotNo?: string; expiryDate?: string }>>({});
   const [busy, setBusy] = useState(false);
 
   async function setStatus(status: 'ORDERED' | 'CANCELLED') {
@@ -280,7 +281,15 @@ function PODetailModal({ po, onClose, onChanged, onEdit }: {
     catch (e) { toast.error((e as Error).message); }
   }
   async function doReceive() {
-    const items = po.items.map((i) => ({ productId: i.productId, qty: recv[i.productId] || 0 })).filter((x) => x.qty > 0);
+    const items = po.items.map((i) => {
+      const b = batchInfo[i.productId];
+      return {
+        productId: i.productId, qty: recv[i.productId] || 0,
+        ...(i.product?.trackBatches && b && (b.lotNo || b.expiryDate)
+          ? { lotNo: b.lotNo || undefined, expiryDate: b.expiryDate ? new Date(`${b.expiryDate}T00:00:00`).toISOString() : undefined }
+          : {}),
+      };
+    }).filter((x) => x.qty > 0);
     if (!items.length) return toast.error('ไม่มีจำนวนที่จะรับ');
     setBusy(true);
     try { const r = await api<{ refNo: string }>(`/purchase-orders/${po.id}/receive`, { method: 'POST', body: { items, branchId: recvBranch || null } }); toast.success(`รับสินค้าแล้ว · ${r.refNo}`); onChanged(po.id); }
@@ -308,7 +317,17 @@ function PODetailModal({ po, onClose, onChanged, onEdit }: {
               const outstanding = it.qty - it.receivedQty;
               return (
                 <tr key={it.id}>
-                  <td className="px-3 py-2"><div className="font-medium">{it.product?.name}</div><div className="text-xs text-slate-400">{it.product?.sku}</div></td>
+                  <td className="px-3 py-2">
+                    <div className="font-medium">{it.product?.name}</div>
+                    <div className="text-xs text-slate-400">{it.product?.sku}</div>
+                    {receiving && it.product?.trackBatches && (recv[it.productId] ?? 0) > 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] font-semibold text-amber-600"><i className="fa-solid fa-flask-vial mr-1" />ล็อต</span>
+                        <input className="w-24 rounded-md bg-slate-50 px-2 py-0.5 text-[11px] ring-1 ring-slate-200 outline-none" placeholder="เลขล็อต" value={batchInfo[it.productId]?.lotNo ?? ''} onChange={(e) => setBatchInfo({ ...batchInfo, [it.productId]: { ...batchInfo[it.productId], lotNo: e.target.value } })} />
+                        <input type="date" className="rounded-md bg-slate-50 px-2 py-0.5 text-[11px] ring-1 ring-slate-200 outline-none" value={batchInfo[it.productId]?.expiryDate ?? ''} onChange={(e) => setBatchInfo({ ...batchInfo, [it.productId]: { ...batchInfo[it.productId], expiryDate: e.target.value } })} title="วันหมดอายุ" />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-right">{it.qty}</td>
                   <td className="px-3 py-2 text-right text-emerald-600">{it.receivedQty}</td>
                   <td className="px-3 py-2 text-right font-semibold">{outstanding}</td>
