@@ -126,7 +126,11 @@ is already branch-correct).
 - ⬜ Saved/custom report builder
 
 ## 7. Security & administration
-- ⬜ Granular permissions (beyond ADMIN/MANAGER/CASHIER roles)
+- 🟨 Granular permissions — ADMIN can choose which back-office pages a MANAGER may
+  open (`Setting.managerPages`); enforced in the sidebar nav + a route gate in
+  BackLayout (empty = full access; dashboard always allowed). UI-level access control;
+  admin-only data routes (users/branches/audit/backup) remain hard-gated server-side.
+  Full per-action backend permission matrix still pending.
 - ✅ Audit log of user actions — `AuditLog` model + app-level `auditLogger`
   middleware that records every mutating /api call (actor snapshot, method, path,
   action label, status, IP) after the response finishes; no request bodies stored.

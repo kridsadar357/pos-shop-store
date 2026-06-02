@@ -50,6 +50,7 @@ export interface Setting {
   printerPaper: '58mm' | '80mm';
   escposCodepage: number;
   openDrawerOnCash: boolean;
+  managerPages: string;
   setupCompleted: boolean;
 }
 

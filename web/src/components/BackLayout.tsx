@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 import { useBranch } from '../store/branch';
 import { api } from '../api/client';
@@ -69,6 +69,12 @@ const GROUPS: NavGroup[] = [
   },
 ];
 
+/** Pages whose access can be granted/revoked for the MANAGER role (admin-only pages
+ *  are always ADMIN-exclusive; the dashboard is always available). */
+export const MANAGER_RESTRICTABLE_PAGES = GROUPS.flatMap((g) => g.items)
+  .filter((n) => !n.adminOnly && n.to !== '/back')
+  .map((n) => ({ to: n.to, label: n.label }));
+
 export function BackLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -76,6 +82,21 @@ export function BackLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const isAdmin = user?.role === 'ADMIN';
+  const location = useLocation();
+
+  // Manager page permissions (ADMIN = unrestricted; empty config = full access).
+  const [allowed, setAllowed] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (isAdmin || user?.role !== 'MANAGER') { setAllowed(null); return; }
+    api<{ managerPages?: string }>('/settings')
+      .then((s) => {
+        const list = (() => { try { return JSON.parse(s.managerPages || '[]'); } catch { return []; } })();
+        setAllowed(Array.isArray(list) && list.length ? new Set<string>(list) : null);
+      })
+      .catch(() => setAllowed(null));
+  }, [isAdmin, user?.role]);
+
+  const canAccess = (to: string) => allowed === null || to === '/back' || allowed.has(to);
 
   // Cmd/Ctrl+K opens global search.
   useEffect(() => {
@@ -102,7 +123,7 @@ export function BackLayout() {
 
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-3">
           {GROUPS.map((g) => {
-            const items = g.items.filter((n) => !n.adminOnly || isAdmin);
+            const items = g.items.filter((n) => (!n.adminOnly || isAdmin) && canAccess(n.to));
             if (!items.length) return null;
             return (
               <div key={g.title}>
@@ -191,7 +212,17 @@ export function BackLayout() {
 
         <main className="flex-1 overflow-auto p-6">
           <div className="mx-auto h-full max-w-[1500px] animate-rise">
-            <Outlet />
+            {canAccess(location.pathname) ? (
+              <Outlet />
+            ) : (
+              <div className="grid h-full place-items-center text-center text-slate-400">
+                <div>
+                  <i className="fa-solid fa-lock text-4xl text-slate-300" />
+                  <p className="mt-3 text-lg font-bold text-slate-500">ไม่มีสิทธิ์เข้าถึงหน้านี้</p>
+                  <p className="text-sm">โปรดติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์</p>
+                </div>
+              </div>
+            )}
           </div>
         </main>
       </div>

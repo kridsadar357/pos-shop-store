@@ -64,6 +64,8 @@ const schema = z.object({
   printerPaper: z.enum(['58mm', '80mm']).default('80mm'),
   escposCodepage: z.number().int().min(0).max(255).default(21),
   openDrawerOnCash: z.boolean().default(true),
+  // Granular access (JSON array of allowed back-office page paths for MANAGER).
+  managerPages: z.string().default(''),
 });
 
 settingsRouter.put(

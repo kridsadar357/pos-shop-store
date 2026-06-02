@@ -108,6 +108,10 @@ model Setting {
   escposCodepage   Int        @default(21)          // ESC t code-page for Thai (vendor-specific)
   openDrawerOnCash Boolean     @default(true)        // pulse the cash drawer on a cash receipt
 
+  // Granular access: JSON array of back-office page paths a MANAGER may open
+  // (empty string = full access). ADMIN always has full access.
+  managerPages   String       @default("")
+
   // First-run setup wizard
   setupCompleted Boolean      @default(false)
 

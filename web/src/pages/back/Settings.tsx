@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { api, uploadFile, resolveUrl } from '../../api/client';
 import { QRCanvas } from '../../components/QRCode';
 import { PageHeader } from '../../components/ui';
+import { MANAGER_RESTRICTABLE_PAGES } from '../../components/BackLayout';
+import { useAuth } from '../../store/auth';
 import { toast } from '../../components/Toast';
 import { money, num } from '../../lib/format';
 import type { LicenseState, Setting } from '../../types';
@@ -126,6 +128,7 @@ function GeneralTab({ s, set, save }: { s: Setting; set: (p: Partial<Setting>) =
             </div>
           )}
         </Section>
+        <ManagerPermissions s={s} set={set} />
         <button className="btn-primary w-full" onClick={save}>บันทึกการตั้งค่า</button>
       </div>
       <div className="card h-fit p-5 text-center">
@@ -384,6 +387,37 @@ function ManualTab() {
 /* ───────────────────────────── helpers ───────────────────────── */
 function F({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return <div className={className}><label className="label">{label}</label>{children}</div>;
+}
+
+/** ADMIN-only: choose which back-office pages a MANAGER may open (empty = all). */
+function ManagerPermissions({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }) {
+  const { user } = useAuth();
+  if (user?.role !== 'ADMIN') return null;
+  const allowed: string[] = (() => { try { return JSON.parse(s.managerPages || '[]'); } catch { return []; } })();
+  const unrestricted = allowed.length === 0;
+  const has = (to: string) => unrestricted || allowed.includes(to);
+  function toggle(to: string) {
+    // Materialize the full list first so unchecking one page restricts the rest.
+    const base = unrestricted ? MANAGER_RESTRICTABLE_PAGES.map((p) => p.to) : [...allowed];
+    const next = base.includes(to) ? base.filter((x) => x !== to) : [...base, to];
+    set({ managerPages: JSON.stringify(next) });
+  }
+  return (
+    <Section title="สิทธิ์ของผู้จัดการ (Manager)">
+      <p className="mb-2 text-xs text-slate-400">เลือกหน้าที่ผู้จัดการเข้าถึงได้ (ผู้ดูแลระบบเข้าได้ทุกหน้าเสมอ · แดชบอร์ดเข้าได้เสมอ)</p>
+      <div className="mb-2">
+        <button className="text-xs font-semibold text-brand-600" onClick={() => set({ managerPages: '' })}>ให้สิทธิ์ทุกหน้า</button>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+        {MANAGER_RESTRICTABLE_PAGES.map((p) => (
+          <label key={p.to} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-200">
+            <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={has(p.to)} onChange={() => toggle(p.to)} />
+            <span className="truncate">{p.label}</span>
+          </label>
+        ))}
+      </div>
+    </Section>
+  );
 }
 function Section({ title, children, first }: { title: string; children: React.ReactNode; first?: boolean }) {
   return <div className={first ? '' : 'border-t border-slate-100 pt-4'}><h3 className="mb-3 font-bold">{title}</h3>{children}</div>;
