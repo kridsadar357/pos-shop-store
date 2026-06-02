@@ -7,6 +7,7 @@ import { postPoints } from '../lib/loyalty.js';
 import { postGift } from '../lib/giftcard.js';
 import { computeTenderPlan } from '../lib/tender.js';
 import { computeRedeem, computeEarn } from '../lib/loyaltyCalc.js';
+import { computeSaleLines } from '../lib/salePricing.js';
 import { buildPromptPayPayload, type PromptPayType } from '../lib/promptpay.js';
 import { evaluatePromotions, type PromoCartLine } from '../lib/promotions.js';
 
@@ -66,44 +67,17 @@ salesRouter.post(
 
       const ids = data.items.map((i) => i.productId);
       const products = await tx.product.findMany({ where: { id: { in: ids } } });
-      const byId = new Map(products.map((p) => [p.id, p]));
 
-      let subtotal = 0;
-      let taxAmount = 0;
-      const lineData = data.items.map((i) => {
-        const p = byId.get(i.productId);
-        if (!p) throw Object.assign(new Error(`Product ${i.productId} not found`), { status: 400 });
-
-        // Member always gets wholesale; otherwise wholesale needs mode + min qty.
-        const useWholesale = memberWholesale || (data.type === 'WHOLESALE' && i.qty >= p.wholesaleMinQty);
-        const unitPrice = Number(useWholesale ? p.wholesalePrice : p.retailPrice);
-        const lineTotal = round2(unitPrice * i.qty);
-        subtotal += lineTotal;
-
-        const rate = p.taxRatePct != null ? Number(p.taxRatePct) : defaultTax;
-        const lineTax = taxInclusive
-          ? lineTotal - lineTotal / (1 + rate / 100)
-          : lineTotal * (rate / 100);
-        taxAmount += lineTax;
-
-        return {
-          productId: p.id,
-          nameSnapshot: p.name,
-          qty: i.qty,
-          unitPrice,
-          unitCost: Number(p.cost),
-          lineTotal,
-        };
+      const { subtotal, taxAmount, lineData } = computeSaleLines({
+        items: data.items, products, memberWholesale, type: data.type, defaultRate: defaultTax, taxInclusive,
       });
-
-      subtotal = round2(subtotal);
-      taxAmount = round2(taxAmount);
 
       // Evaluate promotions server-side (authoritative) and combine with the
       // cashier's manual discount.
+      const catById = new Map(products.map((p) => [p.id, p.categoryId]));
       const promoLines: PromoCartLine[] = lineData.map((l) => ({
         productId: l.productId,
-        categoryId: byId.get(l.productId)?.categoryId ?? null,
+        categoryId: catById.get(l.productId) ?? null,
         qty: l.qty,
         unitPrice: l.unitPrice,
         lineTotal: l.lineTotal,

@@ -175,12 +175,12 @@ is already branch-correct).
 - 🟨 Offline POS — the customer display is an installable PWA, but the POS itself
   doesn't queue sales offline; needs local persistence + sync
 - ⬜ Production deploy story (Docker image for server + built web, reverse proxy, HTTPS)
-- 🟨 Automated tests + CI — Vitest in `server` (34 unit tests): PromptPay CRC + EMVCo payload,
-  ESC/POS code-page + drawer bytes, **split-payment tender** (`lib/tender.ts`), **loyalty
-  redeem/earn** (`lib/loyaltyCalc.ts`), **returns refund proration** (`lib/refundCalc.ts`),
-  and **quotation/layaway bill totals** (`lib/billing.ts` `buildBill` — also dedups the two
-  identical `computeTotals`). The money-critical calcs are pure, tested functions.
-  `npm --prefix server test`. GitHub Actions
+- 🟨 Automated tests + CI — Vitest in `server` (39 unit tests). Every money calc is now a
+  pure, tested function: **POS sale line pricing + wholesale selection** (`lib/salePricing.ts`),
+  **split-payment tender** (`lib/tender.ts`), **loyalty redeem/earn** (`lib/loyaltyCalc.ts`),
+  **returns refund proration** (`lib/refundCalc.ts`), **quotation/layaway bill totals**
+  (`lib/billing.ts`), plus PromptPay CRC/payload + ESC/POS bytes. `npm --prefix server test`.
+  GitHub Actions
   (`.github/workflows/ci.yml`): install → prisma generate → test → typecheck-build server +
   web. (Integration/e2e still to expand.)
 
