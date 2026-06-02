@@ -4,6 +4,8 @@ import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
 import { buildBill } from '../lib/billing.js';
+import { buildQuotationEmail } from '../lib/quotationEmail.js';
+import { sendMail } from '../lib/mailer.js';
 
 export const quotationsRouter = Router();
 quotationsRouter.use(requireAuth);
@@ -53,6 +55,29 @@ quotationsRouter.get(
     const quotation = await prisma.quotation.findUnique({ where: { id: Number(req.params.id) }, include: { items: true } });
     if (!quotation) return res.status(404).json({ error: 'Not found' });
     res.json(quotation);
+  })
+);
+
+// Email a quotation (proforma) to the customer. Marks a DRAFT as SENT.
+quotationsRouter.post(
+  '/:id/email',
+  ah(async (req, res) => {
+    const { to } = z.object({ to: z.string().email('อีเมลไม่ถูกต้อง') }).parse(req.body);
+    const [quotation, setting] = await Promise.all([
+      prisma.quotation.findUnique({ where: { id: Number(req.params.id) }, include: { items: true } }),
+      prisma.setting.findUniqueOrThrow({ where: { id: 1 } }),
+    ]);
+    if (!quotation) return res.status(404).json({ error: 'Not found' });
+    const msg = buildQuotationEmail(quotation, {
+      storeName: setting.storeName, address: setting.address, phone: setting.phone,
+      taxId: setting.taxId, currency: setting.currency,
+    });
+    const { messageId } = await sendMail(
+      { smtpHost: setting.smtpHost, smtpPort: setting.smtpPort, smtpSecure: setting.smtpSecure, smtpUser: setting.smtpUser, smtpPass: setting.smtpPass, smtpFrom: setting.smtpFrom, storeName: setting.storeName },
+      { to, ...msg }
+    );
+    if (quotation.status === 'DRAFT') await prisma.quotation.update({ where: { id: quotation.id }, data: { status: 'SENT' } });
+    res.json({ ok: true, to, messageId });
   })
 );
 

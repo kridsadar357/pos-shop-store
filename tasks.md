@@ -99,7 +99,9 @@ is already branch-correct).
   (snapshotted line prices, retail/wholesale, tax-aware totals). Back-office page:
   CRUD, status workflow (draft→sent→accepted/expired/cancelled), printable A4
   document, export. One-click **convert** creates a completed sale server-side from
-  the quoted prices (default เงินเชื่อ/CREDIT), decrements stock, marks CONVERTED
+  the quoted prices (default เงินเชื่อ/CREDIT), decrements stock, marks CONVERTED.
+  **Email**: `POST /quotations/:id/email` sends the quotation (pure `buildQuotationEmail`,
+  unit-tested) and marks a DRAFT → SENT on success; "อีเมล" button on the Quotations page
 - ✅ Layaway / deposits / partial payment — `Layaway` + `LayawayItem` +
   `LayawayPayment`; create with an opening deposit, record installments (capped at
   the balance), then **complete** (only when fully paid) builds a sale from the
@@ -210,7 +212,7 @@ is already branch-correct).
   (Postgres + app, `prisma migrate deploy` on start, uploads/pgdata volumes), `.dockerignore`,
   and `DEPLOY.md` (incl. reverse-proxy/HTTPS + WS notes). First run → /setup wizard.
   Verified end-to-end: `docker compose up` → migrations applied on a fresh DB → /health + SPA
-- 🟨 Automated tests + CI — Vitest in `server` (62 unit tests). Every money calc is a pure,
+- 🟨 Automated tests + CI — Vitest in `server` (65 unit tests). Every money calc is a pure,
   tested function: **POS sale line pricing + wholesale selection** (`lib/salePricing.ts`),
   **split-payment tender** (`lib/tender.ts`), **loyalty redeem/earn** (`lib/loyaltyCalc.ts`),
   **returns refund proration** (`lib/refundCalc.ts`), **quotation/layaway bill totals**

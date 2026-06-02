@@ -35,6 +35,12 @@ export default function Quotations() {
   async function doPrint(id: number) { setPrintDoc(await api<Quotation>(`/quotations/${id}`)); }
 
   async function setStatusOf(qt: Quotation, s: string) { await api(`/quotations/${qt.id}/status`, { method: 'POST', body: { status: s } }); load(); }
+  async function emailQuote(qt: Quotation) {
+    const to = prompt(`ส่งใบเสนอราคา ${qt.refNo} ไปยังอีเมล:`, '')?.trim();
+    if (!to) return;
+    try { await api(`/quotations/${qt.id}/email`, { method: 'POST', body: { to } }); toast.success(`ส่งใบเสนอราคาไปยัง ${to} แล้ว`); load(); }
+    catch (e) { toast.error((e as Error).message); }
+  }
   async function remove(qt: Quotation) { if (!confirm(`ลบใบเสนอราคา ${qt.refNo}?`)) return; await api(`/quotations/${qt.id}`, { method: 'DELETE' }); load(); }
   async function convert(qt: Quotation) {
     if (!confirm(`แปลงใบเสนอราคา ${qt.refNo} เป็นการขาย (เงินเชื่อ)?`)) return;
@@ -87,6 +93,7 @@ export default function Quotations() {
             <td className="px-4 py-3"><span className={`chip ${ST_CHIP[r.status]}`}>{ST_LABEL[r.status]}</span></td>
             <td className="px-4 py-3 text-right whitespace-nowrap text-sm">
               <button className="font-semibold text-slate-600" onClick={() => doPrint(r.id)}>พิมพ์</button>
+              <button className="ml-3 font-semibold text-emerald-600" onClick={() => emailQuote(r)}>อีเมล</button>
               {r.status !== 'CONVERTED' && <button className="ml-3 font-semibold text-brand-600" onClick={() => openEdit(r.id)}>แก้ไข</button>}
               {r.status !== 'CONVERTED' && <button className="ml-3 font-semibold text-emerald-600" onClick={() => convert(r)}>แปลงเป็นการขาย</button>}
               {r.status === 'DRAFT' && <button className="ml-3 font-semibold text-sky-600" onClick={() => setStatusOf(r, 'SENT')}>ส่งแล้ว</button>}
