@@ -5,6 +5,7 @@ import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
 import { postPoints } from '../lib/loyalty.js';
 import { postGift } from '../lib/giftcard.js';
+import { computeTenderPlan } from '../lib/tender.js';
 import { buildPromptPayPayload, type PromptPayType } from '../lib/promptpay.js';
 import { evaluatePromotions, type PromoCartLine } from '../lib/promotions.js';
 
@@ -143,27 +144,13 @@ salesRouter.post(
       }
 
       // ---- Tender plan: single payment, or split / multi-tender ----
-      type Tender = { method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT' | 'GIFT'; amount: number; reference: string };
-      const tenders: Tender[] = data.payments?.length
-        ? data.payments.map((p) => ({ method: p.method, amount: round2(p.amount), reference: p.reference }))
-        : [{ method: data.paymentMethod, amount: data.paymentMethod === 'CASH' ? round2(data.cashReceived || total) : total, reference: data.paymentRef }];
-
-      const cashTendered = round2(tenders.filter((t) => t.method === 'CASH').reduce((s, t) => s + t.amount, 0));
-      const nonCash = round2(tenders.filter((t) => t.method !== 'CASH').reduce((s, t) => s + t.amount, 0));
-      if (nonCash > total + 0.001) throw Object.assign(new Error('ยอดชำระแบบไม่ใช่เงินสดเกินยอดบิล'), { status: 400 });
-      const tendered = round2(cashTendered + nonCash);
-      if (tendered < total - 0.001) throw Object.assign(new Error('ยอดชำระไม่เพียงพอกับยอดบิล'), { status: 400 });
-      const changeDue = round2(Math.max(0, tendered - total)); // change comes out of cash
-      const cashApplied = round2(cashTendered - changeDue);
-
-      // Applied-per-method rows (sum exactly to total) — the source of truth for reports.
-      const paymentRows: { method: Tender['method']; amount: number; reference: string }[] = [];
-      for (const t of tenders) if (t.method !== 'CASH') paymentRows.push({ method: t.method, amount: t.amount, reference: t.reference });
-      if (cashApplied > 0.001) paymentRows.push({ method: 'CASH', amount: cashApplied, reference: tenders.find((t) => t.method === 'CASH')?.reference ?? '' });
-      if (!paymentRows.length) paymentRows.push({ method: data.paymentMethod, amount: total, reference: data.paymentRef });
-      const isSplit = paymentRows.length > 1;
-      // Largest applied portion drives the legacy single Sale.paymentMethod.
-      const dominant = paymentRows.slice().sort((a, b) => b.amount - a.amount)[0].method;
+      const { paymentRows, cashTendered, changeDue, dominant, isSplit } = computeTenderPlan({
+        total,
+        payments: data.payments,
+        paymentMethod: data.paymentMethod,
+        cashReceived: data.cashReceived,
+        paymentRef: data.paymentRef,
+      });
 
       // PromptPay QR payload for a single transfer payment (uses the branch's PromptPay if set).
       let qrPayload = '';
