@@ -10,7 +10,8 @@
     "migrate": "prisma migrate dev --name init",
     "generate": "prisma generate",
     "seed": "tsx prisma/seed.ts",
-    "seed:sales": "tsx prisma/seed-sales.ts"
+    "seed:sales": "tsx prisma/seed-sales.ts",
+    "test": "vitest run"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -36,6 +37,7 @@
     "@types/node": "^22.10.5",
     "prisma": "^6.2.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.9"
   }
 }

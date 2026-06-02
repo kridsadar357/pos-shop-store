@@ -164,7 +164,11 @@ is already branch-correct).
 - 🟨 Offline POS — the customer display is an installable PWA, but the POS itself
   doesn't queue sales offline; needs local persistence + sync
 - ⬜ Production deploy story (Docker image for server + built web, reverse proxy, HTTPS)
-- ⬜ Automated tests (unit/integration/e2e) and CI
+- 🟨 Automated tests + CI — Vitest set up in `server` with unit tests for the pure libs
+  (PromptPay CRC + EMVCo payload, ESC/POS code-page + drawer bytes); `npm --prefix server
+  test`. GitHub Actions workflow (`.github/workflows/ci.yml`) installs, generates Prisma,
+  runs the tests, and typecheck-builds both server and web. (Integration/e2e coverage still
+  to expand.)
 
 ## 9. Smaller polish / known stubs
 - ⬜ Sidebar "เปลี่ยนสาขา" — currently a "coming soon" toast (see §1)
