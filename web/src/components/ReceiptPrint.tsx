@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, resolveUrl } from '../api/client';
 import { QRCanvas } from './QRCode';
-import { money, num, dateTime } from '../lib/format';
+import { money, num, dateTime, secondaryAmount } from '../lib/format';
 import type { Sale, Setting } from '../types';
 
 const PM: Record<string, string> = { CASH: 'เงินสด', TRANSFER: 'โอนเงิน/พร้อมเพย์', CARD: 'บัตรเครดิต', CREDIT: 'เงินเชื่อ', GIFT: 'บัตรของขวัญ' };
@@ -76,6 +76,9 @@ export function ReceiptPrint({ sale, setting, onDone }: { sale: Sale; setting: S
 
         <div className="r-hr" />
         <div className="r-row" style={{ fontSize: 16, fontWeight: 800 }}><span>ยอดสุทธิ</span><span>{money(sale.total, currency)}</span></div>
+        {secondaryAmount(num(sale.total), setting?.secondaryCurrency, setting?.secondaryRate) && (
+          <div className="r-row" style={{ fontSize: 11 }}><span /><span>{secondaryAmount(num(sale.total), setting?.secondaryCurrency, setting?.secondaryRate)}</span></div>
+        )}
 
         <div className="r-hr" />
         {sale.payments && sale.payments.length > 1 ? (

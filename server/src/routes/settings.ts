@@ -66,6 +66,9 @@ const schema = z.object({
   openDrawerOnCash: z.boolean().default(true),
   // Granular access (JSON array of allowed back-office page paths for MANAGER).
   managerPages: z.string().default(''),
+  // Secondary display currency (approx. conversion).
+  secondaryCurrency: z.string().default(''),
+  secondaryRate: z.number().nonnegative().default(0),
 });
 
 settingsRouter.put(

@@ -109,7 +109,10 @@ is already branch-correct).
   branch / category filters); back-office Expenses page (ListToolbar + filters +
   Excel/PDF/CSV export, total + by-category summary, CRUD modal). Branch-aware,
   records the user; seeded with a few demo expenses
-- ⬜ Multi-currency support (currently THB only)
+- 🟨 Multi-currency support — configurable **secondary-currency display** (approx.
+  conversion at a set rate) shown on the POS net total and the receipt
+  (`Setting.secondaryCurrency`/`secondaryRate`, `secondaryAmount()` helper). Display-only;
+  transactions are still recorded in THB. Full multi-currency accounting still pending.
 
 ## 6. Reporting & data
 - ⬜ Scheduled / emailed reports

@@ -16,7 +16,7 @@ import { ShiftGate, CloseShiftModal, CashDrawerModal } from './ShiftModals';
 import { MemberPicker } from './MemberWidget';
 import { PosSidebar } from './PosSidebar';
 import { toast } from '../../components/Toast';
-import { money, num } from '../../lib/format';
+import { money, num, secondaryAmount } from '../../lib/format';
 import { th } from '../../lib/th';
 import { createPublisher, type DisplayState } from '../../lib/display';
 import type { Category, HeldBill, Member, Product, Sale, Setting } from '../../types';
@@ -656,7 +656,12 @@ export default function POS() {
 
               <div className="mt-2 flex items-end justify-between border-t border-dashed border-slate-200 pt-2">
                 <span className="text-sm font-bold text-slate-600">{th.netTotal}</span>
-                <span className="text-3xl font-extrabold text-brand-700">{money(totals.net, currency)}</span>
+                <div className="text-right">
+                  <span className="text-3xl font-extrabold text-brand-700">{money(totals.net, currency)}</span>
+                  {secondaryAmount(totals.net, setting?.secondaryCurrency, setting?.secondaryRate) && (
+                    <div className="text-xs font-semibold text-slate-400">{secondaryAmount(totals.net, setting?.secondaryCurrency, setting?.secondaryRate)}</div>
+                  )}
+                </div>
               </div>
 
               {/* received / change */}

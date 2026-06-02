@@ -51,6 +51,8 @@ export interface Setting {
   escposCodepage: number;
   openDrawerOnCash: boolean;
   managerPages: string;
+  secondaryCurrency: string;
+  secondaryRate: string;
   setupCompleted: boolean;
 }
 

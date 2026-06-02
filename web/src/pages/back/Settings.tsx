@@ -31,7 +31,7 @@ export default function Settings() {
   async function save() {
     if (!s) return;
     try {
-      await api('/settings', { method: 'PUT', body: { ...s, taxRatePct: num(s.taxRatePct), pointsEarnBaht: num(s.pointsEarnBaht), pointsRedeemValue: num(s.pointsRedeemValue), escposCodepage: Math.round(num(s.escposCodepage)) } });
+      await api('/settings', { method: 'PUT', body: { ...s, taxRatePct: num(s.taxRatePct), pointsEarnBaht: num(s.pointsEarnBaht), pointsRedeemValue: num(s.pointsRedeemValue), escposCodepage: Math.round(num(s.escposCodepage)), secondaryRate: num(s.secondaryRate) } });
       toast.success('บันทึกการตั้งค่าแล้ว');
     } catch (e) { toast.error((e as Error).message); }
   }
@@ -126,6 +126,16 @@ function GeneralTab({ s, set, save }: { s: Setting; set: (p: Partial<Setting>) =
                 ตัวอย่าง: ซื้อครบ {num(s.pointsEarnBaht) || 0} บาท ได้ 1 แต้ม · ใช้ 1 แต้มแทนเงิน {num(s.pointsRedeemValue) || 0} บาท
               </p>
             </div>
+          )}
+        </Section>
+        <Section title="สกุลเงินที่สอง (แสดงผลโดยประมาณ)">
+          <p className="mb-2 text-xs text-slate-400">แสดงยอดเงินโดยประมาณในอีกสกุลที่หน้าขายและใบเสร็จ (เหมาะกับร้านที่มีนักท่องเที่ยว) — ใช้แสดงผลเท่านั้น ไม่กระทบการบันทึกบัญชี</p>
+          <div className="grid grid-cols-2 gap-3">
+            <F label="สกุลเงิน (เว้นว่าง = ปิด)"><input className="input" placeholder="เช่น USD" value={s.secondaryCurrency} onChange={(e) => set({ secondaryCurrency: e.target.value.toUpperCase().slice(0, 4) })} /></F>
+            <F label={`อัตรา (บาท ต่อ 1 ${s.secondaryCurrency || 'หน่วย'})`}><input type="number" className="input" value={num(s.secondaryRate) || ''} onChange={(e) => set({ secondaryRate: e.target.value as any })} /></F>
+          </div>
+          {s.secondaryCurrency && num(s.secondaryRate) > 0 && (
+            <p className="mt-2 text-xs text-slate-400"><i className="fa-solid fa-circle-info mr-1" />ตัวอย่าง: 1,000 บาท ≈ {s.secondaryCurrency} {(1000 / num(s.secondaryRate)).toFixed(2)}</p>
           )}
         </Section>
         <ManagerPermissions s={s} set={set} />

@@ -112,6 +112,10 @@ model Setting {
   // (empty string = full access). ADMIN always has full access.
   managerPages   String       @default("")
 
+  // Optional secondary currency shown as an approximate conversion (display only).
+  secondaryCurrency String    @default("")              // e.g. USD; empty = off
+  secondaryRate     Decimal   @default(0) @db.Decimal(14, 4) // THB per 1 unit of the secondary currency
+
   // First-run setup wizard
   setupCompleted Boolean      @default(false)
 

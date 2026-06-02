@@ -11,6 +11,15 @@ export function num(n: number | string): number {
   return typeof n === 'string' ? Number(n) : n;
 }
 
+/** Approximate secondary-currency string for a THB amount, or '' if not configured.
+ *  rate = THB per 1 unit of the secondary currency. */
+export function secondaryAmount(thb: number, currency?: string, rate?: number | string): string {
+  const r = typeof rate === 'string' ? Number(rate) : rate ?? 0;
+  if (!currency || !r || r <= 0) return '';
+  const v = thb / r;
+  return `≈ ${currency} ${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function dateTime(s: string): string {
   return new Date(s).toLocaleString('en-GB', { hour12: false });
 }
