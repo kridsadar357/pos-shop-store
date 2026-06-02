@@ -196,9 +196,11 @@ is already branch-correct).
   **returns refund proration** (`lib/refundCalc.ts`), **quotation/layaway bill totals**
   (`lib/billing.ts`), the **promotion engine** (`lib/promotions.ts` — %/fixed/BXGY ×
   bill/product/category + coupons + minSpend), plus PromptPay CRC/payload + ESC/POS bytes.
-  `npm --prefix server test`. GitHub Actions
-  (`.github/workflows/ci.yml`): install → prisma generate → test → typecheck-build server +
-  web. (Integration/e2e still to expand.)
+  `npm --prefix server test`. Plus **integration tests** (`npm run test:integration`, 3 tests)
+  that exercise the real `postMovement` stock chokepoint + batch FEFO against Postgres via a
+  transaction-rollback harness (zero residue). GitHub Actions (`.github/workflows/ci.yml`):
+  install → prisma generate → unit test → typecheck-build server + web. (DB-backed integration
+  run in CI + e2e still to expand.)
 
 ## 9. Smaller polish / known stubs
 - ⬜ Sidebar "เปลี่ยนสาขา" — currently a "coming soon" toast (see §1)
