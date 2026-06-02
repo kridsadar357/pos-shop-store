@@ -122,6 +122,10 @@ is already branch-correct).
   transactions are still recorded in THB. Full multi-currency accounting still pending.
 
 ## 6. Reporting & data
+- ✅ Profit & Loss report — `/reports/profit-loss` (date-range + branch): revenue → less
+  VAT → net revenue → less COGS → gross profit → less operating expenses (from the Expense
+  table, by category) → net profit, with margins. New "กำไร-ขาดทุน (P&L)" tab on the Reports
+  page (statement view + KPIs + CSV export). Ties sales and expenses into the bottom line
 - ⬜ Scheduled / emailed reports
 - ✅ Z-report / X-report end-of-day printout — printable `ShiftReport` (80mm, same
   print path as the receipt): X = mid-shift snapshot from the POS *More* menu, Z =

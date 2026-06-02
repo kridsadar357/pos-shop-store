@@ -257,6 +257,50 @@ reportsRouter.get(
   })
 );
 
+// --- Profit & Loss: revenue − COGS − operating expenses = net profit ---
+reportsRouter.get(
+  '/profit-loss',
+  ah(async (req, res) => {
+    const { from, to, branchId } = range(req);
+    const sales = await prisma.sale.findMany({
+      where: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } },
+      select: { total: true, taxAmount: true, items: { select: { unitCost: true, qty: true } } },
+    });
+    let revenue = 0, tax = 0, cogs = 0;
+    for (const s of sales) {
+      revenue += num(s.total);
+      tax += num(s.taxAmount);
+      cogs += s.items.reduce((a, i) => a + num(i.unitCost) * i.qty, 0);
+    }
+    const netRevenue = revenue - tax; // ex-VAT sales
+    const grossProfit = netRevenue - cogs;
+
+    const exp = await prisma.expense.groupBy({
+      by: ['category'],
+      where: { date: { gte: from, lte: to }, branchId },
+      _sum: { amount: true },
+    });
+    const expenses = exp
+      .map((e) => ({ category: e.category, amount: round2(num(e._sum.amount)) }))
+      .sort((a, b) => b.amount - a.amount);
+    const totalExpenses = round2(expenses.reduce((a, e) => a + e.amount, 0));
+
+    res.json({
+      orders: sales.length,
+      revenue: round2(revenue),
+      vat: round2(tax),
+      netRevenue: round2(netRevenue),
+      cogs: round2(cogs),
+      grossProfit: round2(grossProfit),
+      grossMarginPct: netRevenue ? round2((grossProfit / netRevenue) * 100) : 0,
+      expenses,
+      totalExpenses,
+      netProfit: round2(grossProfit - totalExpenses),
+      netMarginPct: netRevenue ? round2(((grossProfit - totalExpenses) / netRevenue) * 100) : 0,
+    });
+  })
+);
+
 // --- Sales by hour of day ---
 reportsRouter.get(
   '/sales-by-hour',

@@ -9,9 +9,10 @@ import type { Setting } from '../../types';
 // Shared report meta (store name + date range) for PDF headers, avoids prop drilling.
 const ReportMeta = createContext<{ store: string; range: string }>({ store: '', range: '' });
 
-type Tab = 'summary' | 'payments' | 'top' | 'category' | 'hourly' | 'tax' | 'low' | 'valuation' | 'z';
+type Tab = 'summary' | 'pnl' | 'payments' | 'top' | 'category' | 'hourly' | 'tax' | 'low' | 'valuation' | 'z';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'summary', label: 'สรุปยอดขาย' },
+  { key: 'pnl', label: 'กำไร-ขาดทุน (P&L)' },
   { key: 'payments', label: 'ช่องทางชำระเงิน' },
   { key: 'top', label: 'สินค้าขายดี' },
   { key: 'category', label: 'กำไรตามหมวดหมู่' },
@@ -42,6 +43,7 @@ export default function Reports() {
     const range = { from: new Date(from).toISOString(), to: new Date(to + 'T23:59:59').toISOString(), branchId: b };
     const endpoints: Record<Tab, () => Promise<any>> = {
       summary: () => api('/reports/summary', { query: range }),
+      pnl: () => api('/reports/profit-loss', { query: range }),
       payments: () => api('/reports/payment-methods', { query: range }),
       top: () => api('/reports/top-products', { query: range }),
       category: () => api('/reports/profit-by-category', { query: range }),
@@ -88,6 +90,7 @@ export default function Reports() {
       {data && (
         <>
           {tab === 'summary' && <SummaryView d={data} />}
+          {tab === 'pnl' && <PnlView d={data} />}
           {tab === 'payments' && <PaymentsView d={data} />}
           {tab === 'top' && <TableView title="สินค้าขายดี" rows={data} cols={[['name', 'สินค้า'], ['qty', 'ขายได้ (ชิ้น)'], ['revenue', 'ยอดขาย', true], ['profit', 'กำไร', true]]} file="top-products.csv" />}
           {tab === 'category' && <CategoryView d={data} />}
@@ -132,6 +135,59 @@ function SummaryView({ d }: { d: any }) {
           </ResponsiveContainer>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PnlView({ d }: { d: any }) {
+  const profitable = d.netProfit >= 0;
+  const csvRows = [
+    { รายการ: 'รายได้ (รวม VAT)', จำนวน: d.revenue },
+    { รายการ: 'หัก ภาษีมูลค่าเพิ่ม', จำนวน: -d.vat },
+    { รายการ: 'รายได้สุทธิ (ก่อนต้นทุน)', จำนวน: d.netRevenue },
+    { รายการ: 'หัก ต้นทุนขาย (COGS)', จำนวน: -d.cogs },
+    { รายการ: 'กำไรขั้นต้น', จำนวน: d.grossProfit },
+    ...d.expenses.map((e: any) => ({ รายการ: `หัก ค่าใช้จ่าย: ${e.category}`, จำนวน: -e.amount })),
+    { รายการ: 'กำไรสุทธิ', จำนวน: d.netProfit },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat label="รายได้สุทธิ (ก่อนต้นทุน)" value={money(d.netRevenue)} accent="text-brand-700" />
+        <Stat label="กำไรขั้นต้น" value={money(d.grossProfit)} accent="text-emerald-600" />
+        <Stat label="ค่าใช้จ่ายรวม" value={money(d.totalExpenses)} accent="text-rose-600" />
+        <Stat label="กำไรสุทธิ" value={money(d.netProfit)} accent={profitable ? 'text-emerald-600' : 'text-rose-600'} />
+      </div>
+      <div className="card p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-bold">งบกำไร-ขาดทุน</h3>
+          <button className="btn-ghost" onClick={() => downloadCSV('profit-loss.csv', csvRows)}>ส่งออก CSV</button>
+        </div>
+        <div className="mx-auto max-w-lg space-y-1 text-sm">
+          <PnlRow label="รายได้ (รวม VAT)" value={d.revenue} />
+          <PnlRow label="หัก ภาษีมูลค่าเพิ่ม" value={-d.vat} muted />
+          <PnlRow label="รายได้สุทธิ (ก่อนต้นทุน)" value={d.netRevenue} bold border />
+          <PnlRow label="หัก ต้นทุนสินค้าขาย (COGS)" value={-d.cogs} muted />
+          <PnlRow label={`กำไรขั้นต้น (${d.grossMarginPct}%)`} value={d.grossProfit} bold border accent="text-emerald-700" />
+          {d.expenses.length > 0 && <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">ค่าใช้จ่ายในการดำเนินงาน</div>}
+          {d.expenses.map((e: any) => <PnlRow key={e.category} label={`  ${e.category}`} value={-e.amount} muted />)}
+          {d.expenses.length > 0 && <PnlRow label="รวมค่าใช้จ่าย" value={-d.totalExpenses} border />}
+          <div className="mt-1 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+            <span className="text-base font-extrabold">กำไรสุทธิ ({d.netMarginPct}%)</span>
+            <span className={`text-2xl font-extrabold ${profitable ? 'text-emerald-600' : 'text-rose-600'}`}>{money(d.netProfit)}</span>
+          </div>
+          <p className="pt-1 text-center text-[11px] text-slate-400">อิงจาก {d.orders} บิลที่ชำระแล้วในช่วงที่เลือก</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PnlRow({ label, value, muted, bold, border, accent }: { label: string; value: number; muted?: boolean; bold?: boolean; border?: boolean; accent?: string }) {
+  return (
+    <div className={`flex items-center justify-between py-1 ${border ? 'border-t border-slate-200' : ''}`}>
+      <span className={muted ? 'text-slate-500' : bold ? 'font-bold text-ink-900' : 'text-ink-800'}>{label}</span>
+      <span className={`${bold ? 'font-extrabold' : 'font-semibold'} ${accent ?? (value < 0 ? 'text-rose-500' : 'text-ink-900')}`}>{money(value)}</span>
     </div>
   );
 }
