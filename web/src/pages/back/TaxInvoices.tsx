@@ -3,8 +3,10 @@ import { api } from '../../api/client';
 import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { makeExporters, type Column } from '../../lib/export';
+import { TaxInvoiceDoc } from '../../components/TaxInvoiceDoc';
+import { toast } from '../../components/Toast';
 import { dateTime, money } from '../../lib/format';
-import type { TaxInvoiceRow } from '../../types';
+import type { Sale, Setting, TaxInvoice, TaxInvoiceRow } from '../../types';
 
 function today() { return new Date().toISOString().slice(0, 10); }
 function monthStart() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10); }
@@ -14,6 +16,20 @@ export default function TaxInvoices() {
   const [q, setQ] = useState('');
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
+  const [setting, setSetting] = useState<Setting | null>(null);
+  const [printDoc, setPrintDoc] = useState<{ sale: Sale; invoice: TaxInvoice } | null>(null);
+
+  useEffect(() => { api<Setting>('/settings').then(setSetting).catch(() => {}); }, []);
+
+  async function reprint(saleId: number) {
+    try {
+      const [sale, invoice] = await Promise.all([
+        api<Sale>(`/sales/${saleId}`),
+        api<TaxInvoice>(`/tax-invoices/sale/${saleId}`),
+      ]);
+      setPrintDoc({ sale, invoice });
+    } catch (e) { toast.error((e as Error).message); }
+  }
 
   async function load() {
     const query: Record<string, string> = {};
@@ -83,10 +99,12 @@ export default function TaxInvoices() {
             <td className="px-4 py-3 text-right text-slate-500">{money(r.base)}</td>
             <td className="px-4 py-3 text-right">{money(r.vat)}</td>
             <td className="px-4 py-3 text-right font-bold">{money(r.total)}</td>
-            <td />
+            <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => reprint(r.saleId)}><i className="fa-solid fa-print mr-1" />พิมพ์</button></td>
           </tr>
         )}
       />
+
+      {printDoc && <TaxInvoiceDoc sale={printDoc.sale} invoice={printDoc.invoice} setting={setting} onDone={() => setPrintDoc(null)} />}
     </div>
   );
 }

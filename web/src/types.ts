@@ -289,6 +289,7 @@ export interface TaxInvoice {
 
 export interface TaxInvoiceRow {
   id: number;
+  saleId: number;
   number: string;
   issuedAt: string;
   orderNo: string;

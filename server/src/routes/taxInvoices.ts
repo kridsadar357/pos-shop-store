@@ -30,7 +30,7 @@ taxInvoicesRouter.get(
       const base = round2(total / (1 + rate / 100));
       const vat = round2(total - base);
       return {
-        id: t.id, number: t.number, issuedAt: t.issuedAt, orderNo: t.sale?.orderNo ?? '',
+        id: t.id, saleId: t.saleId, number: t.number, issuedAt: t.issuedAt, orderNo: t.sale?.orderNo ?? '',
         buyerName: t.buyerName, buyerTaxId: t.buyerTaxId, buyerBranch: t.buyerBranch,
         base, vat, total: round2(total),
       };
