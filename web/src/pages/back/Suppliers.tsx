@@ -5,8 +5,14 @@ import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { makeExporters, type Column } from '../../lib/export';
 import { toast } from '../../components/Toast';
+import { money, dateTime } from '../../lib/format';
 
 interface Supplier { id: number; name: string; phone: string; email: string; note: string; }
+interface SupplierHistory {
+  purchaseOrders: { id: number; refNo: string; status: string; createdAt: string; total: number; items: number; paid: number }[];
+  stats: { poCount: number; totalOrdered: number; totalPaid: number; outstanding: number; lastOrder: string | null };
+}
+const PO_ST: Record<string, string> = { DRAFT: 'ร่าง', ORDERED: 'สั่งแล้ว', PARTIAL: 'รับบางส่วน', RECEIVED: 'รับครบ', CANCELLED: 'ยกเลิก' };
 const empty = { name: '', phone: '', email: '', note: '' };
 type Form = typeof empty;
 
@@ -16,6 +22,7 @@ export default function Suppliers() {
   const [contactFilter, setContactFilter] = useState('');
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  const [historyFor, setHistoryFor] = useState<Supplier | null>(null);
 
   async function load() { setItems(await api<Supplier[]>('/suppliers')); }
   useEffect(() => { load(); }, []);
@@ -88,7 +95,10 @@ export default function Suppliers() {
             <td className="px-4 py-3">{s.phone || '—'}</td>
             <td className="px-4 py-3 text-slate-500">{s.email || '—'}</td>
             <td className="px-4 py-3 text-slate-500">{s.note || '—'}</td>
-            <td className="px-4 py-3 text-right"><button className="text-sm font-semibold text-brand-600" onClick={() => openEdit(s)}>แก้ไข</button></td>
+            <td className="px-4 py-3 text-right whitespace-nowrap">
+              <button className="text-sm font-semibold text-sky-600" onClick={() => setHistoryFor(s)}>ประวัติ</button>
+              <button className="ml-3 text-sm font-semibold text-brand-600" onClick={() => openEdit(s)}>แก้ไข</button>
+            </td>
           </tr>
         )}
       />
@@ -106,6 +116,51 @@ export default function Suppliers() {
           <div className="mt-5 flex gap-2"><button className="btn-ghost flex-1" onClick={() => setForm(null)}>ยกเลิก</button><button className="btn-primary flex-1" disabled={!form.name} onClick={save}>บันทึก</button></div>
         </Modal>
       )}
+
+      {historyFor && <HistoryModal supplier={historyFor} onClose={() => setHistoryFor(null)} />}
     </div>
   );
+}
+
+function HistoryModal({ supplier, onClose }: { supplier: Supplier; onClose: () => void }) {
+  const [data, setData] = useState<SupplierHistory | null>(null);
+  useEffect(() => { api<SupplierHistory>(`/suppliers/${supplier.id}/history`).then(setData).catch(() => setData({ purchaseOrders: [], stats: { poCount: 0, totalOrdered: 0, totalPaid: 0, outstanding: 0, lastOrder: null } })); }, [supplier.id]);
+
+  return (
+    <Modal title={`ประวัติการสั่งซื้อ · ${supplier.name}`} wide onClose={onClose}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Tile label="ใบสั่งซื้อ" value={String(data?.stats.poCount ?? 0)} />
+        <Tile label="ยอดสั่งซื้อสะสม" value={money(data?.stats.totalOrdered ?? 0)} tone="text-brand-700" />
+        <Tile label="ชำระแล้ว" value={money(data?.stats.totalPaid ?? 0)} tone="text-emerald-600" />
+        <Tile label="คงค้างชำระ" value={money(data?.stats.outstanding ?? 0)} tone="text-rose-600" />
+      </div>
+      <div className="mt-4 max-h-80 overflow-auto rounded-xl ring-1 ring-slate-100">
+        {!data ? <p className="py-8 text-center text-sm text-slate-400">กำลังโหลด…</p>
+          : data.purchaseOrders.length === 0 ? <p className="py-8 text-center text-sm text-slate-400">ยังไม่มีใบสั่งซื้อ</p>
+          : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr><th className="px-3 py-2">เลขที่ PO</th><th className="px-3 py-2">วันที่</th><th className="px-3 py-2">สถานะ</th><th className="px-3 py-2 text-right">รายการ</th><th className="px-3 py-2 text-right">ยอดรวม</th><th className="px-3 py-2 text-right">ชำระแล้ว</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {data.purchaseOrders.map((po) => (
+                  <tr key={po.id}>
+                    <td className="px-3 py-2 font-mono text-xs font-semibold">{po.refNo}</td>
+                    <td className="px-3 py-2 text-slate-500">{dateTime(po.createdAt)}</td>
+                    <td className="px-3 py-2"><span className="chip bg-slate-100 text-slate-600">{PO_ST[po.status] ?? po.status}</span></td>
+                    <td className="px-3 py-2 text-right">{po.items}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{money(po.total)}</td>
+                    <td className="px-3 py-2 text-right text-emerald-600">{money(po.paid)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </div>
+    </Modal>
+  );
+}
+
+function Tile({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return <div className="rounded-xl bg-slate-50 p-3 text-center"><div className="text-[11px] text-slate-400">{label}</div><div className={`text-lg font-extrabold ${tone ?? 'text-ink-900'}`}>{value}</div></div>;
 }

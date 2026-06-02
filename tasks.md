@@ -10,6 +10,11 @@ Legend: ⬜ not started · 🟨 partial (notes)
 
 ---
 
+## 0. Cross-cutting / CRM
+- ✅ Supplier purchase history — `GET /api/suppliers/:id/history` returns committed POs +
+  stats (count, total ordered, paid, outstanding, last order); "ประวัติ" modal on the
+  Suppliers page (KPI tiles + PO table). Mirrors the member purchase history.
+
 ## 1. Multi-branch & warehousing
 - ✅ **Phase 1** — `Branch` model + management page, branch switcher, sales &
   shifts attributed to a branch, branch filter on the Sales list
