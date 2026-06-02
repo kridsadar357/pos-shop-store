@@ -180,12 +180,13 @@ is already branch-correct).
   (Postgres + app, `prisma migrate deploy` on start, uploads/pgdata volumes), `.dockerignore`,
   and `DEPLOY.md` (incl. reverse-proxy/HTTPS + WS notes). First run → /setup wizard.
   Verified end-to-end: `docker compose up` → migrations applied on a fresh DB → /health + SPA
-- 🟨 Automated tests + CI — Vitest in `server` (39 unit tests). Every money calc is now a
-  pure, tested function: **POS sale line pricing + wholesale selection** (`lib/salePricing.ts`),
+- 🟨 Automated tests + CI — Vitest in `server` (47 unit tests). Every money calc is a pure,
+  tested function: **POS sale line pricing + wholesale selection** (`lib/salePricing.ts`),
   **split-payment tender** (`lib/tender.ts`), **loyalty redeem/earn** (`lib/loyaltyCalc.ts`),
   **returns refund proration** (`lib/refundCalc.ts`), **quotation/layaway bill totals**
-  (`lib/billing.ts`), plus PromptPay CRC/payload + ESC/POS bytes. `npm --prefix server test`.
-  GitHub Actions
+  (`lib/billing.ts`), the **promotion engine** (`lib/promotions.ts` — %/fixed/BXGY ×
+  bill/product/category + coupons + minSpend), plus PromptPay CRC/payload + ESC/POS bytes.
+  `npm --prefix server test`. GitHub Actions
   (`.github/workflows/ci.yml`): install → prisma generate → test → typecheck-build server +
   web. (Integration/e2e still to expand.)
 
