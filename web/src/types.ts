@@ -48,6 +48,8 @@ export interface Setting {
   printerType: 'BROWSER' | 'ESCPOS_NET' | 'ESCPOS_USB';
   printerAddress: string;
   printerPaper: '58mm' | '80mm';
+  escposCodepage: number;
+  openDrawerOnCash: boolean;
   setupCompleted: boolean;
 }
 

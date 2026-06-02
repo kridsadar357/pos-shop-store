@@ -62,6 +62,8 @@ const schema = z.object({
   printerType: z.enum(['BROWSER', 'ESCPOS_NET', 'ESCPOS_USB']).default('BROWSER'),
   printerAddress: z.string().default(''),
   printerPaper: z.enum(['58mm', '80mm']).default('80mm'),
+  escposCodepage: z.number().int().min(0).max(255).default(21),
+  openDrawerOnCash: z.boolean().default(true),
 });
 
 settingsRouter.put(

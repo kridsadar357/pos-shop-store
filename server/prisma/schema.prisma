@@ -105,6 +105,8 @@ model Setting {
   printerType    String       @default("BROWSER")  // BROWSER | ESCPOS_NET | ESCPOS_USB
   printerAddress String       @default("")          // e.g. 192.168.1.50:9100
   printerPaper   String       @default("80mm")      // 58mm | 80mm
+  escposCodepage   Int        @default(21)          // ESC t code-page for Thai (vendor-specific)
+  openDrawerOnCash Boolean     @default(true)        // pulse the cash drawer on a cash receipt
 
   // First-run setup wizard
   setupCompleted Boolean      @default(false)

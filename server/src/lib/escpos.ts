@@ -10,7 +10,7 @@
 import net from 'node:net';
 
 const ESC = 0x1b, GS = 0x1d, LF = 0x0a;
-const THAI_CODEPAGE = Number(process.env.ESCPOS_THAI_CODEPAGE || 21);
+const DEFAULT_THAI_CODEPAGE = Number(process.env.ESCPOS_THAI_CODEPAGE || 21);
 
 /** Encode a string to TIS-620 bytes (ASCII passthrough; Thai block → 0xA1–0xFB). */
 function encodeThai(s: string): Buffer {
@@ -34,6 +34,7 @@ export interface ReceiptSetting {
   storeName: string; address: string; phone: string; taxId: string;
   receiptHeader: string; receiptFooter: string; taxRatePct: any; taxInclusive: boolean;
   printerPaper: string; currency: string;
+  escposCodepage?: number; openDrawerOnCash?: boolean;
 }
 
 const PM: Record<string, string> = { CASH: 'เงินสด', TRANSFER: 'โอน/พร้อมเพย์', CARD: 'บัตร', CREDIT: 'เงินเชื่อ' };
@@ -42,7 +43,9 @@ const n2 = (v: any) => Number(v).toFixed(2);
 class Builder {
   private parts: Buffer[] = [];
   raw(...b: number[]) { this.parts.push(Buffer.from(b)); return this; }
-  init() { return this.raw(ESC, 0x40).raw(ESC, 0x74, THAI_CODEPAGE); }
+  init(codepage: number = DEFAULT_THAI_CODEPAGE) { return this.raw(ESC, 0x40).raw(ESC, 0x74, codepage & 0xff); }
+  /** Cash-drawer kick: ESC p 0 (pin 2) on/off pulse durations. */
+  drawer() { return this.raw(ESC, 0x70, 0x00, 0x19, 0xfa); }
   align(n: 0 | 1 | 2) { return this.raw(ESC, 0x61, n); }
   bold(on: boolean) { return this.raw(ESC, 0x45, on ? 1 : 0); }
   size(w: number, h: number) { return this.raw(GS, 0x21, ((w - 1) << 4) | (h - 1)); } // 1..8
@@ -72,7 +75,9 @@ class Builder {
 
 export function buildReceipt(sale: ReceiptSale, setting: ReceiptSetting, opts: { qr?: string } = {}): Buffer {
   const W = setting.printerPaper === '58mm' ? 32 : 42;
-  const b = new Builder().init();
+  const b = new Builder().init(setting.escposCodepage);
+  // Open the cash drawer up-front on a cash sale (if enabled).
+  if (sale.paymentMethod === 'CASH' && setting.openDrawerOnCash !== false) b.drawer();
 
   // Header
   b.align(1).bold(true).size(2, 2).line(setting.storeName || 'POS Store').size(1, 1).bold(false);
@@ -113,9 +118,14 @@ export function buildReceipt(sale: ReceiptSale, setting: ReceiptSetting, opts: {
   return b.cut().done();
 }
 
+/** A standalone cash-drawer kick (no print). */
+export function buildDrawerKick(setting?: ReceiptSetting): Buffer {
+  return new Builder().init(setting?.escposCodepage).drawer().done();
+}
+
 /** A short connectivity test slip. */
 export function buildTestSlip(setting: ReceiptSetting): Buffer {
-  return new Builder().init()
+  return new Builder().init(setting.escposCodepage)
     .align(1).bold(true).size(2, 2).line('ทดสอบการพิมพ์').size(1, 1).bold(false)
     .line(setting.storeName || 'POS Store')
     .line(new Date().toLocaleString('th-TH'))

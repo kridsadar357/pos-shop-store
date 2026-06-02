@@ -36,8 +36,11 @@ is already branch-correct).
 
 ## 2. Hardware & printing
 - 🟨 ESC/POS **USB** printing — only network (port 9100) is implemented; USB needs a local print agent/bridge
-- ⬜ Cash-drawer kick (ESC/POS drawer pulse on cash payment)
-- ⬜ Configurable Thai code page in the UI (currently env `ESCPOS_THAI_CODEPAGE`)
+- ✅ Cash-drawer kick (ESC/POS drawer pulse) — `buildReceipt` pulses the drawer on a
+  cash receipt when `Setting.openDrawerOnCash`; plus a manual `/api/print/drawer` endpoint
+  + "ทดสอบเปิดลิ้นชัก" button in the Printer settings
+- ✅ Configurable Thai code page in the UI — `Setting.escposCodepage` (default 21),
+  editable in the Printer settings; `Builder.init(codepage)` uses it (env is just the default)
 - ✅ Barcode / shelf-label printing — `Labels` page: pick products (search/category),
   set copies + labels-per-row + retail/wholesale price, print an A4 grid of labels with
   a CODE128 barcode (jsbarcode) of each product's barcode/SKU, name, and price

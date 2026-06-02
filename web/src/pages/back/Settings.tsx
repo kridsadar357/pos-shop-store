@@ -29,7 +29,7 @@ export default function Settings() {
   async function save() {
     if (!s) return;
     try {
-      await api('/settings', { method: 'PUT', body: { ...s, taxRatePct: num(s.taxRatePct), pointsEarnBaht: num(s.pointsEarnBaht), pointsRedeemValue: num(s.pointsRedeemValue) } });
+      await api('/settings', { method: 'PUT', body: { ...s, taxRatePct: num(s.taxRatePct), pointsEarnBaht: num(s.pointsEarnBaht), pointsRedeemValue: num(s.pointsRedeemValue), escposCodepage: Math.round(num(s.escposCodepage)) } });
       toast.success('บันทึกการตั้งค่าแล้ว');
     } catch (e) { toast.error((e as Error).message); }
   }
@@ -215,15 +215,28 @@ function PrinterTab({ s, set, save, setS }: { s: Setting; set: (p: Partial<Setti
               </select>
             </F>
             {s.printerType === 'ESCPOS_NET' && (
-              <F label="ที่อยู่เครื่องพิมพ์ (IP:Port)" className="col-span-2"><input className="input" placeholder="192.168.1.50:9100" value={s.printerAddress} onChange={(e) => set({ printerAddress: e.target.value })} /></F>
+              <>
+                <F label="ที่อยู่เครื่องพิมพ์ (IP:Port)" className="col-span-2"><input className="input" placeholder="192.168.1.50:9100" value={s.printerAddress} onChange={(e) => set({ printerAddress: e.target.value })} /></F>
+                <F label="รหัสหน้าอักษรไทย (ESC t)"><input type="number" className="input" value={s.escposCodepage} onChange={(e) => set({ escposCodepage: Number(e.target.value) })} /></F>
+                <label className="col-span-2 flex items-center justify-between rounded-xl bg-slate-50 p-3">
+                  <span><span className="text-sm font-semibold">เปิดลิ้นชักเมื่อรับเงินสด</span><span className="block text-xs text-slate-400">ส่งสัญญาณเปิดลิ้นชักตอนพิมพ์ใบเสร็จเงินสด</span></span>
+                  <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={s.openDrawerOnCash} onChange={(e) => set({ openDrawerOnCash: e.target.checked })} />
+                </label>
+              </>
             )}
           </div>
-          <p className="mt-2 text-xs text-slate-400">โหมดเบราว์เซอร์ใช้กล่องพิมพ์ของระบบ (เลือกเครื่องพิมพ์/บันทึก PDF ได้) — เหมาะกับเครื่องพิมพ์ความร้อนที่ติดตั้งไดรเวอร์แล้ว · โหมดเครือข่ายส่งคำสั่ง ESC/POS ไปยังเครื่องพิมพ์โดยตรง (พอร์ต 9100)</p>
+          <p className="mt-2 text-xs text-slate-400">โหมดเบราว์เซอร์ใช้กล่องพิมพ์ของระบบ (เลือกเครื่องพิมพ์/บันทึก PDF ได้) — เหมาะกับเครื่องพิมพ์ความร้อนที่ติดตั้งไดรเวอร์แล้ว · โหมดเครือข่ายส่งคำสั่ง ESC/POS ไปยังเครื่องพิมพ์โดยตรง (พอร์ต 9100). รหัสหน้าอักษรไทยขึ้นกับรุ่นเครื่องพิมพ์ (ค่าทั่วไป 21 สำหรับ TIS-620)</p>
           {s.printerType === 'ESCPOS_NET' && (
-            <button className="btn-ghost mt-3" onClick={async () => {
-              try { await api('/print/test', { method: 'POST' }); toast.success('ส่งใบทดสอบไปยังเครื่องพิมพ์แล้ว'); }
-              catch (e) { toast.error((e as Error).message); }
-            }}><i className="fa-solid fa-vial mr-1.5" />พิมพ์ใบทดสอบ</button>
+            <div className="mt-3 flex gap-2">
+              <button className="btn-ghost" onClick={async () => {
+                try { await api('/print/test', { method: 'POST' }); toast.success('ส่งใบทดสอบไปยังเครื่องพิมพ์แล้ว'); }
+                catch (e) { toast.error((e as Error).message); }
+              }}><i className="fa-solid fa-vial mr-1.5" />พิมพ์ใบทดสอบ</button>
+              <button className="btn-ghost" onClick={async () => {
+                try { await api('/print/drawer', { method: 'POST' }); toast.success('ส่งคำสั่งเปิดลิ้นชักแล้ว'); }
+                catch (e) { toast.error((e as Error).message); }
+              }}><i className="fa-solid fa-cash-register mr-1.5" />ทดสอบเปิดลิ้นชัก</button>
+            </div>
           )}
         </Section>
 
