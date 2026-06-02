@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
+import { buildBill } from '../lib/billing.js';
 
 export const layawaysRouter = Router();
 layawaysRouter.use(requireAuth);
@@ -26,27 +27,8 @@ const createSchema = z.object({
 /** Compute totals from items + the tax setting (VAT-inclusive aware). */
 async function computeTotals(data: z.infer<typeof createSchema>) {
   const setting = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
-  const inc = setting.taxInclusive;
-  const rate = num(setting.taxRatePct);
   const products = await prisma.product.findMany({ where: { id: { in: data.items.map((i) => i.productId) } } });
-  const pmap = new Map(products.map((p) => [p.id, p]));
-  let subtotal = 0;
-  let tax = 0;
-  const lines = data.items.map((i) => {
-    const p = pmap.get(i.productId);
-    if (!p) throw Object.assign(new Error(`Product ${i.productId} not found`), { status: 400 });
-    const unitPrice = round2(i.unitPrice ?? num(data.type === 'WHOLESALE' ? p.wholesalePrice : p.retailPrice));
-    const lineTotal = round2(unitPrice * i.qty);
-    subtotal += lineTotal;
-    const r = p.taxRatePct != null ? num(p.taxRatePct) : rate;
-    tax += inc ? lineTotal - lineTotal / (1 + r / 100) : lineTotal * (r / 100);
-    return { productId: p.id, nameSnapshot: p.name, qty: i.qty, unitPrice, lineTotal, unitCost: num(p.cost) };
-  });
-  subtotal = round2(subtotal);
-  const discount = round2(Math.min(subtotal, data.discount));
-  const taxAmount = round2(tax);
-  const total = round2(inc ? subtotal - discount : subtotal + taxAmount - discount);
-  return { subtotal, discount, taxAmount, total, lines };
+  return buildBill({ items: data.items, products, type: data.type, discount: data.discount, defaultRate: num(setting.taxRatePct), taxInclusive: setting.taxInclusive });
 }
 
 async function withSummary(id: number) {
