@@ -301,6 +301,35 @@ reportsRouter.get(
   })
 );
 
+// --- Expiring / expired batches (lot tracking) ---
+reportsRouter.get(
+  '/expiring-batches',
+  ah(async (req, res) => {
+    const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+    const days = req.query.days ? Number(req.query.days) : 60; // window for "expiring soon"
+    const horizon = new Date();
+    horizon.setDate(horizon.getDate() + days);
+    const now = new Date();
+    const batches = await prisma.productBatch.findMany({
+      where: { branchId, qtyRemaining: { gt: 0 }, expiryDate: { not: null, lte: horizon } },
+      orderBy: { expiryDate: 'asc' },
+      take: 500,
+      include: { product: { select: { name: true, sku: true } } },
+    });
+    res.json(
+      batches.map((b) => {
+        const exp = b.expiryDate as Date;
+        const daysLeft = Math.floor((exp.getTime() - now.getTime()) / 86400000);
+        return {
+          id: b.id, sku: b.product.sku, name: b.product.name,
+          lotNo: b.lotNo, expiryDate: b.expiryDate, qtyRemaining: b.qtyRemaining,
+          daysLeft, status: daysLeft < 0 ? 'EXPIRED' : 'EXPIRING',
+        };
+      })
+    );
+  })
+);
+
 // --- Cash flow: where the cash drawer money came from / went over a period ---
 reportsRouter.get(
   '/cash-flow',

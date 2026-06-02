@@ -9,7 +9,7 @@ import type { Setting } from '../../types';
 // Shared report meta (store name + date range) for PDF headers, avoids prop drilling.
 const ReportMeta = createContext<{ store: string; range: string }>({ store: '', range: '' });
 
-type Tab = 'summary' | 'pnl' | 'cashflow' | 'payments' | 'top' | 'category' | 'hourly' | 'tax' | 'low' | 'valuation' | 'z';
+type Tab = 'summary' | 'pnl' | 'cashflow' | 'payments' | 'top' | 'category' | 'hourly' | 'tax' | 'low' | 'expiring' | 'valuation' | 'z';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'summary', label: 'สรุปยอดขาย' },
   { key: 'pnl', label: 'กำไร-ขาดทุน (P&L)' },
@@ -20,6 +20,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'hourly', label: 'ยอดขายรายชั่วโมง' },
   { key: 'tax', label: 'สรุปภาษี' },
   { key: 'low', label: 'สินค้าใกล้หมด' },
+  { key: 'expiring', label: 'ใกล้หมดอายุ' },
   { key: 'valuation', label: 'มูลค่าสินค้าคงเหลือ' },
   { key: 'z', label: 'รายงานปิดยอด (Z)' },
 ];
@@ -52,6 +53,7 @@ export default function Reports() {
       hourly: () => api('/reports/sales-by-hour', { query: range }),
       tax: () => api('/reports/tax-summary', { query: range }),
       low: () => api('/reports/low-stock', { query: { branchId: b } }),
+      expiring: () => api('/reports/expiring-batches', { query: { branchId: b } }),
       valuation: () => api('/reports/inventory-valuation', { query: { branchId: b } }),
       z: () => api('/reports/z-report', { query: { date: new Date(to).toISOString(), branchId: b } }),
     };
@@ -100,6 +102,7 @@ export default function Reports() {
           {tab === 'hourly' && <HourlyView d={data} />}
           {tab === 'tax' && <TaxView d={data} />}
           {tab === 'low' && <TableView title="สินค้าใกล้หมด" rows={data} cols={[['name', 'สินค้า'], ['sku', 'SKU'], ['stockQty', 'คงเหลือ'], ['reorderLevel', 'จุดสั่งซื้อ ≤']]} file="low-stock.csv" />}
+          {tab === 'expiring' && <ExpiringView d={data} />}
           {tab === 'valuation' && <ValuationView d={data} />}
           {tab === 'z' && <ZView d={data} />}
         </>
@@ -182,6 +185,39 @@ function PnlView({ d }: { d: any }) {
           <p className="pt-1 text-center text-[11px] text-slate-400">อิงจาก {d.orders} บิลที่ชำระแล้วในช่วงที่เลือก</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ExpiringView({ d }: { d: any }) {
+  const rows: any[] = Array.isArray(d) ? d : [];
+  return (
+    <div className="card p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-bold">ล็อตสินค้าที่ใกล้หมดอายุ / หมดอายุแล้ว</h3>
+        <button className="btn-ghost" onClick={() => downloadCSV('expiring-batches.csv', rows)}>ส่งออก CSV</button>
+      </div>
+      {rows.length === 0 ? (
+        <p className="py-10 text-center text-sm text-slate-400">ไม่มีล็อตที่ใกล้หมดอายุ (เฉพาะสินค้าที่เปิดติดตามล็อต/วันหมดอายุ)</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
+            <tr><th className="py-2">สินค้า</th><th className="py-2">ล็อต</th><th className="py-2">วันหมดอายุ</th><th className="py-2 text-right">คงเหลือ</th><th className="py-2 text-right">เหลือ (วัน)</th><th className="py-2">สถานะ</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((b) => (
+              <tr key={b.id}>
+                <td className="py-2"><div className="font-semibold">{b.name}</div><div className="font-mono text-[11px] text-slate-400">{b.sku}</div></td>
+                <td className="py-2">{b.lotNo || '—'}</td>
+                <td className="py-2">{b.expiryDate ? new Date(b.expiryDate).toLocaleDateString('th-TH') : '—'}</td>
+                <td className="py-2 text-right font-semibold">{b.qtyRemaining}</td>
+                <td className="py-2 text-right">{b.daysLeft}</td>
+                <td className="py-2"><span className={`chip ${b.status === 'EXPIRED' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{b.status === 'EXPIRED' ? 'หมดอายุแล้ว' : 'ใกล้หมดอายุ'}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

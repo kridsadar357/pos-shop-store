@@ -548,6 +548,7 @@ model Product {
   taxRatePct      Decimal? @db.Decimal(5, 2) // null => fall back to Setting
   reorderLevel    Int      @default(0)
   stockQty        Int      @default(0) // cached balance; ledger is source of truth
+  trackBatches    Boolean  @default(false) // opt-in lot/expiry batch tracking (FEFO)
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -561,8 +562,28 @@ model Product {
   poItems    PurchaseOrderItem[]
   branchStock BranchStock[]
   suppliers  SupplierProduct[]
+  batches    ProductBatch[]
 
   @@index([name])
+}
+
+// Lot/expiry batch balance for a batch-tracked product at a branch. Maintained by
+// postMovement (FEFO consumption); Σ(qtyRemaining) per product×branch == BranchStock.qty.
+model ProductBatch {
+  id           Int       @id @default(autoincrement())
+  productId    Int
+  branchId     Int?
+  lotNo        String    @default("")
+  expiryDate   DateTime?
+  qtyReceived  Int       @default(0)
+  qtyRemaining Int       @default(0)
+  unitCost     Decimal   @default(0) @db.Decimal(12, 2)
+  createdAt    DateTime  @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId, branchId])
+  @@index([expiryDate])
 }
 
 // The backtrack ledger: every stock change is recorded here.

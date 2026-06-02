@@ -24,6 +24,7 @@ const empty = {
   wholesalePrice: 0,
   wholesaleMinQty: 1,
   reorderLevel: 0,
+  trackBatches: false,
   isActive: true,
 };
 type Form = typeof empty;
@@ -128,6 +129,7 @@ export default function Products() {
       wholesalePrice: num(p.wholesalePrice),
       wholesaleMinQty: p.wholesaleMinQty,
       reorderLevel: p.reorderLevel,
+      trackBatches: p.trackBatches ?? false,
       isActive: p.isActive,
     });
   }
@@ -324,6 +326,10 @@ export default function Products() {
             <NumField label="จำนวนขั้นต่ำราคาส่ง" v={form.wholesaleMinQty} set={(v) => setForm({ ...form, wholesaleMinQty: v })} />
             <NumField label="จุดสั่งซื้อซ้ำ" v={form.reorderLevel} set={(v) => setForm({ ...form, reorderLevel: v })} />
           </div>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={form.trackBatches} onChange={(e) => setForm({ ...form, trackBatches: e.target.checked })} />
+            ติดตามล็อต / วันหมดอายุ (ตัดสต็อกแบบ FEFO — ใกล้หมดอายุก่อนออกก่อน)
+          </label>
           {editing && <p className="mt-3 text-xs text-slate-400">การปรับสต็อกทำผ่าน รับสินค้า / นับสต็อก / บัญชีสต็อก — สต็อกควบคุมด้วยบัญชีเดินสินค้า</p>}
 
           {editing && (

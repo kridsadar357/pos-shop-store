@@ -67,8 +67,13 @@ is already branch-correct).
 - ✅ Units-of-measure conversion (buy by box, sell by piece) — Product has a
   purchase unit + pack size; **receiving and PO line entry** both convert
   pack→base (stock & ledger stay in base units)
-- ⬜ Batch / lot & expiry-date tracking — **large**: needs batch-level balances
-  layered on the per-branch stock model + FEFO picking
+- 🟨 Batch / lot & expiry-date tracking — opt-in per product (`Product.trackBatches`).
+  `ProductBatch` (lot/expiry/qtyRemaining per product×branch) maintained by `postMovement`:
+  receives create batches (lot/expiry on the receive line), sales/outflows consume **FEFO**
+  (earliest expiry first), positive non-receive deltas + shortfalls use a no-expiry catch-all
+  (so Σbatch == net stock change since enabling). "ใกล้หมดอายุ" report + product toggle.
+  Verified FEFO + report end-to-end. Phase-2 TODO: lot/expiry inputs on the Receive/PO **UI**,
+  and an initial-batch count for stock that predates enabling
 - ⬜ Serial-number tracking — **large**: per-unit records + scan-in/scan-out
 
 ## 4. Sales & customer features

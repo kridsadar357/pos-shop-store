@@ -10,6 +10,57 @@ export interface MovementInput {
   note?: string;
   userId?: number;
   branchId?: number | null; // which branch's stock moved; defaults to the default branch
+  batch?: { lotNo?: string; expiryDate?: Date | null }; // lot/expiry for a batch-tracked receive
+}
+
+/**
+ * Maintain lot/expiry batches for a batch-tracked product so that
+ * Σ(qtyRemaining) per product×branch always equals BranchStock.qty.
+ *  - positive delta with lot/expiry → a new received batch
+ *  - positive delta otherwise (void/return/count-up) → a no-expiry "catch-all" batch
+ *  - negative delta → FEFO consumption (earliest expiry first, then oldest);
+ *    any shortfall (overselling) is absorbed by the catch-all batch.
+ */
+async function applyBatch(
+  tx: Prisma.TransactionClient,
+  o: { productId: number; branchId: number; qtyDelta: number; unitCost: number; batch?: { lotNo?: string; expiryDate?: Date | null } }
+): Promise<void> {
+  const { productId, branchId } = o;
+  async function catchAll() {
+    return (
+      (await tx.productBatch.findFirst({ where: { productId, branchId, lotNo: '', expiryDate: null } })) ??
+      (await tx.productBatch.create({ data: { productId, branchId, lotNo: '', expiryDate: null, qtyReceived: 0, qtyRemaining: 0, unitCost: o.unitCost } }))
+    );
+  }
+  if (o.qtyDelta > 0) {
+    if (o.batch && (o.batch.lotNo || o.batch.expiryDate)) {
+      await tx.productBatch.create({
+        data: { productId, branchId, lotNo: o.batch.lotNo ?? '', expiryDate: o.batch.expiryDate ?? null, qtyReceived: o.qtyDelta, qtyRemaining: o.qtyDelta, unitCost: o.unitCost },
+      });
+    } else {
+      const ca = await catchAll();
+      await tx.productBatch.update({ where: { id: ca.id }, data: { qtyReceived: { increment: o.qtyDelta }, qtyRemaining: { increment: o.qtyDelta } } });
+    }
+    return;
+  }
+  // qtyDelta < 0 → FEFO consume
+  let need = -o.qtyDelta;
+  const open = await tx.productBatch.findMany({ where: { productId, branchId, qtyRemaining: { gt: 0 } } });
+  open.sort((a, b) => {
+    const ax = a.expiryDate ? a.expiryDate.getTime() : Infinity;
+    const bx = b.expiryDate ? b.expiryDate.getTime() : Infinity;
+    return ax - bx || a.id - b.id;
+  });
+  for (const b of open) {
+    if (need <= 0) break;
+    const take = Math.min(b.qtyRemaining, need);
+    await tx.productBatch.update({ where: { id: b.id }, data: { qtyRemaining: { decrement: take } } });
+    need -= take;
+  }
+  if (need > 0) {
+    const ca = await catchAll();
+    await tx.productBatch.update({ where: { id: ca.id }, data: { qtyRemaining: { decrement: need } } });
+  }
 }
 
 /** The default branch id (cached per process; branches rarely change). */
@@ -30,7 +81,7 @@ export async function defaultBranchId(tx: Prisma.TransactionClient): Promise<num
 export async function postMovement(tx: Prisma.TransactionClient, m: MovementInput): Promise<number> {
   const product = await tx.product.findUniqueOrThrow({
     where: { id: m.productId },
-    select: { stockQty: true, cost: true },
+    select: { stockQty: true, cost: true, trackBatches: true },
   });
 
   // Product.stockQty stays the all-branch total (cached aggregate).
@@ -47,6 +98,11 @@ export async function postMovement(tx: Prisma.TransactionClient, m: MovementInpu
       update: { qty: { increment: m.qtyDelta } },
     });
     balanceAfter = bs.qty;
+
+    // Opt-in lot/expiry batches layered under the branch balance (FEFO).
+    if (product.trackBatches) {
+      await applyBatch(tx, { productId: m.productId, branchId, qtyDelta: m.qtyDelta, unitCost: m.unitCost ?? Number(product.cost), batch: m.batch });
+    }
   }
 
   await tx.stockMovement.create({

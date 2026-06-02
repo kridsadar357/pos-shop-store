@@ -23,6 +23,7 @@ export interface Product {
   taxRatePct: string | null;
   reorderLevel: number;
   stockQty: number;
+  trackBatches?: boolean;
   isActive: boolean;
 }
 

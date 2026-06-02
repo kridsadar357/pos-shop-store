@@ -201,6 +201,7 @@ const productSchema = z.object({
   wholesaleMinQty: z.number().int().positive().default(1),
   taxRatePct: z.number().nonnegative().nullable().optional(),
   reorderLevel: z.number().int().nonnegative().default(0),
+  trackBatches: z.boolean().optional(),
   isActive: z.boolean().default(true),
 });
 

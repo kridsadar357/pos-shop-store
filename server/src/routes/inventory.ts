@@ -80,6 +80,8 @@ const receiveSchema = z.object({
         productId: z.number().int(),
         qty: z.number().int().positive(),
         unitCost: z.number().nonnegative(),
+        lotNo: z.string().optional(),
+        expiryDate: z.string().datetime().nullable().optional(),
       })
     )
     .min(1),
@@ -121,6 +123,7 @@ inventoryRouter.post(
           note: refNo,
           userId,
           branchId: data.branchId ?? undefined,
+          batch: (i.lotNo || i.expiryDate) ? { lotNo: i.lotNo, expiryDate: i.expiryDate ? new Date(i.expiryDate) : null } : undefined,
         });
       }
       return receipt;
