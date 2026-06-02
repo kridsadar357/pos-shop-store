@@ -1,0 +1,40 @@
+# Production stack: PostgreSQL + the single-image POS app (API + built SPA).
+#   cp .env.example .env   # then set JWT_SECRET (and DB_PASSWORD)
+#   docker compose -f docker-compose.prod.yml up -d --build
+# First run lands on the /setup wizard to create the admin user + license.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pos
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pos}
+      POSTGRES_DB: posdb
+    volumes:
+      - pos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pos -d posdb']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://pos:${DB_PASSWORD:-pos}@db:5432/posdb
+      JWT_SECRET: ${JWT_SECRET:?set a strong JWT_SECRET in .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      PORT: 4000
+    ports:
+      - '${APP_PORT:-4000}:4000'
+    volumes:
+      - pos_uploads:/app/server/dist/uploads
+
+volumes:
+  pos_pgdata:
+  pos_uploads:

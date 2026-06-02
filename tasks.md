@@ -174,7 +174,12 @@ is already branch-correct).
 ## 8. Platform / offline / PWA
 - 🟨 Offline POS — the customer display is an installable PWA, but the POS itself
   doesn't queue sales offline; needs local persistence + sync
-- ⬜ Production deploy story (Docker image for server + built web, reverse proxy, HTTPS)
+- ✅ Production deploy story — single-image deploy: Express serves the API **and** the
+  built SPA (`WEB_DIST`, SPA fallback for non-`/api`/`/uploads`/`/ws` GETs). Multi-stage
+  `Dockerfile` (build web → build server → slim runtime), `docker-compose.prod.yml`
+  (Postgres + app, `prisma migrate deploy` on start, uploads/pgdata volumes), `.dockerignore`,
+  and `DEPLOY.md` (incl. reverse-proxy/HTTPS + WS notes). First run → /setup wizard.
+  Verified end-to-end: `docker compose up` → migrations applied on a fresh DB → /health + SPA
 - 🟨 Automated tests + CI — Vitest in `server` (39 unit tests). Every money calc is now a
   pure, tested function: **POS sale line pricing + wholesale selection** (`lib/salePricing.ts`),
   **split-payment tender** (`lib/tender.ts`), **loyalty redeem/earn** (`lib/loyaltyCalc.ts`),

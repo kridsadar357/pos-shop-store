@@ -1,5 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
+import path from 'node:path';
+import fs from 'node:fs';
 import { ZodError } from 'zod';
 import { env } from './env.js';
 import { authRouter } from './routes/auth.js';
@@ -75,6 +77,17 @@ export function createApp() {
   app.use('/api/tax-invoices', taxInvoicesRouter);
   app.use('/api/layaways', layawaysRouter);
   app.use('/api/backup', backupRouter);
+
+  // Serve the built web app for single-image production deploys (set WEB_DIST to the
+  // built `web/dist` directory). Non-API/uploads/ws GETs fall back to index.html (SPA).
+  const webDist = process.env.WEB_DIST;
+  if (webDist && fs.existsSync(webDist)) {
+    app.use(express.static(webDist));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/ws')) return next();
+      res.sendFile(path.join(webDist, 'index.html'));
+    });
+  }
 
   // Central error handler.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

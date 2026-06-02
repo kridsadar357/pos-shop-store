@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+web/dist
+server/dist
+server/uploads
+.git
+.github
+**/*.log
+**/.DS_Store
+plan*.md
