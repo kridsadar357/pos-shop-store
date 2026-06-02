@@ -73,7 +73,8 @@ is already branch-correct).
   non-receive deltas + shortfalls use a no-expiry catch-all (Σbatch == net change since enabling).
   Both receiving paths (Receive page + PO receive) capture lot/expiry; product editor lists batches
   and records **opening/manual batches** (no stock movement) for pre-existing stock; "ใกล้หมดอายุ"
-  report. Verified FEFO + report + opening-count end-to-end
+  report (also surfaced in the topbar notification bell as near-expiry/expired alerts).
+  Verified FEFO + report + opening-count end-to-end
 - ⬜ Serial-number tracking — **large**: per-unit records + scan-in/scan-out
 
 ## 4. Sales & customer features

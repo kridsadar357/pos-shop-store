@@ -10,6 +10,7 @@ import { toast } from './Toast';
 import type { Member, Product } from '../types';
 
 interface StockAlert { id: number; sku: string; name: string; category: string; stockQty: number; reorderLevel: number; unit: string; }
+interface ExpiringBatch { id: number; sku: string; name: string; lotNo: string; expiryDate: string | null; qtyRemaining: number; daysLeft: number; status: 'EXPIRED' | 'EXPIRING'; }
 
 interface NavItem { to: string; label: string; icon: string; end?: boolean; adminOnly?: boolean; }
 interface NavGroup { title: string; items: NavItem[]; }
@@ -356,10 +357,14 @@ function BranchSwitcher() {
 function Notifications() {
   const navigate = useNavigate();
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
+  const [expiring, setExpiring] = useState<ExpiringBatch[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const load = () => api<StockAlert[]>('/reports/low-stock').then(setAlerts).catch(() => {});
+  const load = () => {
+    api<StockAlert[]>('/reports/low-stock').then(setAlerts).catch(() => {});
+    api<ExpiringBatch[]>('/reports/expiring-batches', { query: { days: 30 } }).then(setExpiring).catch(() => {});
+  };
   useEffect(() => {
     load();
     const t = setInterval(load, 60_000); // refresh every minute
@@ -375,7 +380,7 @@ function Notifications() {
 
   const out = alerts.filter((a) => a.stockQty <= 0);
   const low = alerts.filter((a) => a.stockQty > 0);
-  const count = alerts.length;
+  const count = alerts.length + expiring.length;
 
   return (
     <div className="relative" ref={ref}>
@@ -401,6 +406,16 @@ function Notifications() {
                 {out.map((a) => <AlertRow key={a.id} a={a} tone="rose" onClick={() => { setOpen(false); navigate('/back/products'); }} />)}
                 {low.length > 0 && <div className="bg-slate-50 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">ใกล้หมด / ถึงจุดสั่งซื้อ ({low.length})</div>}
                 {low.map((a) => <AlertRow key={a.id} a={a} tone="amber" onClick={() => { setOpen(false); navigate('/back/products'); }} />)}
+                {expiring.length > 0 && <div className="bg-slate-50 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">ใกล้หมดอายุ / หมดอายุ ({expiring.length})</div>}
+                {expiring.map((b) => (
+                  <button key={`b${b.id}`} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50" onClick={() => { setOpen(false); navigate('/back/reports'); }}>
+                    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${b.status === 'EXPIRED' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}><i className="fa-solid fa-flask-vial" /></span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-ink-900">{b.name}</span>
+                      <span className="block text-[11px] text-slate-400">ล็อต {b.lotNo || '—'} · เหลือ {b.qtyRemaining} · {b.status === 'EXPIRED' ? 'หมดอายุแล้ว' : `อีก ${b.daysLeft} วัน`}</span>
+                    </span>
+                  </button>
+                ))}
               </>
             )}
           </div>
