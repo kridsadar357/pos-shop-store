@@ -287,6 +287,19 @@ export interface TaxInvoice {
   issuedAt: string;
 }
 
+export interface TaxInvoiceRow {
+  id: number;
+  number: string;
+  issuedAt: string;
+  orderNo: string;
+  buyerName: string;
+  buyerTaxId: string;
+  buyerBranch: string;
+  base: number;
+  vat: number;
+  total: number;
+}
+
 export interface SaleTender {
   id?: number;
   method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT' | 'GIFT';

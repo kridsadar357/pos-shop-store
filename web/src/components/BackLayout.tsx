@@ -54,6 +54,7 @@ const GROUPS: NavGroup[] = [
       { to: '/back/shifts', label: 'การเงิน / กะ', icon: 'fa-cash-register' },
       { to: '/back/expenses', label: 'ค่าใช้จ่าย', icon: 'fa-money-bill-wave' },
       { to: '/back/payables', label: 'เจ้าหนี้การค้า', icon: 'fa-file-invoice-dollar' },
+      { to: '/back/tax-invoices', label: 'รายงานภาษีขาย', icon: 'fa-file-invoice' },
       { to: '/back/reports', label: 'รายงาน', icon: 'fa-chart-line' },
     ],
   },

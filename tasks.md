@@ -123,6 +123,9 @@ is already branch-correct).
   transactions are still recorded in THB. Full multi-currency accounting still pending.
 
 ## 6. Reporting & data
+- ✅ Tax-invoice register (รายงานภาษีขาย, สำหรับ ภ.พ.30) — `GET /api/tax-invoices` lists
+  issued full tax invoices over a date range with per-invoice VAT base/amount; back-office
+  register page (month-default range, period totals base/VAT/total, export)
 - ✅ Profit & Loss report — `/reports/profit-loss` (date-range + branch): revenue → less
   VAT → net revenue → less COGS → gross profit → less operating expenses (from the Expense
   table, by category) → net profit, with margins. New "กำไร-ขาดทุน (P&L)" tab on the Reports

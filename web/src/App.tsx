@@ -30,6 +30,7 @@ const Promotions = lazy(() => import('./pages/back/Promotions'));
 const Shifts = lazy(() => import('./pages/back/Shifts'));
 const Expenses = lazy(() => import('./pages/back/Expenses'));
 const Payables = lazy(() => import('./pages/back/Payables'));
+const TaxInvoices = lazy(() => import('./pages/back/TaxInvoices'));
 const Labels = lazy(() => import('./pages/back/Labels'));
 const GiftCards = lazy(() => import('./pages/back/GiftCards'));
 const Quotations = lazy(() => import('./pages/back/Quotations'));
@@ -117,6 +118,7 @@ export default function App() {
           <Route path="shifts" element={<Shifts />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="payables" element={<Payables />} />
+          <Route path="tax-invoices" element={<TaxInvoices />} />
           <Route path="labels" element={<Labels />} />
           <Route path="gift-cards" element={<GiftCards />} />
           <Route path="quotations" element={<Quotations />} />

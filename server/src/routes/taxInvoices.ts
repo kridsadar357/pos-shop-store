@@ -7,6 +7,37 @@ import { nextSeq } from '../lib/stock.js';
 export const taxInvoicesRouter = Router();
 taxInvoicesRouter.use(requireAuth);
 
+const num = (d: unknown) => Number(d ?? 0);
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// Tax-invoice register (for VAT filing): all issued invoices with VAT base/amount.
+taxInvoicesRouter.get(
+  '/',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const from = req.query.from ? new Date(String(req.query.from)) : undefined;
+    const to = req.query.to ? new Date(String(req.query.to)) : undefined;
+    const setting = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
+    const rate = num(setting.taxRatePct);
+    const rows = await prisma.taxInvoice.findMany({
+      where: { issuedAt: { gte: from, lte: to } },
+      orderBy: { id: 'desc' },
+      take: 1000,
+      include: { sale: { select: { orderNo: true, total: true } } },
+    });
+    res.json(rows.map((t) => {
+      const total = num(t.sale?.total);
+      const base = round2(total / (1 + rate / 100));
+      const vat = round2(total - base);
+      return {
+        id: t.id, number: t.number, issuedAt: t.issuedAt, orderNo: t.sale?.orderNo ?? '',
+        buyerName: t.buyerName, buyerTaxId: t.buyerTaxId, buyerBranch: t.buyerBranch,
+        base, vat, total: round2(total),
+      };
+    }));
+  })
+);
+
 // Fetch the tax invoice for a sale (404 if none issued yet).
 taxInvoicesRouter.get(
   '/sale/:saleId',
