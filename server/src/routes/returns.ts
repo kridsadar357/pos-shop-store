@@ -4,6 +4,7 @@ import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
 import { postGift } from '../lib/giftcard.js';
+import { computeRefund } from '../lib/refundCalc.js';
 
 export const returnsRouter = Router();
 returnsRouter.use(requireAuth);
@@ -99,9 +100,9 @@ returnsRouter.post(
 
       const gross = round2(lines.reduce((s, l) => s + l.lineTotal, 0));
       // Prorate any bill-level discount, then derive tax from the refund total.
-      const ratio = Number(sale.subtotal) > 0 ? Number(sale.total) / Number(sale.subtotal) : 1;
-      const refundTotal = round2(gross * ratio);
-      const taxAmount = setting.taxInclusive ? round2(refundTotal - refundTotal / (1 + rate / 100)) : round2(gross * (rate / 100));
+      const { refundTotal, taxAmount } = computeRefund({
+        gross, saleTotal: Number(sale.total), saleSubtotal: Number(sale.subtotal), taxRate: rate, taxInclusive: setting.taxInclusive,
+      });
 
       const seq = await nextSeq(tx, 'return');
       const ret = await tx.return.create({
