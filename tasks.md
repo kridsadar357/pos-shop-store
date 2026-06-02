@@ -199,8 +199,9 @@ is already branch-correct).
   `npm --prefix server test`. Plus **integration tests** (`npm run test:integration`, 3 tests)
   that exercise the real `postMovement` stock chokepoint + batch FEFO against Postgres via a
   transaction-rollback harness (zero residue). GitHub Actions (`.github/workflows/ci.yml`):
-  install → prisma generate → unit test → typecheck-build server + web. (DB-backed integration
-  run in CI + e2e still to expand.)
+  install → prisma generate → **migrate deploy on a Postgres service** → unit test → **integration
+  test** → typecheck-build server + web. Root `npm test` / `npm run test:integration`. (e2e still
+  to expand.)
 
 ## 9. Smaller polish / known stubs
 - ⬜ Sidebar "เปลี่ยนสาขา" — currently a "coming soon" toast (see §1)

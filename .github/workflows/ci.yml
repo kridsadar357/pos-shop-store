@@ -8,6 +8,20 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://pos:pos@localhost:5432/posdb_test?schema=public
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pos
+          POSTGRES_PASSWORD: pos
+          POSTGRES_DB: posdb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pos -d posdb_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -24,8 +38,15 @@ jobs:
       - name: Generate Prisma client
         run: npm --prefix server run generate
 
+      - name: Apply migrations (test DB)
+        run: npx prisma migrate deploy
+        working-directory: server
+
       - name: Server unit tests
         run: npm --prefix server test
+
+      - name: Server integration tests
+        run: npm --prefix server run test:integration
 
       - name: Server typecheck / build
         run: npm --prefix server run build
