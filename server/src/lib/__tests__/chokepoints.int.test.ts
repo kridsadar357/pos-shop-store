@@ -3,6 +3,7 @@ import { prisma } from '../../prisma.js';
 import { postPoints } from '../loyalty.js';
 import { postGift } from '../giftcard.js';
 import { nextSeq } from '../stock.js';
+import { registerSerials, consumeSerials, releaseSerials } from '../serial.js';
 
 /**
  * Integration tests for the remaining DB-mutation chokepoints (loyalty points,
@@ -57,6 +58,34 @@ describe('postGift (integration)', () => {
     });
     expect(r.balance).toBe(380);
     expect(r.blocked).toBe(true);
+  });
+});
+
+describe('serials consume/release (integration)', () => {
+  it('marks scanned units SOLD against a sale and releases them back IN_STOCK on void', async () => {
+    const r = await inRolledBackTx(async (tx) => {
+      const prod = await tx.product.create({ data: { sku: `SER-${uniq()}`, name: 'SerTest', cost: 10, retailPrice: 20, trackSerials: true } });
+      await registerSerials(tx, { productId: prod.id, branchId: null, serials: ['A1', 'A2', 'A3'], ref: 'seed' });
+      const consumed = await consumeSerials(tx, { productId: prod.id, saleId: 999, serials: ['A1', 'A2'], soldAt: new Date() });
+      const sold = await tx.productSerial.count({ where: { productId: prod.id, status: 'SOLD' } });
+      const released = await releaseSerials(tx, 999);
+      const inStock = await tx.productSerial.count({ where: { productId: prod.id, status: 'IN_STOCK' } });
+      return { consumed, sold, released, inStock };
+    });
+    expect(r.consumed).toBe(2);
+    expect(r.sold).toBe(2);
+    expect(r.released).toBe(2);
+    expect(r.inStock).toBe(3); // all back in stock after void
+  });
+
+  it('rejects an unknown serial (rolls the sale back)', async () => {
+    await expect(
+      inRolledBackTx(async (tx) => {
+        const prod = await tx.product.create({ data: { sku: `SER-${uniq()}`, name: 'SerTest2', cost: 10, retailPrice: 20, trackSerials: true } });
+        await registerSerials(tx, { productId: prod.id, branchId: null, serials: ['B1'], ref: 'seed' });
+        await consumeSerials(tx, { productId: prod.id, saleId: 1, serials: ['NOPE'], soldAt: new Date() });
+      })
+    ).rejects.toThrow();
   });
 });
 

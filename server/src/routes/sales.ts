@@ -5,6 +5,7 @@ import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
 import { postPoints } from '../lib/loyalty.js';
 import { postGift } from '../lib/giftcard.js';
+import { consumeSerials, releaseSerials } from '../lib/serial.js';
 import { computeTenderPlan } from '../lib/tender.js';
 import { computeRedeem, computeEarn } from '../lib/loyaltyCalc.js';
 import { computeSaleLines } from '../lib/salePricing.js';
@@ -30,7 +31,7 @@ const checkoutSchema = z.object({
     .array(z.object({ method: z.enum(['CASH', 'TRANSFER', 'CARD', 'CREDIT', 'GIFT']), amount: z.number().positive(), reference: z.string().default('') }))
     .optional(),
   items: z
-    .array(z.object({ productId: z.number().int(), qty: z.number().int().positive() }))
+    .array(z.object({ productId: z.number().int(), qty: z.number().int().positive(), serials: z.array(z.string()).optional() }))
     .min(1),
 });
 
@@ -181,6 +182,15 @@ salesRouter.post(
         });
       }
 
+      // Serial-tracked lines: mark the scanned units SOLD against this sale.
+      // Validated against IN_STOCK serials — a bad/duplicate serial rolls the sale back.
+      const soldAt = created.createdAt;
+      for (const item of data.items) {
+        if (item.serials?.length) {
+          await consumeSerials(tx, { productId: item.productId, saleId: created.id, serials: item.serials, soldAt });
+        }
+      }
+
       // Gift-card tenders: validate the card and deduct its balance (the GIFT row's
       // reference carries the card code). Throws → whole checkout rolls back.
       for (const row of paymentRows) {
@@ -316,6 +326,9 @@ salesRouter.post(
           branchId: sale.branchId,
         });
       }
+
+      // Return any serial-tracked units sold on this bill back to IN_STOCK.
+      await releaseSerials(tx, sale.id);
 
       // Reverse loyalty points: refund redeemed points, claw back earned points
       // (clamped so the balance can't go negative if the member already spent them).

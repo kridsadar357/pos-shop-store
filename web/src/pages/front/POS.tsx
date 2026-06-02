@@ -21,7 +21,7 @@ import { th } from '../../lib/th';
 import { createPublisher, type DisplayState } from '../../lib/display';
 import type { Category, HeldBill, Member, Product, Sale, Setting } from '../../types';
 
-interface Line { product: Product; qty: number; }
+interface Line { product: Product; qty: number; serials?: string; }
 type PayKey = 'CASH' | 'TRANSFER' | 'CARD' | 'QR' | 'CREDIT';
 
 const PAGE_SIZE = 24;
@@ -158,6 +158,10 @@ export default function POS() {
     if (qty <= 0) return setLines((prev) => prev.filter((l) => l.product.id !== id));
     setLines((prev) => prev.map((l) => (l.product.id === id ? { ...l, qty } : l)));
   }
+  function setSerials(id: number, serials: string) {
+    setLines((prev) => prev.map((l) => (l.product.id === id ? { ...l, serials } : l)));
+  }
+  const parseSerials = (s?: string) => (s ?? '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
   function clearCart() { setLines([]); setMember(null); setDiscount(0); setRedeemPts(0); setCashReceived(0); setCoupon(''); setPromo({ promoDiscount: 0, applied: [] }); }
 
   // Live promotion preview whenever the cart / coupon / pricing context changes.
@@ -233,6 +237,9 @@ export default function POS() {
 
   // ---- checkout ----
   async function completeSale(method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT' | 'GIFT', ref = '', payments?: { method: string; amount: number; reference?: string }[]) {
+    // Serial-tracked lines: if the cashier captured serials, the count must match qty.
+    const badSerial = lines.find((l) => l.product.trackSerials && parseSerials(l.serials).length > 0 && parseSerials(l.serials).length !== l.qty);
+    if (badSerial) { toast.error(`จำนวนซีเรียลของ "${badSerial.product.name}" ไม่ตรงกับจำนวน (${parseSerials(badSerial.serials).length}/${badSerial.qty})`); return; }
     try {
       const sale = await api<Sale>('/sales', {
         method: 'POST',
@@ -241,7 +248,7 @@ export default function POS() {
           cashReceived: method === 'CASH' ? cashReceived : 0,
           paymentRef: ref, memberId: member?.id ?? null, pointsRedeem: totals.usePts, branchId: useBranch.getState().activeId ?? undefined,
           ...(payments ? { payments } : {}),
-          items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
+          items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, ...(l.product.trackSerials && parseSerials(l.serials).length ? { serials: parseSerials(l.serials) } : {}) })),
         },
       });
       publisher.current?.publish({ ...baseDisplay(), status: 'PAID', orderNo: sale.orderNo, paymentMethod: method === 'CASH' ? 'CASH' : 'TRANSFER', change: num(sale.changeDue), cashReceived: num(sale.cashReceived) });
@@ -610,6 +617,21 @@ export default function POS() {
                           <td className="px-1 py-2 text-right text-[13px]">{num(price).toFixed(2)}</td>
                           <td className="px-2 py-2 text-right text-[13px] font-bold">{(price * l.qty).toFixed(2)}</td>
                           <td className="pr-1 text-right"><button className="text-slate-300 hover:text-rose-500" onClick={() => setQty(l.product.id, 0)}>✕</button></td>
+                        </tr>
+                      );
+                    })}
+                    {lines.filter((l) => l.product.trackSerials).map((l) => {
+                      const n = parseSerials(l.serials).length;
+                      const ok = n === l.qty;
+                      return (
+                        <tr key={`sn-${l.product.id}`} className="border-t border-slate-100 bg-slate-50/60">
+                          <td colSpan={5} className="px-2 py-1.5">
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-indigo-600">
+                              <i className="fa-solid fa-barcode" />ซีเรียล · {l.product.name}
+                              <span className={n === 0 ? 'text-slate-400' : ok ? 'text-emerald-600' : 'text-rose-500'}>({n}/{l.qty})</span>
+                            </div>
+                            <textarea rows={1} className="mt-1 w-full resize-none rounded-md bg-white px-2 py-1 text-[11px] ring-1 ring-slate-200 outline-none focus:ring-indigo-300" placeholder="สแกน/พิมพ์ซีเรียล (บรรทัด/คอมมา)…" value={l.serials ?? ''} onChange={(e) => setSerials(l.product.id, e.target.value)} />
+                          </td>
                         </tr>
                       );
                     })}

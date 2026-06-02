@@ -75,16 +75,16 @@ is already branch-correct).
   and records **opening/manual batches** (no stock movement) for pre-existing stock; "ใกล้หมดอายุ"
   report (also surfaced in the topbar notification bell as near-expiry/expired alerts).
   Verified FEFO + report + opening-count end-to-end
-- 🟨 Serial-number tracking — opt-in per product (`Product.trackSerials`). `ProductSerial`
-  (per-unit serialNo + status IN_STOCK/SOLD/RETURNED + receipt ref). **Phase 1**: serials are
+- ✅ Serial-number tracking — opt-in per product (`Product.trackSerials`). `ProductSerial`
+  (per-unit serialNo + status IN_STOCK/SOLD/RETURNED + receipt/sale ref). Serials are
   scanned-in on **both receiving paths** — the inventory Receive page AND PO receiving
-  (PO detail receive modal serials textarea per serialized line → `registerSerials`),
-  registered manually for opening stock, looked up + status-managed in the product editor.
-  **Serial / warranty lookup** (back-office `/back/serials` page): cross-product search by
-  serial number or product name/SKU + status filter, resolves the sale order no. for sold
-  units (`GET /products/serials/search`); exportable. Phase 2 remaining: auto-consume serials
-  at POS checkout (capture/scan the sold unit, set status SOLD + saleId). No checkout changes
-  yet, so nothing breaks.
+  (per-serialized-line textarea → `registerSerials`), registered manually for opening stock,
+  looked up + status-managed in the product editor. **Serial / warranty lookup** (`/back/serials`):
+  cross-product search by serial or product name/SKU + status filter, resolves the sale order no.
+  (`GET /products/serials/search`); exportable. **POS checkout consume**: serialized cart lines
+  capture serials (count must match qty), `consumeSerials` marks them SOLD + saleId in the sale
+  tx (bad/duplicate serial rolls the whole sale back); voiding a sale `releaseSerials` back to
+  IN_STOCK. Covered by integration tests (consume/release + reject-unknown).
 
 ## 4. Sales & customer features
 - ✅ Member purchase history + lifetime value — `GET /api/members/:id/sales` returns the
