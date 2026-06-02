@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Modal } from '../../components/Modal';
@@ -23,6 +23,9 @@ export default function Members() {
   const [pointsFor, setPointsFor] = useState<Member | null>(null);
   const [historyFor, setHistoryFor] = useState<Member | null>(null);
 
+  const importRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+
   async function load() {
     setMembers(await api<Member[]>('/members', { query: { q } }));
   }
@@ -30,6 +33,30 @@ export default function Members() {
     const t = setTimeout(load, 150);
     return () => clearTimeout(t);
   }, [q]);
+
+  async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImporting(true);
+    try {
+      const XLSX = await import('xlsx');
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      if (!rows.length) { toast.error('ไฟล์ว่างเปล่า'); return; }
+      const res = await api<{ created: number; updated: number; errors: { row: number; error: string }[]; total: number }>(
+        '/members/import', { method: 'POST', body: { rows } }
+      );
+      const errMsg = res.errors.length ? ` · ผิดพลาด ${res.errors.length}` : '';
+      toast.success(`นำเข้าสำเร็จ: เพิ่ม ${res.created} · แก้ไข ${res.updated}${errMsg}`);
+      if (res.errors.length) console.warn('Member import errors:', res.errors);
+      load();
+    } catch (err) {
+      toast.error('นำเข้าไม่สำเร็จ: ' + (err as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  }
 
   function openNew() {
     setEditing(null);
@@ -82,7 +109,15 @@ export default function Members() {
         subtitle="สมาชิกสะสมแต้ม · มีสิทธิ์ได้ราคาส่ง (ตั้งค่าได้ในหน้าตั้งค่า)"
         icon={<i className="fa-solid fa-users" />}
         q={q} setQ={setQ} placeholder="ค้นหาชื่อ / เบอร์โทร / รหัส…"
-        primary={<button className="btn-primary" onClick={openNew}><i className="fa-solid fa-plus mr-1.5" />เพิ่มสมาชิก</button>}
+        primary={
+          <div className="flex gap-2">
+            <input ref={importRef} type="file" accept=".csv,.xlsx,.xls,text/csv" className="hidden" onChange={onImportFile} />
+            <button className="btn-ghost" disabled={importing} onClick={() => importRef.current?.click()} title="นำเข้าจาก CSV/Excel (คอลัมน์: phone, name, code, email, note)">
+              <i className="fa-solid fa-file-import mr-1.5" />{importing ? 'กำลังนำเข้า…' : 'นำเข้า'}
+            </button>
+            <button className="btn-primary" onClick={openNew}><i className="fa-solid fa-plus mr-1.5" />เพิ่มสมาชิก</button>
+          </div>
+        }
         exports={exporters}
         filterCount={filterCount}
         onResetFilter={() => { setStatusFilter(''); setEmailFilter(''); }}

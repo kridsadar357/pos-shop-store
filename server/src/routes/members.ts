@@ -120,3 +120,44 @@ membersRouter.put(
     res.json(member);
   })
 );
+
+// Bulk import members from a parsed CSV/Excel. Upserts by phone (the natural key);
+// the loyalty points balance is never touched (managed by the points ledger).
+// Coerce numbers/blanks to a trimmed string, but treat a missing value as empty
+// (NOT the literal "undefined") so required-field validation actually rejects it.
+const str = (min = 0) => z.preprocess((v) => (v == null ? '' : String(v)).trim(), min ? z.string().min(min) : z.string());
+const importRow = z.object({
+  phone: str(1),
+  name: str(1),
+  code: str(),
+  email: str(),
+  note: str(),
+});
+membersRouter.post(
+  '/import',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const rows = z.array(z.record(z.any())).max(5000).parse(req.body?.rows);
+    let created = 0, updated = 0;
+    const errors: { row: number; phone?: string; error: string }[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const parsed = importRow.safeParse(rows[i]);
+      if (!parsed.success) { errors.push({ row: i + 1, phone: String(rows[i]?.phone ?? ''), error: parsed.error.issues[0]?.message ?? 'invalid' }); continue; }
+      const r = parsed.data;
+      try {
+        const fields = {
+          name: r.name,
+          ...(r.code ? { code: r.code } : {}),
+          ...(r.email != null ? { email: r.email } : {}),
+          ...(r.note != null ? { note: r.note } : {}),
+        };
+        const existing = await prisma.member.findUnique({ where: { phone: r.phone }, select: { id: true } });
+        await prisma.member.upsert({ where: { phone: r.phone }, create: { phone: r.phone, ...fields }, update: fields });
+        if (existing) updated++; else created++;
+      } catch (e) {
+        errors.push({ row: i + 1, phone: r.phone, error: (e as Error).message.split('\n')[0] });
+      }
+    }
+    res.json({ created, updated, errors, total: rows.length });
+  })
+);

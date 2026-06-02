@@ -90,6 +90,10 @@ is already branch-correct).
 - ✅ Member purchase history + lifetime value — `GET /api/members/:id/sales` returns the
   member's bills + stats (orders, total spent, avg, last visit); "ประวัติ" modal on the
   Members page shows the history table + KPI tiles (CRM)
+- ✅ Bulk member import (CSV/Excel) — `POST /api/members/import` upserts by phone (the natural
+  key; numeric phones coerced to string, missing phone/name rejected per row), never touches
+  points. Members page "นำเข้า" button parses the file via lazy `xlsx`. Columns: phone, name,
+  code, email, note. Mirrors the product import
 - ✅ Loyalty points: accrual + redemption — `Member.points` + `PointTransaction`
   ledger via a single `postPoints()` chokepoint; earn on the net total and redeem
   points as a bill discount at the POS (capped by balance + bill room); voids
