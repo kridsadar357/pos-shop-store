@@ -80,8 +80,11 @@ is already branch-correct).
   scanned-in on **both receiving paths** — the inventory Receive page AND PO receiving
   (PO detail receive modal serials textarea per serialized line → `registerSerials`),
   registered manually for opening stock, looked up + status-managed in the product editor.
-  Phase 2 (TODO): auto-consume serials at POS checkout (capture/scan the sold unit) + a serial
-  history/warranty lookup report. No checkout changes yet, so nothing breaks.
+  **Serial / warranty lookup** (back-office `/back/serials` page): cross-product search by
+  serial number or product name/SKU + status filter, resolves the sale order no. for sold
+  units (`GET /products/serials/search`); exportable. Phase 2 remaining: auto-consume serials
+  at POS checkout (capture/scan the sold unit, set status SOLD + saleId). No checkout changes
+  yet, so nothing breaks.
 
 ## 4. Sales & customer features
 - ✅ Member purchase history + lifetime value — `GET /api/members/:id/sales` returns the

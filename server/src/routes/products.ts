@@ -337,6 +337,38 @@ productsRouter.get(
   })
 );
 
+// Cross-product serial lookup (warranty desk / serial report). Search by serial
+// number or product name/sku, optionally filter by status. Resolves the sale
+// order number for sold units.
+productsRouter.get(
+  '/serials/search',
+  ah(async (req, res) => {
+    const q = String(req.query.q || '').trim();
+    const status = req.query.status ? String(req.query.status) : undefined;
+    const serials = await prisma.productSerial.findMany({
+      where: {
+        ...(status ? { status } : {}),
+        ...(q
+          ? { OR: [
+              { serialNo: { contains: q, mode: 'insensitive' } },
+              { product: { is: { name: { contains: q, mode: 'insensitive' } } } },
+              { product: { is: { sku: { contains: q, mode: 'insensitive' } } } },
+            ] }
+          : {}),
+      },
+      include: { product: { select: { name: true, sku: true } } },
+      orderBy: [{ id: 'desc' }],
+      take: 300,
+    });
+    const saleIds = [...new Set(serials.map((s) => s.saleId).filter((x): x is number => x != null))];
+    const sales = saleIds.length
+      ? await prisma.sale.findMany({ where: { id: { in: saleIds } }, select: { id: true, orderNo: true } })
+      : [];
+    const orderNoById = new Map(sales.map((s) => [s.id, s.orderNo]));
+    res.json(serials.map((s) => ({ ...s, orderNo: s.saleId != null ? orderNoById.get(s.saleId) ?? null : null })));
+  })
+);
+
 // Manually register serial numbers (e.g. opening stock or correction).
 productsRouter.post(
   '/:id/serials',

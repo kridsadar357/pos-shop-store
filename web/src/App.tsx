@@ -21,6 +21,7 @@ const PurchaseOrders = lazy(() => import('./pages/back/PurchaseOrders'));
 const Transfers = lazy(() => import('./pages/back/Transfers'));
 const StockCount = lazy(() => import('./pages/back/StockCount'));
 const Movements = lazy(() => import('./pages/back/Movements'));
+const Serials = lazy(() => import('./pages/back/Serials'));
 const Reports = lazy(() => import('./pages/back/Reports'));
 const Sales = lazy(() => import('./pages/back/Sales'));
 const Returns = lazy(() => import('./pages/back/Returns'));
@@ -123,6 +124,7 @@ export default function App() {
           <Route path="gift-cards" element={<GiftCards />} />
           <Route path="quotations" element={<Quotations />} />
           <Route path="layaways" element={<Layaways />} />
+          <Route path="serials" element={<Serials />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
           <Route path="branches" element={<Branches />} />
