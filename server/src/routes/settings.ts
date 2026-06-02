@@ -79,6 +79,10 @@ const schema = z.object({
   smtpUser: z.string().default(''),
   smtpPass: z.string().default(''),
   smtpFrom: z.string().default(''),
+  // Scheduled daily report email (reportEmailLastSent is internal — not settable here).
+  reportEmailEnabled: z.boolean().default(false),
+  reportEmailTo: z.string().default(''),
+  reportEmailHour: z.number().int().min(0).max(23).default(8),
 });
 
 settingsRouter.put(

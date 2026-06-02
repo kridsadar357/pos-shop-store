@@ -124,6 +124,12 @@ model Setting {
   smtpPass   String  @default("")
   smtpFrom   String  @default("")     // From: header (falls back to "storeName <smtpUser>")
 
+  // Scheduled daily sales-summary email
+  reportEmailEnabled  Boolean @default(false)
+  reportEmailTo       String  @default("")
+  reportEmailHour     Int     @default(8)   // local hour (0–23) to send the prior day's summary
+  reportEmailLastSent String  @default("")  // internal: YYYY-MM-DD of the last successful send
+
   // First-run setup wizard
   setupCompleted Boolean      @default(false)
 

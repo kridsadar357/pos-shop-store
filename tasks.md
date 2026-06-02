@@ -158,7 +158,13 @@ is already branch-correct).
   VAT → net revenue → less COGS → gross profit → less operating expenses (from the Expense
   table, by category) → net profit, with margins. New "กำไร-ขาดทุน (P&L)" tab on the Reports
   page (statement view + KPIs + CSV export). Ties sales and expenses into the bottom line
-- ⬜ Scheduled / emailed reports
+- ✅ Scheduled / emailed reports — daily sales-summary email. `computeDailySummary` (orders,
+  revenue, cost, tax, gross profit, expenses, by-method, top-5 items) + pure `buildDailySummaryEmail`
+  (HTML+text, escaped, unit-tested). `POST /reports/email-daily` {to?, date?} sends on demand;
+  an in-process scheduler (`startReportScheduler`, started in index.ts) sends the prior day's
+  summary at `Setting.reportEmailHour` when `reportEmailEnabled` + `reportEmailTo` are set
+  (dedup via `reportEmailLastSent`; trigger logic `shouldSendDailyReport` is pure + unit-tested).
+  Settings "อีเมล (SMTP)" tab has the enable/recipient/hour controls + "ส่งสรุปวันนี้เลย" button.
 - ✅ Z-report / X-report end-of-day printout — printable `ShiftReport` (80mm, same
   print path as the receipt): X = mid-shift snapshot from the POS *More* menu, Z =
   end-of-day close report (offered after closing + reprintable per shift on the
@@ -204,7 +210,7 @@ is already branch-correct).
   (Postgres + app, `prisma migrate deploy` on start, uploads/pgdata volumes), `.dockerignore`,
   and `DEPLOY.md` (incl. reverse-proxy/HTTPS + WS notes). First run → /setup wizard.
   Verified end-to-end: `docker compose up` → migrations applied on a fresh DB → /health + SPA
-- 🟨 Automated tests + CI — Vitest in `server` (56 unit tests). Every money calc is a pure,
+- 🟨 Automated tests + CI — Vitest in `server` (62 unit tests). Every money calc is a pure,
   tested function: **POS sale line pricing + wholesale selection** (`lib/salePricing.ts`),
   **split-payment tender** (`lib/tender.ts`), **loyalty redeem/earn** (`lib/loyaltyCalc.ts`),
   **returns refund proration** (`lib/refundCalc.ts`), **quotation/layaway bill totals**

@@ -314,6 +314,8 @@ function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }
       const body: Record<string, unknown> = {
         smtpHost: s.smtpHost, smtpPort: num(s.smtpPort) || 587, smtpSecure: s.smtpSecure,
         smtpUser: s.smtpUser, smtpFrom: s.smtpFrom,
+        reportEmailEnabled: s.reportEmailEnabled, reportEmailTo: s.reportEmailTo,
+        reportEmailHour: Math.round(num(s.reportEmailHour)),
       };
       if (pass.trim()) body.smtpPass = pass.trim();
       const updated = await api<Setting>('/settings', { method: 'PUT', body });
@@ -326,6 +328,11 @@ function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }
     if (!to.trim()) return toast.error('กรอกอีเมลผู้รับสำหรับทดสอบ');
     setBusy(true);
     try { await api('/settings/email-test', { method: 'POST', body: { to: to.trim() } }); toast.success(`ส่งอีเมลทดสอบไปยัง ${to.trim()} แล้ว`); }
+    catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
+  async function sendReportNow() {
+    setBusy(true);
+    try { const r = await api<{ to: string }>('/reports/email-daily', { method: 'POST', body: {} }); toast.success(`ส่งสรุปยอดขายวันนี้ไปยัง ${r.to} แล้ว`); }
     catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
 
@@ -357,6 +364,21 @@ function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }
           <button className="btn-ghost" onClick={sendTest} disabled={busy}><i className="fa-solid fa-paper-plane mr-1.5" />ส่งทดสอบ</button>
         </div>
         <p className="mt-2 text-xs text-slate-400">บันทึกการตั้งค่าก่อนทดสอบ การส่งจะใช้ค่าที่บันทึกไว้ในระบบ</p>
+      </Section>
+
+      <Section title="สรุปยอดขายประจำวันอัตโนมัติ">
+        <label className="flex items-center justify-between rounded-xl bg-slate-50 p-3">
+          <div><div className="text-sm font-semibold">ส่งสรุปยอดขายทางอีเมลทุกวัน</div><div className="text-xs text-slate-400">ระบบจะส่งสรุปยอดขายของวันก่อนหน้าให้อัตโนมัติตามเวลาที่กำหนด</div></div>
+          <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={s.reportEmailEnabled} onChange={(e) => set({ reportEmailEnabled: e.target.checked })} />
+        </label>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <F label="อีเมลผู้รับรายงาน" className="col-span-2"><input type="email" className="input" placeholder="owner@example.com" value={s.reportEmailTo} onChange={(e) => set({ reportEmailTo: e.target.value })} /></F>
+          <F label="เวลาส่ง (ชั่วโมง 0–23)"><input type="number" min={0} max={23} className="input" value={s.reportEmailHour} onChange={(e) => set({ reportEmailHour: Number(e.target.value) })} /></F>
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <button className="btn-primary" onClick={saveEmail} disabled={busy}>บันทึก</button>
+          <button className="btn-ghost" onClick={sendReportNow} disabled={busy}><i className="fa-solid fa-chart-line mr-1.5" />ส่งสรุปวันนี้เลย</button>
+        </div>
       </Section>
     </div>
   );

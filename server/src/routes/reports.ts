@@ -1,9 +1,22 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
+import { sendDailyReport, localDateStr } from '../lib/reportScheduler.js';
 
 export const reportsRouter = Router();
 reportsRouter.use(requireAuth, requireRole('ADMIN', 'MANAGER'));
+
+// --- Email a day's sales summary on demand (also previews the scheduled report) ---
+reportsRouter.post(
+  '/email-daily',
+  ah(async (req, res) => {
+    const { to, date } = z.object({ to: z.string().email().optional(), date: z.string().optional() }).parse(req.body);
+    const dateStr = date || localDateStr(new Date());
+    const result = await sendDailyReport(prisma, dateStr, to);
+    res.json({ ok: true, ...result, date: dateStr });
+  })
+);
 
 function range(req: { query: Record<string, unknown> }) {
   const from = req.query.from ? new Date(String(req.query.from)) : new Date(Date.now() - 30 * 864e5);

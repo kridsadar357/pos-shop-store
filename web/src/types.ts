@@ -61,6 +61,9 @@ export interface Setting {
   smtpUser: string;
   smtpFrom: string;
   smtpPassSet?: boolean;
+  reportEmailEnabled: boolean;
+  reportEmailTo: string;
+  reportEmailHour: number;
   setupCompleted: boolean;
 }
 
