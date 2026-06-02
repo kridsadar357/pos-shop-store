@@ -55,6 +55,12 @@ export interface Setting {
   managerPages: string;
   secondaryCurrency: string;
   secondaryRate: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string;
+  smtpFrom: string;
+  smtpPassSet?: boolean;
   setupCompleted: boolean;
 }
 

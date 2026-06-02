@@ -6,6 +6,8 @@ import { nextSeq, postMovement } from '../lib/stock.js';
 import { postPoints } from '../lib/loyalty.js';
 import { postGift } from '../lib/giftcard.js';
 import { consumeSerials, releaseSerials } from '../lib/serial.js';
+import { buildReceiptEmail } from '../lib/receiptEmail.js';
+import { sendMail } from '../lib/mailer.js';
 import { computeTenderPlan } from '../lib/tender.js';
 import { computeRedeem, computeEarn } from '../lib/loyaltyCalc.js';
 import { computeSaleLines } from '../lib/salePricing.js';
@@ -299,6 +301,31 @@ salesRouter.get(
     });
     if (!sale) return res.status(404).json({ error: 'Not found' });
     res.json(sale);
+  })
+);
+
+// Email a receipt for a sale to a customer. Uses the store's configured SMTP.
+salesRouter.post(
+  '/:id/email',
+  ah(async (req, res) => {
+    const { to } = z.object({ to: z.string().email('อีเมลไม่ถูกต้อง') }).parse(req.body);
+    const [sale, setting] = await Promise.all([
+      prisma.sale.findUnique({ where: { id: Number(req.params.id) }, include: { items: true, payments: true } }),
+      prisma.setting.findUniqueOrThrow({ where: { id: 1 } }),
+    ]);
+    if (!sale) return res.status(404).json({ error: 'Not found' });
+    const msg = buildReceiptEmail(sale, {
+      storeName: setting.storeName, address: setting.address, phone: setting.phone,
+      taxId: setting.taxId, currency: setting.currency, receiptFooter: setting.receiptFooter,
+    });
+    const { messageId } = await sendMail(
+      {
+        smtpHost: setting.smtpHost, smtpPort: setting.smtpPort, smtpSecure: setting.smtpSecure,
+        smtpUser: setting.smtpUser, smtpPass: setting.smtpPass, smtpFrom: setting.smtpFrom, storeName: setting.storeName,
+      },
+      { to, ...msg }
+    );
+    res.json({ ok: true, to, messageId });
   })
 );
 

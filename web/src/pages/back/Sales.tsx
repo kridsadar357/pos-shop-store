@@ -52,6 +52,15 @@ export default function Sales() {
     } catch (e) { toast.error((e as Error).message); }
   }
 
+  async function emailSale(sale: Sale) {
+    const to = prompt('ส่งใบเสร็จไปยังอีเมล:', '')?.trim();
+    if (!to) return;
+    try {
+      await api(`/sales/${sale.id}/email`, { method: 'POST', body: { to } });
+      toast.success(`ส่งใบเสร็จไปยัง ${to} แล้ว`);
+    } catch (e) { toast.error((e as Error).message); }
+  }
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return sales.filter((s) =>
@@ -192,6 +201,7 @@ export default function Sales() {
             {detail.status === 'PAID' && (
               <button className="btn-ghost flex-1 text-sky-600" onClick={() => { setTaxFor(detail); setDetail(null); }}><i className="fa-solid fa-file-invoice mr-1.5" />ใบกำกับภาษี</button>
             )}
+            <button className="btn-ghost flex-1 text-emerald-600" onClick={() => emailSale(detail)}><i className="fa-solid fa-envelope mr-1.5" />อีเมล</button>
             <button className="btn-primary flex-1" onClick={() => { doPrint(detail); setDetail(null); }}><i className="fa-solid fa-print mr-1.5" />พิมพ์ใบเสร็จ</button>
           </div>
         </Modal>

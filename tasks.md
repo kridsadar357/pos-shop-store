@@ -119,7 +119,12 @@ is already branch-correct).
   modal (code + amount, validated & deducted server-side); voids refund the card.
   Split-aware everywhere (byMethod, reports, receipt). Also a **refund option**: a return
   with refund method GIFT issues a new store-credit card (`RC-xxxxxx`) loaded with the refund
-- ⬜ Email / SMS / LINE receipt delivery
+- 🟨 Email / SMS / LINE receipt delivery — **Email done**: SMTP settings on `Setting`
+  (host/port/secure/user/pass/from; password redacted from GET, `smtpPassSet` flag, empty
+  pass on PUT keeps existing), `lib/mailer.ts` (nodemailer, throws 400 if unconfigured),
+  pure `lib/receiptEmail.ts` (HTML + text + subject, HTML-escaped, unit-tested), `POST
+  /sales/:id/email` emails a receipt, `POST /settings/email-test` sends a test. Settings
+  "อีเมล (SMTP)" tab + "อีเมล" button on the Sales bill detail. SMS/LINE still pending.
 
 ## 5. Finance & accounting
 - ✅ Petty cash / cash in-out during a shift — `CashMovement` model + POS drawer
@@ -199,7 +204,7 @@ is already branch-correct).
   (Postgres + app, `prisma migrate deploy` on start, uploads/pgdata volumes), `.dockerignore`,
   and `DEPLOY.md` (incl. reverse-proxy/HTTPS + WS notes). First run → /setup wizard.
   Verified end-to-end: `docker compose up` → migrations applied on a fresh DB → /health + SPA
-- 🟨 Automated tests + CI — Vitest in `server` (47 unit tests). Every money calc is a pure,
+- 🟨 Automated tests + CI — Vitest in `server` (56 unit tests). Every money calc is a pure,
   tested function: **POS sale line pricing + wholesale selection** (`lib/salePricing.ts`),
   **split-payment tender** (`lib/tender.ts`), **loyalty redeem/earn** (`lib/loyaltyCalc.ts`),
   **returns refund proration** (`lib/refundCalc.ts`), **quotation/layaway bill totals**

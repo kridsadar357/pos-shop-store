@@ -116,6 +116,14 @@ model Setting {
   secondaryCurrency String    @default("")              // e.g. USD; empty = off
   secondaryRate     Decimal   @default(0) @db.Decimal(14, 4) // THB per 1 unit of the secondary currency
 
+  // Outgoing email (SMTP) — used for emailing receipts/documents. Empty host = off.
+  smtpHost   String  @default("")
+  smtpPort   Int     @default(587)
+  smtpSecure Boolean @default(false)  // true = implicit TLS (port 465)
+  smtpUser   String  @default("")
+  smtpPass   String  @default("")
+  smtpFrom   String  @default("")     // From: header (falls back to "storeName <smtpUser>")
+
   // First-run setup wizard
   setupCompleted Boolean      @default(false)
 

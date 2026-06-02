@@ -7,6 +7,7 @@ import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { buildPromptPayPayload, type PromptPayType } from '../lib/promptpay.js';
 import { resolvedSettings } from '../lib/branchSettings.js';
+import { sendMail } from '../lib/mailer.js';
 import { uploadsDir } from './products.js';
 
 export const settingsRouter = Router();
@@ -25,7 +26,9 @@ settingsRouter.get(
   '/',
   ah(async (_req, res) => {
     const setting = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
-    res.json(setting);
+    // Never expose the SMTP password; signal whether one is set instead.
+    const { smtpPass, ...safe } = setting;
+    res.json({ ...safe, smtpPassSet: !!smtpPass });
   })
 );
 
@@ -69,6 +72,13 @@ const schema = z.object({
   // Secondary display currency (approx. conversion).
   secondaryCurrency: z.string().default(''),
   secondaryRate: z.number().nonnegative().default(0),
+  // Outgoing email (SMTP).
+  smtpHost: z.string().default(''),
+  smtpPort: z.number().int().min(1).max(65535).default(587),
+  smtpSecure: z.boolean().default(false),
+  smtpUser: z.string().default(''),
+  smtpPass: z.string().default(''),
+  smtpFrom: z.string().default(''),
 });
 
 settingsRouter.put(
@@ -76,8 +86,31 @@ settingsRouter.put(
   requireRole('ADMIN', 'MANAGER'),
   ah(async (req, res) => {
     const data = schema.partial().parse(req.body);
+    // An empty smtpPass means "leave the stored password unchanged".
+    if (data.smtpPass === '') delete data.smtpPass;
     const setting = await prisma.setting.update({ where: { id: 1 }, data });
-    res.json(setting);
+    const { smtpPass, ...safe } = setting;
+    res.json({ ...safe, smtpPassSet: !!smtpPass });
+  })
+);
+
+// Send a test email to verify the SMTP configuration.
+settingsRouter.post(
+  '/email-test',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const { to } = z.object({ to: z.string().email('อีเมลไม่ถูกต้อง') }).parse(req.body);
+    const s = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
+    const { messageId } = await sendMail(
+      { smtpHost: s.smtpHost, smtpPort: s.smtpPort, smtpSecure: s.smtpSecure, smtpUser: s.smtpUser, smtpPass: s.smtpPass, smtpFrom: s.smtpFrom, storeName: s.storeName },
+      {
+        to,
+        subject: `ทดสอบอีเมลจาก ${s.storeName}`,
+        html: `<p>นี่คืออีเมลทดสอบจากระบบ POS ของ <b>${s.storeName}</b> — การตั้งค่า SMTP ใช้งานได้แล้ว ✓</p>`,
+        text: `อีเมลทดสอบจาก ${s.storeName} — การตั้งค่า SMTP ใช้งานได้แล้ว`,
+      }
+    );
+    res.json({ ok: true, to, messageId });
   })
 );
 

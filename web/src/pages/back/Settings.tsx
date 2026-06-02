@@ -9,11 +9,12 @@ import { toast } from '../../components/Toast';
 import { money, num } from '../../lib/format';
 import type { LicenseState, Setting } from '../../types';
 
-type TabKey = 'general' | 'display' | 'printer' | 'license' | 'manual';
+type TabKey = 'general' | 'display' | 'printer' | 'email' | 'license' | 'manual';
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'general', label: 'ทั่วไป', icon: 'fa-gear' },
   { key: 'display', label: 'จอแสดงลูกค้า', icon: 'fa-display' },
   { key: 'printer', label: 'เครื่องพิมพ์ & ใบเสร็จ', icon: 'fa-print' },
+  { key: 'email', label: 'อีเมล (SMTP)', icon: 'fa-envelope' },
   { key: 'license', label: 'ไลเซนส์', icon: 'fa-key' },
   { key: 'manual', label: 'คู่มือใช้งาน', icon: 'fa-book-open' },
 ];
@@ -57,6 +58,7 @@ export default function Settings() {
       {tab === 'general' && <GeneralTab s={s} set={set} save={save} />}
       {tab === 'display' && <DisplayTab s={s} />}
       {tab === 'printer' && <PrinterTab s={s} set={set} save={save} setS={setS} />}
+      {tab === 'email' && <EmailTab s={s} set={set} />}
       {tab === 'license' && <LicenseTab />}
       {tab === 'manual' && <ManualTab />}
     </div>
@@ -296,6 +298,66 @@ function PrinterTab({ s, set, save, setS }: { s: Setting; set: (p: Partial<Setti
         </div>
         <p className="mt-2 text-center text-[11px] text-slate-400">กระดาษ {s.printerPaper}</p>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── Email (SMTP) ────────────────────── */
+function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }) {
+  const [pass, setPass] = useState('');
+  const [to, setTo] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function saveEmail() {
+    setBusy(true);
+    try {
+      const body: Record<string, unknown> = {
+        smtpHost: s.smtpHost, smtpPort: num(s.smtpPort) || 587, smtpSecure: s.smtpSecure,
+        smtpUser: s.smtpUser, smtpFrom: s.smtpFrom,
+      };
+      if (pass.trim()) body.smtpPass = pass.trim();
+      const updated = await api<Setting>('/settings', { method: 'PUT', body });
+      set({ smtpPassSet: updated.smtpPassSet });
+      setPass('');
+      toast.success('บันทึกการตั้งค่าอีเมลแล้ว');
+    } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
+  async function sendTest() {
+    if (!to.trim()) return toast.error('กรอกอีเมลผู้รับสำหรับทดสอบ');
+    setBusy(true);
+    try { await api('/settings/email-test', { method: 'POST', body: { to: to.trim() } }); toast.success(`ส่งอีเมลทดสอบไปยัง ${to.trim()} แล้ว`); }
+    catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="card max-w-2xl space-y-4 p-6">
+      <Section title="เซิร์ฟเวอร์อีเมลขาออก (SMTP)" first>
+        <p className="mb-3 text-xs text-slate-400"><i className="fa-solid fa-circle-info mr-1" />ใช้สำหรับส่งใบเสร็จทางอีเมลให้ลูกค้า เว้นว่าง “โฮสต์” เพื่อปิดการส่งอีเมล (เช่น Gmail ใช้ smtp.gmail.com พอร์ต 587 และรหัสผ่านแอป)</p>
+        <div className="grid grid-cols-2 gap-3">
+          <F label="โฮสต์ SMTP" className="col-span-2"><input className="input" placeholder="smtp.gmail.com" value={s.smtpHost} onChange={(e) => set({ smtpHost: e.target.value })} /></F>
+          <F label="พอร์ต"><input type="number" className="input" value={s.smtpPort || ''} onChange={(e) => set({ smtpPort: Number(e.target.value) })} /></F>
+          <F label="การเข้ารหัส">
+            <select className="input" value={s.smtpSecure ? '1' : '0'} onChange={(e) => set({ smtpSecure: e.target.value === '1' })}>
+              <option value="0">STARTTLS (พอร์ต 587)</option>
+              <option value="1">SSL/TLS (พอร์ต 465)</option>
+            </select>
+          </F>
+          <F label="ชื่อผู้ใช้ (อีเมล)" className="col-span-2"><input className="input" placeholder="you@gmail.com" value={s.smtpUser} onChange={(e) => set({ smtpUser: e.target.value })} /></F>
+          <F label={`รหัสผ่าน${s.smtpPassSet ? ' (ตั้งไว้แล้ว — เว้นว่างเพื่อคงเดิม)' : ''}`} className="col-span-2">
+            <input type="password" className="input" placeholder={s.smtpPassSet ? '••••••••' : 'รหัสผ่าน / App password'} value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="new-password" />
+          </F>
+          <F label="ชื่อผู้ส่ง (From) — เว้นว่างเพื่อใช้ชื่อร้าน" className="col-span-2"><input className="input" placeholder={`${s.storeName} <${s.smtpUser || 'you@example.com'}>`} value={s.smtpFrom} onChange={(e) => set({ smtpFrom: e.target.value })} /></F>
+        </div>
+        <button className="btn-primary mt-4 w-full" onClick={saveEmail} disabled={busy}>บันทึกการตั้งค่าอีเมล</button>
+      </Section>
+
+      <Section title="ทดสอบการส่ง">
+        <div className="flex items-end gap-2">
+          <F label="ส่งอีเมลทดสอบไปยัง" className="flex-1"><input type="email" className="input" placeholder="customer@example.com" value={to} onChange={(e) => setTo(e.target.value)} /></F>
+          <button className="btn-ghost" onClick={sendTest} disabled={busy}><i className="fa-solid fa-paper-plane mr-1.5" />ส่งทดสอบ</button>
+        </div>
+        <p className="mt-2 text-xs text-slate-400">บันทึกการตั้งค่าก่อนทดสอบ การส่งจะใช้ค่าที่บันทึกไว้ในระบบ</p>
+      </Section>
     </div>
   );
 }
