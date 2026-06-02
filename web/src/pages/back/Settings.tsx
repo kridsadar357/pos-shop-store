@@ -320,6 +320,11 @@ function LicenseTab() {
     try { await api('/license/demo', { method: 'POST' }); toast.success('เริ่มทดลองใช้แล้ว'); load(); }
     catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
+  async function revalidate() {
+    setBusy(true);
+    try { const r = await api<{ message: string }>('/license/revalidate', { method: 'POST' }); toast.success(r.message); load(); }
+    catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
 
   const STATUS: Record<string, { label: string; cls: string; icon: string }> = {
     ACTIVE: { label: 'เปิดใช้งานเต็มรูปแบบ', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', icon: 'fa-circle-check' },
@@ -342,6 +347,16 @@ function LicenseTab() {
             {lic?.plan && <div className="text-xs opacity-80">{lic.plan}</div>}
           </div>
         </div>
+
+        {lic?.status === 'ACTIVE' && (
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 text-sm ring-1 ring-slate-200">
+            <span className={lic.needsRevalidation ? 'font-semibold text-amber-600' : 'text-slate-500'}>
+              <i className="fa-solid fa-rotate mr-1.5" />
+              {lic.needsRevalidation ? `ควรตรวจสอบไลเซนส์ออนไลน์อีกครั้ง (ผ่านมา ${lic.daysSinceCheck} วัน)` : 'ไลเซนส์ได้รับการตรวจสอบล่าสุดแล้ว'}
+            </span>
+            <button className="btn-ghost py-1" disabled={busy} onClick={revalidate}>ตรวจสอบอีกครั้ง</button>
+          </div>
+        )}
 
         <Section title="เปิดใช้งานด้วยรหัสไลเซนส์" first>
           <div className="flex gap-2">

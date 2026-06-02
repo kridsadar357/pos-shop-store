@@ -65,6 +65,9 @@ export interface LicenseState {
   plan: string;
   key: string;
   demoDays: number;
+  needsRevalidation?: boolean;
+  withinGrace?: boolean;
+  daysSinceCheck?: number;
 }
 
 export interface Member {

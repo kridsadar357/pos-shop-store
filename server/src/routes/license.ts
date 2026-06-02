@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
-import { verifyLicense, computeLicenseState, DEMO_DAYS } from '../lib/license.js';
+import { verifyLicense, computeLicenseState, licenseHealth, DEMO_DAYS } from '../lib/license.js';
 
 export const licenseRouter = Router();
 
@@ -16,7 +16,7 @@ licenseRouter.get(
   ah(async (_req, res) => {
     const lic = await getLicense();
     const state = computeLicenseState(lic);
-    res.json({ ...state, plan: lic?.plan ?? '', key: lic?.key ?? '', demoDays: DEMO_DAYS });
+    res.json({ ...state, ...licenseHealth(lic), plan: lic?.plan ?? '', key: lic?.key ?? '', demoDays: DEMO_DAYS });
   })
 );
 
@@ -52,6 +52,32 @@ licenseRouter.post(
       },
     });
     res.json({ ...lic, ...computeLicenseState(lic), message: result.message });
+  })
+);
+
+// Re-validate an active license against the vendor. A definite "invalid" expires
+// it; an unreachable vendor keeps it valid (grace) so a network outage never locks
+// the shop out.
+licenseRouter.post(
+  '/revalidate',
+  ah(async (_req, res) => {
+    const lic = await getLicense();
+    if (!lic || lic.status !== 'ACTIVE' || !lic.key) return res.status(400).json({ error: 'ไม่มีไลเซนส์ที่เปิดใช้งานให้ตรวจสอบ' });
+    const result = await verifyLicense(lic.key);
+    if (result.ok) {
+      const updated = await prisma.license.update({
+        where: { id: 1 },
+        data: { expiresAt: result.expiresAt ?? lic.expiresAt, lastCheckedAt: new Date(), raw: result.raw, plan: result.plan || lic.plan, customer: result.customer || lic.customer },
+      });
+      return res.json({ ...updated, ...computeLicenseState(updated), ...licenseHealth(updated), revalidated: true, message: 'ตรวจสอบไลเซนส์สำเร็จ' });
+    }
+    // raw is non-empty when the vendor responded (a definite "invalid"); empty on a
+    // network/connection failure → keep the license valid within the grace window.
+    if (result.raw !== '') {
+      const updated = await prisma.license.update({ where: { id: 1 }, data: { status: 'EXPIRED', lastCheckedAt: new Date() } });
+      return res.json({ ...updated, ...computeLicenseState(updated), ...licenseHealth(updated), revalidated: false, message: result.message });
+    }
+    res.json({ ...lic, ...computeLicenseState(lic), ...licenseHealth(lic), revalidated: false, graceKept: true, message: 'ตรวจสอบออนไลน์ไม่ได้ — ใช้งานต่อได้ในช่วงผ่อนผัน' });
   })
 );
 

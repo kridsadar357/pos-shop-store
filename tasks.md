@@ -174,7 +174,11 @@ is already branch-correct).
   verifies current; available to every role from the back-office user menu and the POS
   More menu) + admin **reset password** per user on the Users page (PUT). (True
   forgot-password email flow still pending — no mail infra.)
-- ⬜ Online license re-validation + grace handling (currently activate/demo only)
+- ✅ Online license re-validation + grace — `POST /api/license/revalidate` re-checks an
+  ACTIVE license against the vendor: success updates expiry/lastCheckedAt; a definite "invalid"
+  expires it; an **unreachable vendor keeps it valid (grace)** so a network outage never locks
+  the shop out. `licenseHealth()` (pure, tested) reports needsRevalidation/withinGrace; the
+  License settings tab shows a re-check button + an overdue nudge
 
 ## 8. Platform / offline / PWA
 - 🟨 Offline POS — the customer display is an installable PWA, but the POS itself

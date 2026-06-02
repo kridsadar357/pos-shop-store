@@ -83,3 +83,20 @@ export function computeLicenseState(lic: LicenseRow | null) {
   const valid = status === 'ACTIVE' || status === 'DEMO';
   return { status, valid, daysLeft, expiresAt: lic.expiresAt };
 }
+
+export interface LicenseHealthRow { status: string; lastCheckedAt?: Date | null }
+
+/**
+ * Re-validation health for an ACTIVE (paid) license. We re-check the vendor
+ * periodically, but a network outage must NEVER lock the shop out — so this only
+ * reports whether a re-check is due (`needsRevalidation`) and whether we're still
+ * inside the grace window (`withinGrace`). DEMO licenses use expiry only.
+ */
+export function licenseHealth(lic: LicenseHealthRow | null, now: Date = new Date(), opts: { staleDays?: number; graceDays?: number } = {}) {
+  const staleDays = opts.staleDays ?? 7;
+  const graceDays = opts.graceDays ?? 30;
+  if (!lic || lic.status !== 'ACTIVE') return { daysSinceCheck: 0, needsRevalidation: false, withinGrace: true, graceDays };
+  const checked = lic.lastCheckedAt ? lic.lastCheckedAt.getTime() : 0;
+  const daysSinceCheck = Math.floor((now.getTime() - checked) / 86_400_000);
+  return { daysSinceCheck, needsRevalidation: daysSinceCheck > staleDays, withinGrace: daysSinceCheck <= graceDays, graceDays };
+}
