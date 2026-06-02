@@ -97,7 +97,8 @@ is already branch-correct).
   `postGift()` chokepoint); admin page to issue / reload / enable-disable / view
   history. New `GIFT` PaymentMethod: redeemed at POS as a tender in the split-payment
   modal (code + amount, validated & deducted server-side); voids refund the card.
-  Split-aware everywhere (byMethod, reports, receipt)
+  Split-aware everywhere (byMethod, reports, receipt). Also a **refund option**: a return
+  with refund method GIFT issues a new store-credit card (`RC-xxxxxx`) loaded with the refund
 - ⬜ Email / SMS / LINE receipt delivery
 
 ## 5. Finance & accounting

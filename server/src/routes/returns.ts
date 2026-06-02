@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
+import { postGift } from '../lib/giftcard.js';
 
 export const returnsRouter = Router();
 returnsRouter.use(requireAuth);
@@ -66,7 +67,7 @@ returnsRouter.get(
 // --- Create a return ---
 const schema = z.object({
   saleId: z.number().int(),
-  refundMethod: z.enum(['CASH', 'TRANSFER', 'CARD', 'CREDIT']).default('CASH'),
+  refundMethod: z.enum(['CASH', 'TRANSFER', 'CARD', 'CREDIT', 'GIFT']).default('CASH'),
   reason: z.string().default(''),
   items: z.array(z.object({ saleItemId: z.number().int(), qty: z.number().int().positive() })).min(1),
 });
@@ -118,7 +119,16 @@ returnsRouter.post(
           refType: 'RETURN', refId: ret.id, note: `${ret.refNo} (${sale.orderNo})`, userId, branchId: sale.branchId,
         });
       }
-      return ret;
+
+      // Refund as store credit: issue a gift card loaded with the refund amount.
+      let giftCardCode: string | null = null;
+      if (data.refundMethod === 'GIFT') {
+        const seqG = await nextSeq(tx, 'gift_card_refund');
+        giftCardCode = `RC${String(seqG).padStart(6, '0')}`;
+        const card = await tx.giftCard.create({ data: { code: giftCardCode, initialBalance: 0, balance: 0, note: `เครดิตจากการคืนสินค้า ${ret.refNo}` } });
+        await postGift(tx, { giftCardId: card.id, type: 'ISSUE', amount: refundTotal, note: `คืนสินค้า ${ret.refNo}`, userId });
+      }
+      return { ...ret, giftCardCode };
     });
 
     res.status(201).json(result);

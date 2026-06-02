@@ -9,7 +9,7 @@ import { makeExporters, type Column } from '../../lib/export';
 import { dateTime, money, num } from '../../lib/format';
 import type { ReturnListItem, Returnable, Sale } from '../../types';
 
-const PAY_TH: Record<string, string> = { CASH: 'เงินสด', TRANSFER: 'โอนเงิน', CARD: 'บัตร', CREDIT: 'เงินเชื่อ' };
+const PAY_TH: Record<string, string> = { CASH: 'เงินสด', TRANSFER: 'โอนเงิน', CARD: 'บัตร', CREDIT: 'เงินเชื่อ', GIFT: 'เครดิตร้านค้า' };
 function today() { return new Date().toISOString().slice(0, 10); }
 function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
@@ -126,8 +126,13 @@ function ReturnModal({ preSaleId, onClose, onDone }: { preSaleId: number | null;
     setBusy(true);
     try {
       const items = sale.items.map((i) => ({ saleItemId: i.saleItemId, qty: qtys[i.saleItemId] || 0 })).filter((x) => x.qty > 0);
-      const r = await api<{ refNo: string }>('/returns', { method: 'POST', body: { saleId: sale.sale.id, refundMethod, reason, items } });
-      toast.success(`บันทึกการคืนแล้ว · ${r.refNo}`);
+      const r = await api<{ refNo: string; giftCardCode?: string | null }>('/returns', { method: 'POST', body: { saleId: sale.sale.id, refundMethod, reason, items } });
+      if (r.giftCardCode) {
+        toast.success(`คืนเป็นเครดิต · บัตร ${r.giftCardCode}`);
+        alert(`ออกบัตรเครดิตร้านค้า\n\nรหัสบัตร: ${r.giftCardCode}\n\nแจ้งรหัสนี้แก่ลูกค้าเพื่อใช้เป็นส่วนลด/ชำระเงินครั้งถัดไป`);
+      } else {
+        toast.success(`บันทึกการคืนแล้ว · ${r.refNo}`);
+      }
       onDone();
     } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
@@ -186,7 +191,7 @@ function ReturnModal({ preSaleId, onClose, onDone }: { preSaleId: number | null;
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div><label className="label">วิธีคืนเงิน</label>
               <select className="input" value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)}>
-                <option value="CASH">เงินสด</option><option value="TRANSFER">โอนเงิน</option><option value="CARD">บัตร</option><option value="CREDIT">เงินเชื่อ</option>
+                <option value="CASH">เงินสด</option><option value="TRANSFER">โอนเงิน</option><option value="CARD">บัตร</option><option value="CREDIT">เงินเชื่อ</option><option value="GIFT">เครดิตร้านค้า (บัตรของขวัญ)</option>
               </select>
             </div>
             <div><label className="label">เหตุผลการคืน</label><input className="input" placeholder="เช่น สินค้าชำรุด / ลูกค้าเปลี่ยนใจ" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
