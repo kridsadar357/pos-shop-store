@@ -6,7 +6,8 @@ import { DataTable } from '../../components/DataTable';
 import { ListToolbar } from '../../components/ListToolbar';
 import { makeExporters, type Column } from '../../lib/export';
 import { toast } from '../../components/Toast';
-import type { Member, PointTransaction } from '../../types';
+import { money, num, dateTime } from '../../lib/format';
+import type { Member, MemberHistory, PointTransaction } from '../../types';
 
 const empty = { code: '', name: '', phone: '', email: '', note: '', isActive: true };
 type Form = typeof empty;
@@ -20,6 +21,7 @@ export default function Members() {
   const [editing, setEditing] = useState<Member | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [pointsFor, setPointsFor] = useState<Member | null>(null);
+  const [historyFor, setHistoryFor] = useState<Member | null>(null);
 
   async function load() {
     setMembers(await api<Member[]>('/members', { query: { q } }));
@@ -120,7 +122,8 @@ export default function Members() {
             <td className="px-4 py-3 text-right"><span className="chip bg-amber-50 font-bold text-amber-700">{(m.points ?? 0).toLocaleString()} แต้ม</span></td>
             <td className="px-4 py-3"><span className={`chip ${m.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{m.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
             <td className="px-4 py-3 text-right whitespace-nowrap">
-              <button className="text-sm font-semibold text-amber-600" onClick={() => setPointsFor(m)}>แต้ม</button>
+              <button className="text-sm font-semibold text-sky-600" onClick={() => setHistoryFor(m)}>ประวัติ</button>
+              <button className="ml-3 text-sm font-semibold text-amber-600" onClick={() => setPointsFor(m)}>แต้ม</button>
               <button className="ml-3 text-sm font-semibold text-brand-600" onClick={() => openEdit(m)}>แก้ไข</button>
             </td>
           </tr>
@@ -148,8 +151,57 @@ export default function Members() {
       {pointsFor && (
         <PointsModal member={pointsFor} onClose={() => setPointsFor(null)} onChanged={load} />
       )}
+
+      {historyFor && <HistoryModal member={historyFor} onClose={() => setHistoryFor(null)} />}
     </div>
   );
+}
+
+const PAY_TH: Record<string, string> = { CASH: 'เงินสด', TRANSFER: 'โอน', CARD: 'บัตร', CREDIT: 'เงินเชื่อ', GIFT: 'บัตรของขวัญ' };
+
+/** A member's purchase history + lifetime value. */
+function HistoryModal({ member, onClose }: { member: Member; onClose: () => void }) {
+  const [data, setData] = useState<MemberHistory | null>(null);
+  useEffect(() => { api<MemberHistory>(`/members/${member.id}/sales`).then(setData).catch(() => setData({ sales: [], stats: { orders: 0, totalSpent: 0, avgOrder: 0, lastVisit: null } })); }, [member.id]);
+
+  return (
+    <Modal title={`ประวัติการซื้อ · ${member.name}`} wide onClose={onClose}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="ยอดซื้อสะสม" value={money(data?.stats.totalSpent ?? 0)} tone="text-emerald-600" />
+        <Stat label="จำนวนบิล" value={String(data?.stats.orders ?? 0)} />
+        <Stat label="เฉลี่ย/บิล" value={money(data?.stats.avgOrder ?? 0)} />
+        <Stat label="แต้มคงเหลือ" value={`${(member.points ?? 0).toLocaleString()}`} tone="text-amber-600" />
+      </div>
+      <div className="mt-4 max-h-80 overflow-auto rounded-xl ring-1 ring-slate-100">
+        {!data ? (
+          <p className="py-8 text-center text-sm text-slate-400">กำลังโหลด…</p>
+        ) : data.sales.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-400">ยังไม่มีประวัติการซื้อ</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
+              <tr><th className="px-3 py-2">วันที่</th><th className="px-3 py-2">เลขที่บิล</th><th className="px-3 py-2 text-right">รายการ</th><th className="px-3 py-2">ชำระ</th><th className="px-3 py-2 text-right">ยอด</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {data.sales.map((s) => (
+                <tr key={s.id} className={s.status === 'VOID' ? 'text-slate-400 line-through' : ''}>
+                  <td className="px-3 py-2 text-slate-500">{dateTime(s.createdAt)}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{s.orderNo}</td>
+                  <td className="px-3 py-2 text-right">{s._count?.items ?? 0}</td>
+                  <td className="px-3 py-2">{PAY_TH[s.paymentMethod] ?? s.paymentMethod}</td>
+                  <td className="px-3 py-2 text-right font-semibold">{money(num(s.total))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return <div className="rounded-xl bg-slate-50 p-3 text-center"><div className="text-[11px] text-slate-400">{label}</div><div className={`text-lg font-extrabold ${tone ?? 'text-ink-900'}`}>{value}</div></div>;
 }
 
 const PT_LABEL: Record<PointTransaction['type'], string> = { EARN: 'ได้รับ', REDEEM: 'ใช้แต้ม', ADJUST: 'ปรับแต้ม' };

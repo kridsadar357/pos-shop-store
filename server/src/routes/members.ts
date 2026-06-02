@@ -38,6 +38,31 @@ membersRouter.get(
   })
 );
 
+// Purchase history + lifetime value for a member.
+membersRouter.get(
+  '/:id/sales',
+  ah(async (req, res) => {
+    const memberId = Number(req.params.id);
+    const sales = await prisma.sale.findMany({
+      where: { memberId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: { id: true, orderNo: true, createdAt: true, total: true, status: true, paymentMethod: true, _count: { select: { items: true } } },
+    });
+    const paid = sales.filter((s) => s.status === 'PAID');
+    const totalSpent = paid.reduce((a, s) => a + Number(s.total), 0);
+    res.json({
+      sales,
+      stats: {
+        orders: paid.length,
+        totalSpent: Math.round(totalSpent * 100) / 100,
+        avgOrder: paid.length ? Math.round((totalSpent / paid.length) * 100) / 100 : 0,
+        lastVisit: paid[0]?.createdAt ?? null,
+      },
+    });
+  })
+);
+
 // Loyalty-point ledger for a member (most recent first).
 membersRouter.get(
   '/:id/points',

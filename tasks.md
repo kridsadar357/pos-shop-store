@@ -67,6 +67,9 @@ is already branch-correct).
 - ⬜ Serial-number tracking — **large**: per-unit records + scan-in/scan-out
 
 ## 4. Sales & customer features
+- ✅ Member purchase history + lifetime value — `GET /api/members/:id/sales` returns the
+  member's bills + stats (orders, total spent, avg, last visit); "ประวัติ" modal on the
+  Members page shows the history table + KPI tiles (CRM)
 - ✅ Loyalty points: accrual + redemption — `Member.points` + `PointTransaction`
   ledger via a single `postPoints()` chokepoint; earn on the net total and redeem
   points as a bill discount at the POS (capped by balance + bill room); voids

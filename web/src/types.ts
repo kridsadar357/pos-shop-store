@@ -78,6 +78,11 @@ export interface Member {
   _count?: { sales: number };
 }
 
+export interface MemberHistory {
+  sales: { id: number; orderNo: string; createdAt: string; total: string; status: 'PAID' | 'VOID'; paymentMethod: string; _count?: { items: number } }[];
+  stats: { orders: number; totalSpent: number; avgOrder: number; lastVisit: string | null };
+}
+
 export interface PointTransaction {
   id: number;
   memberId: number;
