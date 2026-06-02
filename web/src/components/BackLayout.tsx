@@ -64,6 +64,7 @@ const GROUPS: NavGroup[] = [
       { to: '/back/branches', label: 'สาขา', icon: 'fa-code-branch', adminOnly: true },
       { to: '/back/users', label: 'ผู้ใช้งานระบบ', icon: 'fa-user-shield', adminOnly: true },
       { to: '/back/audit', label: 'บันทึกการใช้งาน', icon: 'fa-clipboard-list', adminOnly: true },
+      { to: '/back/backup', label: 'สำรอง / กู้คืนข้อมูล', icon: 'fa-database', adminOnly: true },
     ],
   },
 ];

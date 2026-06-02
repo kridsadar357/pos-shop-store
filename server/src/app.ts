@@ -30,12 +30,13 @@ import { giftCardsRouter } from './routes/giftcards.js';
 import { quotationsRouter } from './routes/quotations.js';
 import { taxInvoicesRouter } from './routes/taxInvoices.js';
 import { layawaysRouter } from './routes/layaways.js';
+import { backupRouter } from './routes/backup.js';
 import { auditLogger } from './middleware/audit.js';
 
 export function createApp() {
   const app = express();
   app.use(cors({ origin: env.CORS_ORIGIN }));
-  app.use(express.json());
+  app.use(express.json({ limit: '64mb' })); // large enough for full backup restore
 
   app.get('/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
@@ -73,6 +74,7 @@ export function createApp() {
   app.use('/api/quotations', quotationsRouter);
   app.use('/api/tax-invoices', taxInvoicesRouter);
   app.use('/api/layaways', layawaysRouter);
+  app.use('/api/backup', backupRouter);
 
   // Central error handler.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

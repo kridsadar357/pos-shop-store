@@ -115,7 +115,11 @@ is already branch-correct).
   end-of-day close report (offered after closing + reprintable per shift on the
   back-office Shifts page). Shows orders, per-payment-method breakdown
   (`shiftTotals.byMethod`), pay-in/out, and the cash-drawer reconciliation
-- ⬜ Data backup & restore (export/import)
+- ✅ Data backup & restore — generic export/restore driven by Prisma DMMF
+  (topological FK order, no per-model maintenance). `/api/backup/export` downloads a
+  full JSON snapshot; `/api/backup/restore` atomically replaces all data in one
+  transaction (rolls back on any error) and resets autoincrement sequences. Admin
+  Backup page with download + upload/confirm. (Verified by a full round-trip.)
 - ⬜ Saved/custom report builder
 
 ## 7. Security & administration
