@@ -198,7 +198,9 @@ is already branch-correct).
   bill/product/category + coupons + minSpend), plus PromptPay CRC/payload + ESC/POS bytes.
   `npm --prefix server test`. Plus **integration tests** (`npm run test:integration`, 3 tests)
   that exercise the real `postMovement` stock chokepoint + batch FEFO against Postgres via a
-  transaction-rollback harness (zero residue). GitHub Actions (`.github/workflows/ci.yml`):
+  transaction-rollback harness (zero residue) — covering every DB-mutation chokepoint
+  (`postMovement`+FEFO, `postPoints`, `postGift`, `nextSeq`), 7 integration tests.
+  GitHub Actions (`.github/workflows/ci.yml`):
   install → prisma generate → **migrate deploy on a Postgres service** → unit test → **integration
   test** → typecheck-build server + web. Root `npm test` / `npm run test:integration`. (e2e still
   to expand.)
