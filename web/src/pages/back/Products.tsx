@@ -44,6 +44,8 @@ export default function Products() {
   const [suppliers, setSuppliers] = useState<{ id: number; name: string }[]>([]);
   const [priceList, setPriceList] = useState<{ id: number; supplierId: number; supplier: string; unitCost: string; isPreferred: boolean }[]>([]);
   const [spForm, setSpForm] = useState<{ supplierId: number | ''; unitCost: number; isPreferred: boolean }>({ supplierId: '', unitCost: 0, isPreferred: false });
+  const [batches, setBatches] = useState<{ id: number; lotNo: string; expiryDate: string | null; qtyRemaining: number }[]>([]);
+  const [batchForm, setBatchForm] = useState({ lotNo: '', expiryDate: '', qty: 0 });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -82,6 +84,16 @@ export default function Products() {
   }, []);
 
   async function loadPriceList(id: number) { setPriceList(await api(`/products/${id}/suppliers`)); }
+  async function loadBatches(id: number) { setBatches(await api(`/products/${id}/batches`)); }
+  async function addBatch() {
+    if (!editing || batchForm.qty <= 0) return toast.error('กรอกจำนวนคงเหลือของล็อต');
+    try {
+      await api(`/products/${editing.id}/batches`, { method: 'POST', body: { lotNo: batchForm.lotNo, expiryDate: batchForm.expiryDate ? new Date(`${batchForm.expiryDate}T00:00:00`).toISOString() : null, qty: batchForm.qty } });
+      toast.success('เพิ่มล็อตแล้ว');
+      setBatchForm({ lotNo: '', expiryDate: '', qty: 0 });
+      loadBatches(editing.id);
+    } catch (e) { toast.error((e as Error).message); }
+  }
   async function addSupplierPrice() {
     if (!editing || !spForm.supplierId) return;
     try {
@@ -115,6 +127,9 @@ export default function Products() {
     setSpForm({ supplierId: '', unitCost: 0, isPreferred: false });
     api<typeof costHistory>(`/products/${p.id}/cost-history`).then(setCostHistory).catch(() => {});
     loadPriceList(p.id).catch(() => {});
+    setBatches([]);
+    setBatchForm({ lotNo: '', expiryDate: '', qty: 0 });
+    if (p.trackBatches) loadBatches(p.id).catch(() => {});
     setForm({
       sku: p.sku,
       barcode: p.barcode ?? '',
@@ -380,6 +395,32 @@ export default function Products() {
               </div>
             </div>
           )}
+
+          {editing && form.trackBatches && (
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="mb-2 text-sm font-bold text-ink-900"><i className="fa-solid fa-flask-vial mr-1.5 text-amber-600" />ล็อต / วันหมดอายุ (FEFO)</div>
+              {batches.length > 0 && (
+                <div className="mb-2 max-h-36 overflow-auto rounded-xl ring-1 ring-slate-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-3 py-2">ล็อต</th><th className="px-3 py-2">วันหมดอายุ</th><th className="px-3 py-2 text-right">คงเหลือ</th></tr></thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {batches.map((b) => (
+                        <tr key={b.id}><td className="px-3 py-1.5">{b.lotNo || '(ไม่มีล็อต)'}</td><td className="px-3 py-1.5">{b.expiryDate ? new Date(b.expiryDate).toLocaleDateString('th-TH') : '—'}</td><td className="px-3 py-1.5 text-right font-medium">{b.qtyRemaining}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="flex flex-wrap items-end gap-2">
+                <div><label className="label">เลขล็อต</label><input className="input py-1.5" value={batchForm.lotNo} onChange={(e) => setBatchForm({ ...batchForm, lotNo: e.target.value })} /></div>
+                <div><label className="label">วันหมดอายุ</label><input type="date" className="input py-1.5" value={batchForm.expiryDate} onChange={(e) => setBatchForm({ ...batchForm, expiryDate: e.target.value })} /></div>
+                <div><label className="label">จำนวนคงเหลือ</label><input type="number" className="input py-1.5 w-24" value={batchForm.qty || ''} onChange={(e) => setBatchForm({ ...batchForm, qty: Math.max(0, Number(e.target.value)) })} /></div>
+                <button type="button" className="btn-ghost mb-0.5" disabled={batchForm.qty <= 0} onClick={addBatch}>เพิ่มล็อต</button>
+              </div>
+              <p className="mt-1.5 text-xs text-slate-400">บันทึกล็อตของสต็อกที่มีอยู่เดิม (ไม่กระทบยอดสต็อก) — รับสินค้าครั้งถัดไปจะสร้างล็อตอัตโนมัติ</p>
+            </div>
+          )}
+
           <div className="mt-5 flex gap-2">
             <button className="btn-ghost flex-1" onClick={() => setForm(null)}>ยกเลิก</button>
             <button className="btn-primary flex-1" onClick={save}>บันทึก</button>

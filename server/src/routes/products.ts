@@ -288,6 +288,39 @@ productsRouter.put(
   })
 );
 
+// --- Lot/expiry batches for a product (open batches first) ---
+productsRouter.get(
+  '/:id/batches',
+  ah(async (req, res) => {
+    const batches = await prisma.productBatch.findMany({
+      where: { productId: Number(req.params.id) },
+      orderBy: [{ qtyRemaining: 'desc' }, { expiryDate: 'asc' }, { id: 'asc' }],
+      take: 200,
+    });
+    res.json(batches);
+  })
+);
+
+// Record an opening / manual batch WITHOUT a stock movement (the on-hand already
+// exists — this just attributes it to a lot/expiry). Use after enabling tracking.
+productsRouter.post(
+  '/:id/batches',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const { branchId, lotNo, expiryDate, qty } = z
+      .object({ branchId: z.number().int().nullable().optional(), lotNo: z.string().default(''), expiryDate: z.string().datetime().nullable().optional(), qty: z.number().int().positive() })
+      .parse(req.body);
+    const productId = Number(req.params.id);
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: productId }, select: { trackBatches: true } });
+    if (!product.trackBatches) return res.status(400).json({ error: 'สินค้านี้ยังไม่ได้เปิดติดตามล็อต/วันหมดอายุ' });
+    const bId = branchId ?? (await prisma.branch.findFirst({ where: { isDefault: true } }))?.id ?? null;
+    const batch = await prisma.productBatch.create({
+      data: { productId, branchId: bId, lotNo, expiryDate: expiryDate ? new Date(expiryDate) : null, qtyReceived: qty, qtyRemaining: qty },
+    });
+    res.status(201).json(batch);
+  })
+);
+
 // Upload a product image (multipart field "image"). Returns the saved URL.
 productsRouter.post(
   '/:id/image',
