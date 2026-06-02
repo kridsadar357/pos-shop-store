@@ -72,8 +72,9 @@ is already branch-correct).
   receives create batches (lot/expiry on the receive line), sales/outflows consume **FEFO**
   (earliest expiry first), positive non-receive deltas + shortfalls use a no-expiry catch-all
   (so Σbatch == net stock change since enabling). "ใกล้หมดอายุ" report + product toggle.
-  Verified FEFO + report end-to-end. Phase-2 TODO: lot/expiry inputs on the Receive/PO **UI**,
-  and an initial-batch count for stock that predates enabling
+  Verified FEFO + report end-to-end. Receive **UI** now shows lot/expiry inputs per
+  batch-tracked line. Remaining: lot/expiry on the PO-receive UI, and an initial-batch count
+  for stock that predates enabling
 - ⬜ Serial-number tracking — **large**: per-unit records + scan-in/scan-out
 
 ## 4. Sales & customer features

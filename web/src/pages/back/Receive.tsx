@@ -10,7 +10,7 @@ import { dateTime, money, num } from '../../lib/format';
 import type { Product } from '../../types';
 
 interface Supplier { id: number; name: string; }
-interface Line { product: Product; qty: number; unitCost: number; byPack: boolean; }
+interface Line { product: Product; qty: number; unitCost: number; byPack: boolean; lotNo?: string; expiryDate?: string }
 interface Receipt { id: number; refNo: string; total: string; note: string; createdAt: string; supplier?: { name: string } | null; _count: { items: number }; }
 
 function today() { return new Date().toISOString().slice(0, 10); }
@@ -77,7 +77,12 @@ export default function Receive() {
             const upp = l.product.unitsPerPurchase ?? 1;
             const baseQty = l.byPack ? l.qty * upp : l.qty;
             const baseCost = l.byPack ? Math.round((l.unitCost / upp) * 100) / 100 : l.unitCost;
-            return { productId: l.product.id, qty: baseQty, unitCost: baseCost };
+            return {
+              productId: l.product.id, qty: baseQty, unitCost: baseCost,
+              ...(l.product.trackBatches && (l.lotNo || l.expiryDate)
+                ? { lotNo: l.lotNo || undefined, expiryDate: l.expiryDate ? new Date(`${l.expiryDate}T00:00:00`).toISOString() : undefined }
+                : {}),
+            };
           }),
         },
       });
@@ -157,6 +162,13 @@ export default function Receive() {
                         >
                           <i className="fa-solid fa-arrows-rotate mr-1" />รับเป็น: {unitLabel} {l.byPack && <span className="text-slate-400">(1 {l.product.purchaseUnit || 'แพ็ก'} = {upp} {l.product.unit})</span>}
                         </button>
+                      )}
+                      {l.product.trackBatches && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] font-semibold text-amber-600"><i className="fa-solid fa-flask-vial mr-1" />ล็อต</span>
+                          <input className="w-24 rounded-md bg-slate-50 px-2 py-0.5 text-[11px] ring-1 ring-slate-200 outline-none" placeholder="เลขล็อต" value={l.lotNo ?? ''} onChange={(e) => update(l.product.id, { lotNo: e.target.value })} />
+                          <input type="date" className="rounded-md bg-slate-50 px-2 py-0.5 text-[11px] ring-1 ring-slate-200 outline-none" value={l.expiryDate ?? ''} onChange={(e) => update(l.product.id, { expiryDate: e.target.value })} title="วันหมดอายุ" />
+                        </div>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
