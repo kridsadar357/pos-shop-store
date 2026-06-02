@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { nextSeq, postMovement } from '../lib/stock.js';
+import { registerSerials } from '../lib/serial.js';
 
 export const inventoryRouter = Router();
 inventoryRouter.use(requireAuth);
@@ -82,6 +83,7 @@ const receiveSchema = z.object({
         unitCost: z.number().nonnegative(),
         lotNo: z.string().optional(),
         expiryDate: z.string().datetime().nullable().optional(),
+        serials: z.array(z.string()).optional(),
       })
     )
     .min(1),
@@ -125,6 +127,7 @@ inventoryRouter.post(
           branchId: data.branchId ?? undefined,
           batch: (i.lotNo || i.expiryDate) ? { lotNo: i.lotNo, expiryDate: i.expiryDate ? new Date(i.expiryDate) : null } : undefined,
         });
+        if (i.serials?.length) await registerSerials(tx, { productId: i.productId, branchId: data.branchId ?? null, serials: i.serials, ref: refNo });
       }
       return receipt;
     });

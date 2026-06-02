@@ -549,6 +549,7 @@ model Product {
   reorderLevel    Int      @default(0)
   stockQty        Int      @default(0) // cached balance; ledger is source of truth
   trackBatches    Boolean  @default(false) // opt-in lot/expiry batch tracking (FEFO)
+  trackSerials    Boolean  @default(false) // opt-in per-unit serial-number tracking
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -563,8 +564,29 @@ model Product {
   branchStock BranchStock[]
   suppliers  SupplierProduct[]
   batches    ProductBatch[]
+  serials    ProductSerial[]
 
   @@index([name])
+}
+
+// Per-unit serial record for a serial-tracked product. Registered on receiving;
+// status moves IN_STOCK → SOLD (and back on return). Enables warranty/provenance lookup.
+model ProductSerial {
+  id         Int       @id @default(autoincrement())
+  productId  Int
+  branchId   Int?
+  serialNo   String
+  status     String    @default("IN_STOCK") // IN_STOCK | SOLD | RETURNED
+  note       String    @default("")
+  receivedRef String   @default("") // goods-receipt / PO ref
+  saleId     Int?
+  receivedAt DateTime  @default(now())
+  soldAt     DateTime?
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([productId, serialNo])
+  @@index([productId, status])
 }
 
 // Lot/expiry batch balance for a batch-tracked product at a branch. Maintained by

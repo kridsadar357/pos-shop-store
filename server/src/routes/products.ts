@@ -202,6 +202,7 @@ const productSchema = z.object({
   taxRatePct: z.number().nonnegative().nullable().optional(),
   reorderLevel: z.number().int().nonnegative().default(0),
   trackBatches: z.boolean().optional(),
+  trackSerials: z.boolean().optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -318,6 +319,54 @@ productsRouter.post(
       data: { productId, branchId: bId, lotNo, expiryDate: expiryDate ? new Date(expiryDate) : null, qtyReceived: qty, qtyRemaining: qty },
     });
     res.status(201).json(batch);
+  })
+);
+
+// --- Serial numbers for a serial-tracked product ---
+productsRouter.get(
+  '/:id/serials',
+  ah(async (req, res) => {
+    const status = req.query.status ? String(req.query.status) : undefined;
+    const q = String(req.query.q || '').trim();
+    const serials = await prisma.productSerial.findMany({
+      where: { productId: Number(req.params.id), status, ...(q ? { serialNo: { contains: q, mode: 'insensitive' } } : {}) },
+      orderBy: [{ status: 'asc' }, { id: 'desc' }],
+      take: 500,
+    });
+    res.json(serials);
+  })
+);
+
+// Manually register serial numbers (e.g. opening stock or correction).
+productsRouter.post(
+  '/:id/serials',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const { serials } = z.object({ serials: z.array(z.string()).min(1) }).parse(req.body);
+    const productId = Number(req.params.id);
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: productId }, select: { trackSerials: true } });
+    if (!product.trackSerials) return res.status(400).json({ error: 'สินค้านี้ยังไม่ได้เปิดติดตามหมายเลขซีเรียล' });
+    const branchId = (await prisma.branch.findFirst({ where: { isDefault: true } }))?.id ?? null;
+    const clean = [...new Set(serials.map((s) => s.trim()).filter(Boolean))];
+    const r = await prisma.productSerial.createMany({
+      data: clean.map((serialNo) => ({ productId, branchId, serialNo, status: 'IN_STOCK', receivedRef: 'manual' })),
+      skipDuplicates: true,
+    });
+    res.status(201).json({ added: r.count });
+  })
+);
+
+// Update a serial's status (IN_STOCK | SOLD | RETURNED).
+productsRouter.put(
+  '/serials/:serialId',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const { status } = z.object({ status: z.enum(['IN_STOCK', 'SOLD', 'RETURNED']) }).parse(req.body);
+    const serial = await prisma.productSerial.update({
+      where: { id: Number(req.params.serialId) },
+      data: { status, soldAt: status === 'SOLD' ? new Date() : null },
+    });
+    res.json(serial);
   })
 );
 

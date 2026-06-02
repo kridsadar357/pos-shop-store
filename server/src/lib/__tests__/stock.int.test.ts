@@ -58,13 +58,13 @@ describe('postMovement (integration)', () => {
       const prod = await tx.product.findUnique({ where: { id: product.id } });
       return { batches: batches.map((b: any) => ({ lot: b.lotNo, rem: b.qtyRemaining })), stockQty: prod.stockQty };
     });
-    const near = r.batches.find((b) => b.lot === 'NEAR');
-    const far = r.batches.find((b) => b.lot === 'FAR');
+    const near = r.batches.find((b: any) => b.lot === 'NEAR');
+    const far = r.batches.find((b: any) => b.lot === 'FAR');
     expect(near!.rem).toBe(5); // earliest expiry consumed first
     expect(far!.rem).toBe(10);
     expect(r.stockQty).toBe(15);
     // Σ batch remaining (received batches) equals total stock change since tracking.
-    expect(r.batches.reduce((s, b) => s + b.rem, 0)).toBe(15);
+    expect(r.batches.reduce((s: number, b: any) => s + b.rem, 0)).toBe(15);
   });
 
   it('a negative delta beyond available batches absorbs the shortfall in a catch-all batch', async () => {

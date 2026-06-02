@@ -10,7 +10,7 @@ import { dateTime, money, num } from '../../lib/format';
 import type { Product } from '../../types';
 
 interface Supplier { id: number; name: string; }
-interface Line { product: Product; qty: number; unitCost: number; byPack: boolean; lotNo?: string; expiryDate?: string }
+interface Line { product: Product; qty: number; unitCost: number; byPack: boolean; lotNo?: string; expiryDate?: string; serials?: string }
 interface Receipt { id: number; refNo: string; total: string; note: string; createdAt: string; supplier?: { name: string } | null; _count: { items: number }; }
 
 function today() { return new Date().toISOString().slice(0, 10); }
@@ -81,6 +81,9 @@ export default function Receive() {
               productId: l.product.id, qty: baseQty, unitCost: baseCost,
               ...(l.product.trackBatches && (l.lotNo || l.expiryDate)
                 ? { lotNo: l.lotNo || undefined, expiryDate: l.expiryDate ? new Date(`${l.expiryDate}T00:00:00`).toISOString() : undefined }
+                : {}),
+              ...(l.product.trackSerials && l.serials?.trim()
+                ? { serials: l.serials.split(/[\n,]/).map((s) => s.trim()).filter(Boolean) }
                 : {}),
             };
           }),
@@ -169,6 +172,9 @@ export default function Receive() {
                           <input className="w-24 rounded-md bg-slate-50 px-2 py-0.5 text-[11px] ring-1 ring-slate-200 outline-none" placeholder="เลขล็อต" value={l.lotNo ?? ''} onChange={(e) => update(l.product.id, { lotNo: e.target.value })} />
                           <input type="date" className="rounded-md bg-slate-50 px-2 py-0.5 text-[11px] ring-1 ring-slate-200 outline-none" value={l.expiryDate ?? ''} onChange={(e) => update(l.product.id, { expiryDate: e.target.value })} title="วันหมดอายุ" />
                         </div>
+                      )}
+                      {l.product.trackSerials && (
+                        <textarea className="mt-1.5 w-full rounded-md bg-slate-50 px-2 py-1 text-[11px] ring-1 ring-slate-200 outline-none" rows={1} placeholder="หมายเลขซีเรียล (คั่นด้วยบรรทัด/จุลภาค)" value={l.serials ?? ''} onChange={(e) => update(l.product.id, { serials: e.target.value })} />
                       )}
                     </td>
                     <td className="px-3 py-2.5">

@@ -25,6 +25,7 @@ const empty = {
   wholesaleMinQty: 1,
   reorderLevel: 0,
   trackBatches: false,
+  trackSerials: false,
   isActive: true,
 };
 type Form = typeof empty;
@@ -46,6 +47,8 @@ export default function Products() {
   const [spForm, setSpForm] = useState<{ supplierId: number | ''; unitCost: number; isPreferred: boolean }>({ supplierId: '', unitCost: 0, isPreferred: false });
   const [batches, setBatches] = useState<{ id: number; lotNo: string; expiryDate: string | null; qtyRemaining: number }[]>([]);
   const [batchForm, setBatchForm] = useState({ lotNo: '', expiryDate: '', qty: 0 });
+  const [serials, setSerials] = useState<{ id: number; serialNo: string; status: string }[]>([]);
+  const [serialInput, setSerialInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -85,6 +88,23 @@ export default function Products() {
 
   async function loadPriceList(id: number) { setPriceList(await api(`/products/${id}/suppliers`)); }
   async function loadBatches(id: number) { setBatches(await api(`/products/${id}/batches`)); }
+  async function loadSerials(id: number) { setSerials(await api(`/products/${id}/serials`)); }
+  async function addSerials() {
+    if (!editing) return;
+    const list = serialInput.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+    if (!list.length) return toast.error('กรอกหมายเลขซีเรียล');
+    try {
+      const r = await api<{ added: number }>(`/products/${editing.id}/serials`, { method: 'POST', body: { serials: list } });
+      toast.success(`เพิ่ม ${r.added} ซีเรียล`);
+      setSerialInput('');
+      loadSerials(editing.id);
+    } catch (e) { toast.error((e as Error).message); }
+  }
+  async function setSerialStatus(serialId: number, status: string) {
+    if (!editing) return;
+    await api(`/products/serials/${serialId}`, { method: 'PUT', body: { status } });
+    loadSerials(editing.id);
+  }
   async function addBatch() {
     if (!editing || batchForm.qty <= 0) return toast.error('กรอกจำนวนคงเหลือของล็อต');
     try {
@@ -130,6 +150,9 @@ export default function Products() {
     setBatches([]);
     setBatchForm({ lotNo: '', expiryDate: '', qty: 0 });
     if (p.trackBatches) loadBatches(p.id).catch(() => {});
+    setSerials([]);
+    setSerialInput('');
+    if (p.trackSerials) loadSerials(p.id).catch(() => {});
     setForm({
       sku: p.sku,
       barcode: p.barcode ?? '',
@@ -145,6 +168,7 @@ export default function Products() {
       wholesaleMinQty: p.wholesaleMinQty,
       reorderLevel: p.reorderLevel,
       trackBatches: p.trackBatches ?? false,
+      trackSerials: p.trackSerials ?? false,
       isActive: p.isActive,
     });
   }
@@ -345,6 +369,10 @@ export default function Products() {
             <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={form.trackBatches} onChange={(e) => setForm({ ...form, trackBatches: e.target.checked })} />
             ติดตามล็อต / วันหมดอายุ (ตัดสต็อกแบบ FEFO — ใกล้หมดอายุก่อนออกก่อน)
           </label>
+          <label className="mt-1.5 flex items-center gap-2 text-sm">
+            <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={form.trackSerials} onChange={(e) => setForm({ ...form, trackSerials: e.target.checked })} />
+            ติดตามหมายเลขซีเรียลรายชิ้น (รับเข้า/ค้นหาประวัติรายเครื่อง)
+          </label>
           {editing && <p className="mt-3 text-xs text-slate-400">การปรับสต็อกทำผ่าน รับสินค้า / นับสต็อก / บัญชีสต็อก — สต็อกควบคุมด้วยบัญชีเดินสินค้า</p>}
 
           {editing && (
@@ -418,6 +446,33 @@ export default function Products() {
                 <button type="button" className="btn-ghost mb-0.5" disabled={batchForm.qty <= 0} onClick={addBatch}>เพิ่มล็อต</button>
               </div>
               <p className="mt-1.5 text-xs text-slate-400">บันทึกล็อตของสต็อกที่มีอยู่เดิม (ไม่กระทบยอดสต็อก) — รับสินค้าครั้งถัดไปจะสร้างล็อตอัตโนมัติ</p>
+            </div>
+          )}
+
+          {editing && form.trackSerials && (
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="mb-2 text-sm font-bold text-ink-900"><i className="fa-solid fa-barcode mr-1.5 text-sky-600" />หมายเลขซีเรียล ({serials.filter((s) => s.status === 'IN_STOCK').length} ในสต็อก / {serials.length} ทั้งหมด)</div>
+              {serials.length > 0 && (
+                <div className="mb-2 max-h-36 overflow-auto rounded-xl ring-1 ring-slate-200">
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-slate-100">
+                      {serials.map((s) => (
+                        <tr key={s.id}>
+                          <td className="px-3 py-1.5 font-mono">{s.serialNo}</td>
+                          <td className="px-3 py-1.5"><span className={`chip ${s.status === 'IN_STOCK' ? 'bg-emerald-50 text-emerald-700' : s.status === 'SOLD' ? 'bg-slate-100 text-slate-500' : 'bg-amber-50 text-amber-700'}`}>{s.status === 'IN_STOCK' ? 'ในสต็อก' : s.status === 'SOLD' ? 'ขายแล้ว' : 'รับคืน'}</span></td>
+                          <td className="px-3 py-1.5 text-right">
+                            {s.status !== 'SOLD' && <button className="text-xs font-semibold text-slate-500" onClick={() => setSerialStatus(s.id, 'SOLD')}>ทำเครื่องหมายขายแล้ว</button>}
+                            {s.status === 'SOLD' && <button className="text-xs font-semibold text-amber-600" onClick={() => setSerialStatus(s.id, 'RETURNED')}>รับคืน</button>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <textarea className="input" rows={2} placeholder="วางหมายเลขซีเรียล (คั่นด้วยบรรทัดใหม่หรือจุลภาค)" value={serialInput} onChange={(e) => setSerialInput(e.target.value)} />
+              <button type="button" className="btn-ghost mt-1" disabled={!serialInput.trim()} onClick={addSerials}>เพิ่มซีเรียล</button>
+              <p className="mt-1 text-xs text-slate-400">รับสินค้าครั้งถัดไปจะลงทะเบียนซีเรียลอัตโนมัติ — หรือเพิ่มที่นี่สำหรับสต็อกเดิม</p>
             </div>
           )}
 

@@ -75,7 +75,12 @@ is already branch-correct).
   and records **opening/manual batches** (no stock movement) for pre-existing stock; "ใกล้หมดอายุ"
   report (also surfaced in the topbar notification bell as near-expiry/expired alerts).
   Verified FEFO + report + opening-count end-to-end
-- ⬜ Serial-number tracking — **large**: per-unit records + scan-in/scan-out
+- 🟨 Serial-number tracking — opt-in per product (`Product.trackSerials`). `ProductSerial`
+  (per-unit serialNo + status IN_STOCK/SOLD/RETURNED + receipt ref). **Phase 1**: serials are
+  scanned-in on **receiving** (Receive page serials field per serialized line → `registerSerials`),
+  registered manually for opening stock, looked up + status-managed in the product editor.
+  Phase 2 (TODO): auto-consume serials at POS checkout (capture/scan the sold unit) + a serial
+  history/warranty lookup report. No checkout changes yet, so nothing breaks.
 
 ## 4. Sales & customer features
 - ✅ Member purchase history + lifetime value — `GET /api/members/:id/sales` returns the

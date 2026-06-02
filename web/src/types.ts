@@ -24,6 +24,7 @@ export interface Product {
   reorderLevel: number;
   stockQty: number;
   trackBatches?: boolean;
+  trackSerials?: boolean;
   isActive: boolean;
 }
 
