@@ -6,6 +6,7 @@ import { nextSeq, postMovement } from '../lib/stock.js';
 import { postPoints } from '../lib/loyalty.js';
 import { postGift } from '../lib/giftcard.js';
 import { computeTenderPlan } from '../lib/tender.js';
+import { computeRedeem, computeEarn } from '../lib/loyaltyCalc.js';
 import { buildPromptPayPayload, type PromptPayType } from '../lib/promptpay.js';
 import { evaluatePromotions, type PromoCartLine } from '../lib/promotions.js';
 
@@ -125,11 +126,10 @@ salesRouter.post(
       let redeemValue = 0;
       if (memberId && setting.loyaltyEnabled && data.pointsRedeem > 0) {
         const m = await tx.member.findUniqueOrThrow({ where: { id: memberId }, select: { points: true } });
-        const redeemRate = Number(setting.pointsRedeemValue) || 0;
-        const room = Math.max(0, subtotal - promoDiscount - manualDiscount);
-        const maxByRoom = redeemRate > 0 ? Math.floor(room / redeemRate) : 0;
-        pointsRedeemed = Math.max(0, Math.min(data.pointsRedeem, m.points, maxByRoom));
-        redeemValue = round2(pointsRedeemed * redeemRate);
+        ({ pointsRedeemed, redeemValue } = computeRedeem({
+          requested: data.pointsRedeem, memberPoints: m.points,
+          redeemRate: Number(setting.pointsRedeemValue) || 0, subtotal, promoDiscount, manualDiscount,
+        }));
       }
 
       const discount = round2(Math.min(subtotal, manualDiscount + promoDiscount + redeemValue));
@@ -137,11 +137,7 @@ salesRouter.post(
       const total = round2(taxInclusive ? subtotal - discount : subtotal + taxAmount - discount);
 
       // Points earned on the net total (only when loyalty is on and a member is attached).
-      let pointsEarned = 0;
-      if (memberId && setting.loyaltyEnabled) {
-        const earnBaht = Number(setting.pointsEarnBaht) || 0;
-        if (earnBaht > 0) pointsEarned = Math.floor(total / earnBaht);
-      }
+      const pointsEarned = memberId && setting.loyaltyEnabled ? computeEarn(total, Number(setting.pointsEarnBaht) || 0) : 0;
 
       // ---- Tender plan: single payment, or split / multi-tender ----
       const { paymentRows, cashTendered, changeDue, dominant, isSplit } = computeTenderPlan({
