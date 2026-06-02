@@ -216,6 +216,64 @@ productsRouter.post(
   })
 );
 
+// Bulk catalog import (upsert by SKU). Category is matched by name (created if new).
+// Stock is NOT touched — receive/adjust still go through the ledger.
+const importRow = z.object({
+  sku: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  barcode: z.string().trim().optional().nullable(),
+  category: z.string().trim().optional(),
+  unit: z.string().trim().optional(),
+  cost: z.coerce.number().nonnegative().optional(),
+  retailPrice: z.coerce.number().nonnegative().optional(),
+  wholesalePrice: z.coerce.number().nonnegative().optional(),
+  wholesaleMinQty: z.coerce.number().int().positive().optional(),
+  reorderLevel: z.coerce.number().int().nonnegative().optional(),
+});
+
+productsRouter.post(
+  '/import',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const rows = z.array(z.record(z.any())).max(5000).parse(req.body?.rows);
+    let created = 0, updated = 0;
+    const errors: { row: number; sku?: string; error: string }[] = [];
+    const catCache = new Map<string, number>();
+    (await prisma.category.findMany()).forEach((c) => catCache.set(c.name.toLowerCase(), c.id));
+
+    for (let i = 0; i < rows.length; i++) {
+      const parsed = importRow.safeParse(rows[i]);
+      if (!parsed.success) { errors.push({ row: i + 1, sku: String(rows[i]?.sku ?? ''), error: parsed.error.issues[0]?.message ?? 'invalid' }); continue; }
+      const r = parsed.data;
+      try {
+        let categoryId: number | null = null;
+        if (r.category) {
+          const key = r.category.toLowerCase();
+          categoryId = catCache.get(key) ?? (await prisma.category.create({ data: { name: r.category } })).id;
+          catCache.set(key, categoryId);
+        }
+        const fields = {
+          name: r.name,
+          barcode: r.barcode || null,
+          ...(categoryId != null ? { categoryId } : {}),
+          ...(r.unit ? { unit: r.unit } : {}),
+          ...(r.cost != null ? { cost: r.cost } : {}),
+          ...(r.retailPrice != null ? { retailPrice: r.retailPrice } : {}),
+          ...(r.wholesalePrice != null ? { wholesalePrice: r.wholesalePrice } : {}),
+          ...(r.wholesaleMinQty != null ? { wholesaleMinQty: r.wholesaleMinQty } : {}),
+          ...(r.reorderLevel != null ? { reorderLevel: r.reorderLevel } : {}),
+        };
+        const existing = await prisma.product.findUnique({ where: { sku: r.sku }, select: { id: true } });
+        await prisma.product.upsert({ where: { sku: r.sku }, create: { sku: r.sku, ...fields }, update: fields });
+        if (existing) updated++; else created++;
+      } catch (e) {
+        errors.push({ row: i + 1, sku: r.sku, error: (e as Error).message.split('\n')[0] });
+      }
+    }
+    res.json({ created, updated, errors, total: rows.length });
+  })
+);
+
 productsRouter.put(
   '/:id',
   requireRole('ADMIN', 'MANAGER'),

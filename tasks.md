@@ -47,6 +47,10 @@ is already branch-correct).
 - ⬜ Customer pole display (VFD) support
 
 ## 3. Inventory depth
+- ✅ Bulk product import (CSV/Excel) — `POST /api/products/import` upserts by SKU,
+  resolves/creates categories by name (catalog only — stock stays in the ledger);
+  Products page "นำเข้า" button parses the file with `xlsx` (lazy) and reports
+  created/updated/errors. Complements the existing CSV/Excel/ZIP export
 - ✅ Reorder suggestions / **auto-PO generation** from low-stock (branch-aware;
   suggested qty + last cost + preferred supplier; one-click creates POs grouped
   by supplier) — on the Purchase Orders page

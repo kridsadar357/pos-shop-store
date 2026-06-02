@@ -45,6 +45,32 @@ export default function Products() {
   const [spForm, setSpForm] = useState<{ supplierId: number | ''; unitCost: number; isPreferred: boolean }>({ supplierId: '', unitCost: 0, isPreferred: false });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+
+  async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImporting(true);
+    try {
+      const XLSX = await import('xlsx');
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      if (!rows.length) { toast.error('ไฟล์ว่างเปล่า'); return; }
+      const res = await api<{ created: number; updated: number; errors: { row: number; error: string }[]; total: number }>(
+        '/products/import', { method: 'POST', body: { rows } }
+      );
+      const errMsg = res.errors.length ? ` · ผิดพลาด ${res.errors.length}` : '';
+      toast.success(`นำเข้าสำเร็จ: เพิ่ม ${res.created} · แก้ไข ${res.updated}${errMsg}`);
+      if (res.errors.length) console.warn('Import errors:', res.errors);
+      load();
+    } catch (err) {
+      toast.error('นำเข้าไม่สำเร็จ: ' + (err as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function load() {
     setProducts(await api<Product[]>('/products', { query: { q } }));
@@ -165,7 +191,15 @@ export default function Products() {
         subtitle={`${filtered.length} รายการ`}
         icon={<i className="fa-solid fa-box" />}
         q={q} setQ={setQ} placeholder="ค้นหาชื่อ / รหัส SKU / บาร์โค้ด…"
-        primary={<button className="btn-primary" onClick={openNew}><i className="fa-solid fa-plus mr-1.5" />เพิ่มสินค้า</button>}
+        primary={
+          <div className="flex gap-2">
+            <input ref={importRef} type="file" accept=".csv,.xlsx,.xls,text/csv" className="hidden" onChange={onImportFile} />
+            <button className="btn-ghost" disabled={importing} onClick={() => importRef.current?.click()} title="นำเข้าจาก CSV/Excel (คอลัมน์: sku, name, barcode, category, unit, cost, retailPrice, wholesalePrice, wholesaleMinQty, reorderLevel)">
+              <i className="fa-solid fa-file-import mr-1.5" />{importing ? 'กำลังนำเข้า…' : 'นำเข้า'}
+            </button>
+            <button className="btn-primary" onClick={openNew}><i className="fa-solid fa-plus mr-1.5" />เพิ่มสินค้า</button>
+          </div>
+        }
         exports={{ ...exporters, zip: () => exportProductsZip('products-with-images.zip', columns, filtered) }}
         filterCount={filterCount}
         onResetFilter={() => { setCatFilter(''); setMinPrice(''); setMaxPrice(''); setStockFilter(''); }}
