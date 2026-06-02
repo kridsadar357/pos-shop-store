@@ -13,7 +13,9 @@
     "db:seed": "npm --prefix server run seed",
     "setup": "npm --prefix server install && npm --prefix web install",
     "dev": "concurrently -n server,web -c blue,magenta \"npm --prefix server run dev\" \"npm --prefix web run dev\"",
-    "build": "npm --prefix server run build && npm --prefix web run build"
+    "build": "npm --prefix server run build && npm --prefix web run build",
+    "test": "npm --prefix server test",
+    "test:integration": "npm --prefix server run test:integration"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
