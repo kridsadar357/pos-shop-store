@@ -5,13 +5,15 @@ import { PageHeader } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import { toast } from '../../components/Toast';
 
-interface U { id: number; username: string; name: string; role: string; isActive: boolean; }
+interface U { id: number; username: string; name: string; role: string; isActive: boolean; hasPin?: boolean; }
 
 export default function Users() {
   const [users, setUsers] = useState<U[]>([]);
   const [form, setForm] = useState<{ username: string; name: string; password: string; role: string } | null>(null);
   const [resetFor, setResetFor] = useState<U | null>(null);
   const [newPw, setNewPw] = useState('');
+  const [pinFor, setPinFor] = useState<U | null>(null);
+  const [newPin, setNewPin] = useState('');
 
   async function load() { setUsers(await api<U[]>('/users')); }
   useEffect(() => { load(); }, []);
@@ -44,6 +46,17 @@ export default function Users() {
     } catch (e) { toast.error((e as Error).message); }
   }
 
+  async function savePin(clear = false) {
+    if (!pinFor) return;
+    if (!clear && !/^\d{4,8}$/.test(newPin)) return toast.error('PIN ต้องเป็นตัวเลข 4–8 หลัก');
+    try {
+      await api(`/users/${pinFor.id}`, { method: 'PUT', body: { pin: clear ? '' : newPin } });
+      toast.success(clear ? `ลบ PIN ของ ${pinFor.name} แล้ว` : `ตั้ง PIN ของ ${pinFor.name} แล้ว`);
+      setPinFor(null); setNewPin('');
+      load();
+    } catch (e) { toast.error((e as Error).message); }
+  }
+
   return (
     <div className="flex h-full flex-col gap-4">
       <PageHeader
@@ -65,7 +78,8 @@ export default function Users() {
             <td className="px-4 py-3"><span className="chip bg-brand-50 text-brand-700">{({ ADMIN: 'ผู้ดูแลระบบ', MANAGER: 'ผู้จัดการ', CASHIER: 'แคชเชียร์' } as Record<string, string>)[u.role] ?? u.role}</span></td>
             <td className="px-4 py-3"><span className={`chip ${u.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{u.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
             <td className="px-4 py-3 text-right whitespace-nowrap">
-              <button className="text-sm font-semibold text-amber-600" onClick={() => { setResetFor(u); setNewPw(''); }}>รีเซ็ตรหัสผ่าน</button>
+              <button className="text-sm font-semibold text-violet-600" onClick={() => { setPinFor(u); setNewPin(''); }}>PIN{u.hasPin ? ' ✓' : ''}</button>
+              <button className="ml-3 text-sm font-semibold text-amber-600" onClick={() => { setResetFor(u); setNewPw(''); }}>รีเซ็ตรหัสผ่าน</button>
               <button className="ml-3 text-sm font-semibold text-brand-600" onClick={() => toggle(u)}>{u.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</button>
             </td>
           </tr>
@@ -93,6 +107,18 @@ export default function Users() {
           <div><label className="label">รหัสผ่านใหม่</label><input className="input" type="text" autoFocus value={newPw} onChange={(e) => setNewPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && resetPassword()} placeholder="อย่างน้อย 4 ตัวอักษร" /></div>
           <p className="mt-2 text-xs text-slate-400">ผู้ใช้จะเข้าสู่ระบบด้วยรหัสผ่านนี้ และควรเปลี่ยนเองภายหลัง</p>
           <div className="mt-5 flex gap-2"><button className="btn-ghost flex-1" onClick={() => setResetFor(null)}>ยกเลิก</button><button className="btn-primary flex-1" disabled={newPw.length < 4} onClick={resetPassword}>รีเซ็ต</button></div>
+        </Modal>
+      )}
+
+      {pinFor && (
+        <Modal title={`PIN สลับผู้ใช้ · ${pinFor.name}`} onClose={() => setPinFor(null)}>
+          <div><label className="label">PIN (ตัวเลข 4–8 หลัก)</label><input className="input font-mono tracking-widest" inputMode="numeric" autoFocus value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 8))} onKeyDown={(e) => e.key === 'Enter' && savePin()} placeholder="••••" /></div>
+          <p className="mt-2 text-xs text-slate-400">ใช้กดสลับผู้ใช้อย่างรวดเร็วที่หน้าขาย (ไม่ต้องพิมพ์รหัสผ่าน)</p>
+          <div className="mt-5 flex gap-2">
+            {pinFor.hasPin && <button className="btn-ghost text-rose-600" onClick={() => savePin(true)}>ลบ PIN</button>}
+            <button className="btn-ghost flex-1" onClick={() => setPinFor(null)}>ยกเลิก</button>
+            <button className="btn-primary flex-1" disabled={!/^\d{4,8}$/.test(newPin)} onClick={() => savePin()}>บันทึก</button>
+          </div>
         </Modal>
       )}
     </div>

@@ -129,7 +129,9 @@ is already branch-correct).
   action label, status, IP) after the response finishes; no request bodies stored.
   ADMIN-only viewer page (`/back/audit`) with search / date-range / method filters
   and export
-- ⬜ Per-user PIN / quick cashier switch on the POS
+- ✅ Per-user PIN / quick cashier switch on the POS — `User.pinHash`; admin sets/clears
+  a 4–8 digit PIN on the Users page; the POS *More* menu has a PIN-pad "สลับผู้ใช้" that
+  re-authenticates via `POST /api/auth/pin` and reloads the new user's shift
 - ✅ Password management — self-service **change password** (`/api/auth/change-password`,
   verifies current; available to every role from the back-office user menu and the POS
   More menu) + admin **reset password** per user on the Users page (PUT). (True

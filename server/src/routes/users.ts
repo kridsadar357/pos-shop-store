@@ -10,12 +10,11 @@ usersRouter.use(requireAuth, requireRole('ADMIN'));
 usersRouter.get(
   '/',
   ah(async (_req, res) => {
-    res.json(
-      await prisma.user.findMany({
-        select: { id: true, username: true, name: true, role: true, isActive: true, createdAt: true },
-        orderBy: { id: 'asc' },
-      })
-    );
+    const users = await prisma.user.findMany({
+      select: { id: true, username: true, name: true, role: true, isActive: true, createdAt: true, pinHash: true },
+      orderBy: { id: 'asc' },
+    });
+    res.json(users.map(({ pinHash, ...u }) => ({ ...u, hasPin: !!pinHash })));
   })
 );
 
@@ -47,6 +46,11 @@ usersRouter.put(
     if (body.role) data.role = body.role;
     if (typeof req.body.isActive === 'boolean') data.isActive = req.body.isActive;
     if (body.password) data.passwordHash = await bcrypt.hash(body.password, 10);
+    // Set or clear the quick-switch PIN (4–8 digits; empty/null clears it).
+    if ('pin' in req.body) {
+      const pin = req.body.pin;
+      data.pinHash = pin ? await bcrypt.hash(String(pin), 10) : null;
+    }
     const user = await prisma.user.update({
       where: { id: Number(req.params.id) },
       data,

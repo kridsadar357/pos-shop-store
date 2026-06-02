@@ -40,7 +40,7 @@ interface Stats {
 }
 
 export default function POS() {
-  const { user, logout } = useAuth();
+  const { user, logout, loginWithPin } = useAuth();
   const navigate = useNavigate();
   const { current: shift, refresh: refreshShift } = useShift();
 
@@ -81,6 +81,7 @@ export default function POS() {
   const [printSale, setPrintSale] = useState<Sale | null>(null);
   const [printXReport, setPrintXReport] = useState(false);
   const [changePw, setChangePw] = useState(false);
+  const [pinSwitch, setPinSwitch] = useState(false);
   const doPrint = (sale: Sale) => printReceipt(sale, setting, () => setPrintSale(sale));
   const [autoPrint, setAutoPrint] = useState(localStorage.getItem('pos_autoprint') === '1');
   const [held, setHeld] = useState<HeldBill[]>([]);
@@ -317,7 +318,7 @@ export default function POS() {
   // Intelligent auto-focus: keep the invisible barcode reader focused so a scan
   // is always captured — unless the cashier is typing in a field or a modal is open.
   useEffect(() => {
-    const overlay = priceCheck || pickMember || transfer || closing || cashDrawer || splitPay || showHeld || showPromo || !!lastSale || showCam || showSearch || showNotif || moreOpen;
+    const overlay = priceCheck || pickMember || transfer || closing || cashDrawer || splitPay || pinSwitch || showHeld || showPromo || !!lastSale || showCam || showSearch || showNotif || moreOpen;
     const focusScan = () => {
       if (overlay) return;
       const a = document.activeElement as HTMLElement | null;
@@ -463,6 +464,7 @@ export default function POS() {
               <div className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl bg-white py-1 shadow-pop ring-1 ring-slate-200" onMouseLeave={() => setMoreOpen(false)}>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setCashDrawer(true); }}><i className="fa-solid fa-money-bill-transfer mr-2 text-slate-400" />{th.cashInOut}</button>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setPrintXReport(true); }}><i className="fa-solid fa-file-invoice-dollar mr-2 text-slate-400" />{th.xReport}</button>
+                <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setPinSwitch(true); }}><i className="fa-solid fa-user-group mr-2 text-slate-400" />สลับผู้ใช้ (PIN)</button>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setChangePw(true); }}><i className="fa-solid fa-key mr-2 text-slate-400" />เปลี่ยนรหัสผ่าน</button>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); setClosing(true); }}><i className="fa-solid fa-clock mr-2 text-slate-400" />{th.closeShift}</button>
                 <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMoreOpen(false); window.open('/display', 'pos-customer-display', 'width=1100,height=720'); }}><i className="fa-solid fa-desktop mr-2 text-slate-400" />{th.customerDisplay}</button>
@@ -745,6 +747,7 @@ export default function POS() {
       {printSale && <ReceiptPrint sale={printSale} setting={setting} onDone={() => setPrintSale(null)} />}
       {printXReport && shift && <ShiftReport shift={{ ...shift, user: user ? { name: user.name } : undefined }} setting={setting} mode="X" onDone={() => setPrintXReport(false)} />}
       {changePw && <ChangePasswordModal onClose={() => setChangePw(false)} />}
+      {pinSwitch && <PinSwitchModal onClose={() => setPinSwitch(false)} onSwitched={() => { setPinSwitch(false); refreshShift(); reload(); }} loginWithPin={loginWithPin} />}
     </div>
   );
 }
@@ -1066,6 +1069,49 @@ function SplitPaymentModal({ total, currency, onConfirm, onCancel }: { total: nu
           <button className="btn-ghost flex-1" onClick={onCancel}>{th.cancel}</button>
           <button className="btn-primary flex-1" disabled={!valid} onClick={() => onConfirm(rows.filter((r) => r.amount > 0))}>{th.confirmPayment}</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Quick cashier switch: enter a PIN to re-authenticate as another user. */
+function PinSwitchModal({ onClose, onSwitched, loginWithPin }: { onClose: () => void; onSwitched: () => void; loginWithPin: (pin: string) => Promise<void> }) {
+  const [pin, setPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const press = (d: string) => setPin((p) => (p.length < 8 ? p + d : p));
+
+  async function submit() {
+    if (pin.length < 4) return toast.error('PIN อย่างน้อย 4 หลัก');
+    setBusy(true);
+    try {
+      await loginWithPin(pin);
+      toast.success('สลับผู้ใช้แล้ว');
+      onSwitched();
+    } catch (e) {
+      toast.error((e as Error).message);
+      setPin('');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={onClose}>
+      <div className="card w-full max-w-xs p-6 text-center" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-bold"><i className="fa-solid fa-user-group mr-2 text-brand-600" />สลับผู้ใช้</h3>
+        <p className="mt-1 text-xs text-slate-400">กรอก PIN ของพนักงาน</p>
+        <div className="mx-auto mt-4 flex h-12 items-center justify-center gap-2 rounded-xl bg-slate-50 text-2xl font-bold tracking-[0.4em] ring-1 ring-slate-200">
+          {pin ? '•'.repeat(pin.length) : <span className="text-base tracking-normal text-slate-300">••••</span>}
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+            <button key={d} className="rounded-xl bg-slate-100 py-3 text-xl font-bold text-slate-700 hover:bg-slate-200" onClick={() => press(d)}>{d}</button>
+          ))}
+          <button className="rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-500 hover:bg-slate-200" onClick={() => setPin((p) => p.slice(0, -1))}><i className="fa-solid fa-delete-left" /></button>
+          <button className="rounded-xl bg-slate-100 py-3 text-xl font-bold text-slate-700 hover:bg-slate-200" onClick={() => press('0')}>0</button>
+          <button className="rounded-xl bg-brand-600 py-3 text-white hover:bg-brand-700 disabled:opacity-50" disabled={busy || pin.length < 4} onClick={submit}><i className="fa-solid fa-check" /></button>
+        </div>
+        <button className="mt-3 text-sm text-slate-400" onClick={onClose}>ยกเลิก</button>
       </div>
     </div>
   );

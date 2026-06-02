@@ -24,6 +24,22 @@ authRouter.post(
   })
 );
 
+// Quick cashier switch on a shared POS terminal: log in by PIN alone.
+authRouter.post(
+  '/pin',
+  ah(async (req, res) => {
+    const { pin } = z.object({ pin: z.string().min(4).max(8) }).parse(req.body);
+    const users = await prisma.user.findMany({ where: { isActive: true, pinHash: { not: null } } });
+    for (const u of users) {
+      if (u.pinHash && (await bcrypt.compare(pin, u.pinHash))) {
+        const profile = { id: u.id, username: u.username, name: u.name, role: u.role };
+        return res.json({ token: signToken(profile), user: profile });
+      }
+    }
+    return res.status(401).json({ error: 'PIN ไม่ถูกต้อง' });
+  })
+);
+
 authRouter.get(
   '/me',
   requireAuth,

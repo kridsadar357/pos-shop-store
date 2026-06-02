@@ -13,6 +13,7 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  loginWithPin: (pin: string) => Promise<void>;
   logout: () => void;
   restore: () => Promise<void>;
 }
@@ -33,6 +34,12 @@ export const useAuth = create<AuthState>((set) => ({
     } finally {
       set({ loading: false });
     }
+  },
+  async loginWithPin(pin) {
+    const res = await api<{ token: string; user: User }>('/auth/pin', { method: 'POST', body: { pin } });
+    setToken(res.token);
+    localStorage.setItem('pos_user', JSON.stringify(res.user));
+    set({ user: res.user });
   },
   logout() {
     setToken(null);

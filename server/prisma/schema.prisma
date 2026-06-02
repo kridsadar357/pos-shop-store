@@ -66,6 +66,7 @@ model User {
   name         String
   role         Role     @default(CASHIER)
   isActive     Boolean  @default(true)
+  pinHash      String?  // optional hashed PIN for quick cashier switch at the POS
   createdAt    DateTime @default(now())
 
   sales         Sale[]          @relation("CashierSales")
