@@ -92,6 +92,8 @@ model Setting {
   receiptFooter String        @default("Thank you!")
   // When true, attaching a member to a sale applies wholesale pricing to all lines.
   memberGetsWholesale Boolean  @default(true)
+  // Max manual bill-discount % a CASHIER may apply at checkout (100 = unlimited; ADMIN/MANAGER unlimited).
+  cashierMaxDiscountPct Int    @default(100)
   // Loyalty points
   loyaltyEnabled    Boolean @default(false)
   pointsEarnBaht    Decimal @default(25) @db.Decimal(12, 2) // baht spent to earn 1 point (0 = no earning)

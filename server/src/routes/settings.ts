@@ -95,6 +95,7 @@ const schema = z.object({
   smsSender: z.string().default(''),
   autoReceiptEmail: z.boolean().default(false),
   autoReceiptSms: z.boolean().default(false),
+  cashierMaxDiscountPct: z.number().int().min(0).max(100).default(100),
 });
 
 settingsRouter.put(

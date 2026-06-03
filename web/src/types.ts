@@ -41,6 +41,7 @@ export interface Setting {
   taxInclusive: boolean;
   receiptFooter: string;
   memberGetsWholesale: boolean;
+  cashierMaxDiscountPct: number;
   loyaltyEnabled: boolean;
   pointsEarnBaht: string;
   pointsRedeemValue: string;

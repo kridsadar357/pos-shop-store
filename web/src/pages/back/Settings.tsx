@@ -32,7 +32,7 @@ export default function Settings() {
   async function save() {
     if (!s) return;
     try {
-      await api('/settings', { method: 'PUT', body: { ...s, taxRatePct: num(s.taxRatePct), pointsEarnBaht: num(s.pointsEarnBaht), pointsRedeemValue: num(s.pointsRedeemValue), escposCodepage: Math.round(num(s.escposCodepage)), secondaryRate: num(s.secondaryRate) } });
+      await api('/settings', { method: 'PUT', body: { ...s, taxRatePct: num(s.taxRatePct), pointsEarnBaht: num(s.pointsEarnBaht), pointsRedeemValue: num(s.pointsRedeemValue), escposCodepage: Math.round(num(s.escposCodepage)), secondaryRate: num(s.secondaryRate), cashierMaxDiscountPct: Math.round(num(s.cashierMaxDiscountPct)) } });
       toast.success('บันทึกการตั้งค่าแล้ว');
     } catch (e) { toast.error((e as Error).message); }
   }
@@ -109,6 +109,13 @@ function GeneralTab({ s, set, save }: { s: Setting; set: (p: Partial<Setting>) =
               <div className="text-xs text-slate-400">เมื่อเปิด การเลือกสมาชิกตอนชำระเงินจะใช้ราคาส่งกับทุกรายการ</div>
             </div>
             <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={s.memberGetsWholesale} onChange={(e) => set({ memberGetsWholesale: e.target.checked })} />
+          </label>
+          <label className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
+            <div>
+              <div className="text-sm font-semibold">เพดานส่วนลดของแคชเชียร์ (%)</div>
+              <div className="text-xs text-slate-400">ส่วนลดบิลสูงสุดที่แคชเชียร์กดได้ (100 = ไม่จำกัด; ผู้จัดการ/ผู้ดูแลไม่จำกัด)</div>
+            </div>
+            <input type="number" min={0} max={100} className="input w-24 text-right" value={s.cashierMaxDiscountPct ?? 100} onChange={(e) => set({ cashierMaxDiscountPct: Number(e.target.value) })} />
           </label>
         </Section>
         <Section title="แต้มสะสม (Loyalty)">

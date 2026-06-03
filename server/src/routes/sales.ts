@@ -11,6 +11,7 @@ import { sendMail } from '../lib/mailer.js';
 import { buildReceiptSms } from '../lib/receiptSms.js';
 import { sendSms } from '../lib/sms.js';
 import { shouldEmailReceipt, shouldSmsReceipt } from '../lib/autoReceipt.js';
+import { withinDiscountLimit } from '../lib/discountLimit.js';
 import { computeTenderPlan } from '../lib/tender.js';
 import { baseFromForeign, fxNote } from '../lib/fx.js';
 import { computeRedeem, computeEarn } from '../lib/loyaltyCalc.js';
@@ -123,6 +124,11 @@ salesRouter.post(
       }), { couponCode: data.couponCode });
       const promoDiscount = promoResult.promoDiscount;
       const manualDiscount = round2(data.discount);
+
+      // Enforce the cashier manual-discount cap (ADMIN/MANAGER unlimited). Throws → rolls back.
+      if (!withinDiscountLimit({ role: req.user!.role, discountAmount: manualDiscount, subtotal, maxPct: Number(setting.cashierMaxDiscountPct ?? 100) })) {
+        throw Object.assign(new Error(`ส่วนลดเกินสิทธิ์ของแคชเชียร์ (สูงสุด ${setting.cashierMaxDiscountPct}% ของยอดสินค้า)`), { status: 403 });
+      }
 
       // Loyalty redemption: spend points as a discount (capped by balance and the
       // remaining bill room after promo + manual discounts).
