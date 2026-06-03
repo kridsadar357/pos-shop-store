@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
@@ -39,6 +40,8 @@ const checkoutSchema = z.object({
   // Idempotency key for offline replay / double-submit protection. Resending the same
   // clientRef returns the original sale instead of creating a duplicate.
   clientRef: z.string().min(1).max(80).optional(),
+  // A manager/admin PIN to approve a manual discount that exceeds the cashier cap.
+  discountApprovalPin: z.string().min(4).max(8).optional(),
   // Optional split / multi-tender payments. When omitted, the single paymentMethod
   // (+ cashReceived) is used as today.
   payments: z
@@ -125,9 +128,19 @@ salesRouter.post(
       const promoDiscount = promoResult.promoDiscount;
       const manualDiscount = round2(data.discount);
 
-      // Enforce the cashier manual-discount cap (ADMIN/MANAGER unlimited). Throws → rolls back.
+      // Enforce the cashier manual-discount cap (ADMIN/MANAGER unlimited). An over-cap discount
+      // is allowed only with a valid manager/admin PIN, whose name is recorded on the bill.
+      let discountApprover: string | null = null;
       if (!withinDiscountLimit({ role: req.user!.role, discountAmount: manualDiscount, subtotal, maxPct: Number(setting.cashierMaxDiscountPct ?? 100) })) {
-        throw Object.assign(new Error(`ส่วนลดเกินสิทธิ์ของแคชเชียร์ (สูงสุด ${setting.cashierMaxDiscountPct}% ของยอดสินค้า)`), { status: 403 });
+        if (data.discountApprovalPin) {
+          const mgrs = await tx.user.findMany({ where: { isActive: true, role: { in: ['ADMIN', 'MANAGER'] }, pinHash: { not: null } } });
+          for (const u of mgrs) {
+            if (u.pinHash && (await bcrypt.compare(data.discountApprovalPin, u.pinHash))) { discountApprover = u.name; break; }
+          }
+        }
+        if (!discountApprover) {
+          throw Object.assign(new Error(`ส่วนลดเกินสิทธิ์ของแคชเชียร์ (สูงสุด ${setting.cashierMaxDiscountPct}% ของยอดสินค้า) — ต้องได้รับการอนุมัติจากผู้จัดการ`), { status: 403 });
+        }
       }
 
       // Loyalty redemption: spend points as a discount (capped by balance and the
@@ -161,6 +174,8 @@ salesRouter.post(
         cashReceived = baseFromForeign(data.cashForeignAmount, rate);
         paymentRef = fxNote(data.cashForeignAmount, data.cashCurrency, rate);
       }
+      // Record who approved an over-cap discount (for the receipt / audit).
+      if (discountApprover) paymentRef = `${paymentRef ? paymentRef + ' · ' : ''}อนุมัติส่วนลด: ${discountApprover}`;
 
       // ---- Tender plan: single payment, or split / multi-tender ----
       const { paymentRows, cashTendered, changeDue, dominant, isSplit } = computeTenderPlan({

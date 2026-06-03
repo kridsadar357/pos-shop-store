@@ -62,6 +62,8 @@ export default function POS() {
   const [lines, setLines] = useState<Line[]>([]);
   const [member, setMember] = useState<Member | null>(null);
   const [discount, setDiscount] = useState(0);
+  // Manager/admin PIN approving an over-cap cashier discount (sent at checkout; server verifies).
+  const [discountApprovalPin, setDiscountApprovalPin] = useState<string | null>(null);
   const [showDiscount, setShowDiscount] = useState(false);
   const [redeemPts, setRedeemPts] = useState(0);
   const [coupon, setCoupon] = useState('');
@@ -178,7 +180,7 @@ export default function POS() {
     setLines((prev) => prev.map((l) => (l.product.id === id ? { ...l, serials } : l)));
   }
   const parseSerials = (s?: string) => (s ?? '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
-  function clearCart() { setLines([]); setMember(null); setDiscount(0); setRedeemPts(0); setCashReceived(0); setForeignCash(false); setCoupon(''); setPromo({ promoDiscount: 0, applied: [] }); checkoutRef.current = null; }
+  function clearCart() { setLines([]); setMember(null); setDiscount(0); setDiscountApprovalPin(null); setRedeemPts(0); setCashReceived(0); setForeignCash(false); setCoupon(''); setPromo({ promoDiscount: 0, applied: [] }); checkoutRef.current = null; }
 
   // Live promotion preview whenever the cart / coupon / pricing context changes.
   useEffect(() => {
@@ -222,7 +224,7 @@ export default function POS() {
     }
     // Cashier manual-discount cap (mirrors the server enforcement; ADMIN/MANAGER unlimited).
     const maxPct = num(setting?.cashierMaxDiscountPct ?? 100);
-    const discountCap = user?.role === 'CASHIER' && maxPct < 100 ? Math.round((subtotal * maxPct) / 100 * 100) / 100 : Infinity;
+    const discountCap = user?.role === 'CASHIER' && maxPct < 100 && !discountApprovalPin ? Math.round((subtotal * maxPct) / 100 * 100) / 100 : Infinity;
     const manualDisc = Math.min(discount, subtotal, discountCap);
     const discountCapped = discount > discountCap;
     const promoDisc = Math.min(promo.promoDiscount, subtotal - manualDisc);
@@ -236,7 +238,7 @@ export default function POS() {
     const net = inc ? subtotal - disc : subtotal + tax - disc;
     const count = lines.reduce((s, l) => s + l.qty, 0);
     return { subtotal, tax, manualDisc, promoDisc, redeemDisc, usePts, maxRedeemPts, disc, net, count, discountCapped, maxPct };
-  }, [lines, mode, member, setting, discount, promo, redeemPts, user]);
+  }, [lines, mode, member, setting, discount, promo, redeemPts, user, discountApprovalPin]);
 
   const fxRate = num(setting?.secondaryRate ?? 0) || 0;
   const fxCurrency = setting?.secondaryCurrency || '';
@@ -293,6 +295,7 @@ export default function POS() {
       ...(cashFx && method === 'CASH' ? { cashCurrency: fxCurrency, cashForeignAmount: cashReceived } : {}),
       paymentRef: ref, memberId: member?.id ?? null, pointsRedeem: totals.usePts, branchId: useBranch.getState().activeId ?? undefined,
       clientRef: checkoutRef.current,
+      ...(discountApprovalPin ? { discountApprovalPin } : {}),
       ...(payments ? { payments } : {}),
       items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, ...(l.product.trackSerials && parseSerials(l.serials).length ? { serials: parseSerials(l.serials) } : {}) })),
     };
@@ -709,7 +712,16 @@ export default function POS() {
                 )}
               </div>
               {totals.discountCapped && (
-                <div className="mb-2 text-[11px] font-semibold text-rose-500"><i className="fa-solid fa-triangle-exclamation mr-1" />{th.discountOverCap(totals.maxPct)}</div>
+                <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-semibold text-rose-500">
+                  <span><i className="fa-solid fa-triangle-exclamation mr-1" />{th.discountOverCap(totals.maxPct)}</span>
+                  <button className="shrink-0 rounded-lg bg-amber-500 px-2 py-1 text-[11px] font-bold text-white hover:bg-amber-600" onClick={() => { const pin = window.prompt(th.managerApprovePrompt); if (pin && pin.trim()) setDiscountApprovalPin(pin.trim()); }}>{th.managerApprove}</button>
+                </div>
+              )}
+              {discountApprovalPin && !totals.discountCapped && user?.role === 'CASHIER' && (
+                <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-emerald-600">
+                  <span><i className="fa-solid fa-circle-check mr-1" />{th.managerApproved}</span>
+                  <button className="shrink-0 text-slate-400 hover:text-rose-500" onClick={() => setDiscountApprovalPin(null)}><i className="fa-solid fa-xmark" /></button>
+                </div>
               )}
 
               {/* Loyalty: redeem the attached member's points as a discount */}

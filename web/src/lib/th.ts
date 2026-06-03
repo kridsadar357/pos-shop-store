@@ -236,6 +236,9 @@ const thDict = {
   tbImagesZip: 'รูปภาพ + CSV (.zip)',
   tbNoData: 'ไม่มีข้อมูล',
   discountOverCap: (pct: number) => `ส่วนลดเกินเพดานของแคชเชียร์ (สูงสุด ${pct}% ของยอดสินค้า)`,
+  managerApprove: 'ผู้จัดการอนุมัติ',
+  managerApprovePrompt: 'กรอก PIN ผู้จัดการเพื่ออนุมัติส่วนลด',
+  managerApproved: 'ผู้จัดการอนุมัติส่วนลดแล้ว',
 };
 
 const enDict: typeof thDict = {
@@ -468,6 +471,9 @@ const enDict: typeof thDict = {
   tbImagesZip: 'Images + CSV (.zip)',
   tbNoData: 'No data',
   discountOverCap: (pct: number) => `Discount exceeds the cashier cap (max ${pct}% of items)`,
+  managerApprove: 'Manager approve',
+  managerApprovePrompt: 'Enter a manager PIN to approve this discount',
+  managerApproved: 'Discount approved by a manager',
 };
 
 export type Lang = 'th' | 'en';
