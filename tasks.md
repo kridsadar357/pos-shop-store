@@ -234,11 +234,18 @@ is already branch-correct).
   replay AND double-click/flaky-network double-submits. Pre-check by clientRef + a P2002
   unique-race fallback inside the handler; the POS generates a stable `crypto.randomUUID()` per
   cart (reused on retry, reset by `clearCart` on success). Verified e2e: same ref twice → one
-  sale (201 then 200, identical id); no-ref path still 201. **Still pending (Phase 2+):** the
-  client doesn't yet cache the catalog or queue sales while actually offline — needs IndexedDB
-  product/branch-stock cache + an outbox that replays queued sales (using clientRef) on
-  reconnect + a "pending sync" UI. The idempotent endpoint is the foundation that makes that
-  replay safe.
+  sale (201 then 200, identical id); no-ref path still 201.
+  **Phase 2 (offline sale outbox) done**: `web/src/store/offline.ts` `useOffline` — a
+  localStorage-persisted queue of sales that fail to reach the server. POS `completeSale` catches
+  connectivity failures (`isNetworkError`: `!navigator.onLine` / fetch `TypeError`), enqueues the
+  exact POST body (carrying its clientRef), and lets the cashier keep selling. `sync()` replays
+  oldest-first (idempotent via clientRef; stops on a network error, flags business rejections);
+  auto-triggered on login, the `online` event, and a 20s interval (`App.tsx`). POS header
+  `ConnBadge` shows live online/offline + a clickable "รอซิงค์ N" chip (manual replay). Verified
+  e2e: a queued sale replays to exactly one bill, a duplicate sync trigger is a no-op (201 then
+  200). **Still pending (Phase 3):** IndexedDB catalog + branch-stock cache so the product grid
+  itself works after a cold reload while offline (today the outbox covers a network drop
+  mid-session, when products are already loaded).
 - ✅ Production deploy story — single-image deploy: Express serves the API **and** the
   built SPA (`WEB_DIST`, SPA fallback for non-`/api`/`/uploads`/`/ws` GETs). Multi-stage
   `Dockerfile` (build web → build server → slim runtime), `docker-compose.prod.yml`

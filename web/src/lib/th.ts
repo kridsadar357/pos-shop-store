@@ -174,4 +174,9 @@ export const th = {
   confirmPayment: 'ยืนยันการชำระเงิน',
   branch: 'สาขา',
   switchBranch: 'เปลี่ยนสาขา',
+  offlineSaleQueued: 'บันทึกการขายแบบออฟไลน์ — จะซิงค์อัตโนมัติเมื่อกลับมาออนไลน์',
+  pendingSync: 'รอซิงค์',
+  syncNow: 'ซิงค์เดี๋ยวนี้',
+  syncing: 'กำลังซิงค์…',
+  offline: 'ออฟไลน์',
 };

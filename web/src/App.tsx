@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { isBackStore, useAuth, type Role } from './store/auth';
 import { useBranch } from './store/branch';
+import { useOffline } from './store/offline';
 import { api, setOnUnauthorized } from './api/client';
 import { ToastHost } from './components/Toast';
 import type { LicenseState } from './types';
@@ -71,6 +72,16 @@ export default function App() {
     refreshLicense();
   }, []);
   useEffect(() => { if (user) { refreshLicense(); useBranch.getState().load(); } }, [user]);
+
+  // Replay any offline-queued sales: on login, when connectivity returns, and periodically.
+  useEffect(() => {
+    if (!user) return;
+    const sync = () => { if (navigator.onLine) useOffline.getState().sync(); };
+    sync();
+    window.addEventListener('online', sync);
+    const t = setInterval(sync, 20000);
+    return () => { window.removeEventListener('online', sync); clearInterval(t); };
+  }, [user]);
 
   // Wait until we know whether first-run setup is needed (avoids a flash).
   if (setupDone === null) {

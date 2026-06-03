@@ -12,6 +12,7 @@ import { ShiftReport } from '../../components/ShiftReport';
 import { ChangePasswordModal } from '../../components/ChangePasswordModal';
 import { printReceipt } from '../../lib/printing';
 import { useBranch } from '../../store/branch';
+import { useOffline, isNetworkError } from '../../store/offline';
 import { ShiftGate, CloseShiftModal, CashDrawerModal } from './ShiftModals';
 import { MemberPicker } from './MemberWidget';
 import { PosSidebar } from './PosSidebar';
@@ -264,18 +265,16 @@ export default function POS() {
     // Stable idempotency key for this cart — reused on retry so a re-sent sale (after a
     // flaky network or a double-click) returns the original bill instead of duplicating it.
     if (!checkoutRef.current) checkoutRef.current = crypto.randomUUID();
+    const body = {
+      type: mode, paymentMethod: method, discount: totals.manualDisc, couponCode: coupon,
+      cashReceived: method === 'CASH' ? cashReceived : 0,
+      paymentRef: ref, memberId: member?.id ?? null, pointsRedeem: totals.usePts, branchId: useBranch.getState().activeId ?? undefined,
+      clientRef: checkoutRef.current,
+      ...(payments ? { payments } : {}),
+      items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, ...(l.product.trackSerials && parseSerials(l.serials).length ? { serials: parseSerials(l.serials) } : {}) })),
+    };
     try {
-      const sale = await api<Sale>('/sales', {
-        method: 'POST',
-        body: {
-          type: mode, paymentMethod: method, discount: totals.manualDisc, couponCode: coupon,
-          cashReceived: method === 'CASH' ? cashReceived : 0,
-          paymentRef: ref, memberId: member?.id ?? null, pointsRedeem: totals.usePts, branchId: useBranch.getState().activeId ?? undefined,
-          clientRef: checkoutRef.current,
-          ...(payments ? { payments } : {}),
-          items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, ...(l.product.trackSerials && parseSerials(l.serials).length ? { serials: parseSerials(l.serials) } : {}) })),
-        },
-      });
+      const sale = await api<Sale>('/sales', { method: 'POST', body });
       publishDisplay({ ...baseDisplay(), status: 'PAID', orderNo: sale.orderNo, paymentMethod: method === 'CASH' ? 'CASH' : 'TRANSFER', change: num(sale.changeDue), cashReceived: num(sale.cashReceived) });
       setLastSale(sale);
       if (autoPrint) doPrint(sale);
@@ -286,7 +285,19 @@ export default function POS() {
       reload();
       refreshShift();
     } catch (e) {
-      toast.error((e as Error).message);
+      // Offline / network drop: queue the sale locally (keyed by clientRef) and let the
+      // cashier keep selling — it replays automatically on reconnect (idempotent).
+      if (isNetworkError(e)) {
+        useOffline.getState().enqueue({ clientRef: checkoutRef.current!, payload: body, queuedAt: Date.now(), attempts: 0, total: totals.net, itemCount: totals.count });
+        toast.success(th.offlineSaleQueued);
+        publishDisplay({ ...baseDisplay(), status: 'IDLE', items: [], count: 0, subtotal: 0, tax: 0, total: 0 });
+        clearCart();
+        setTransfer(false);
+        setSplitPay(false);
+        setPayKey('CASH');
+      } else {
+        toast.error((e as Error).message);
+      }
     }
   }
 
@@ -409,9 +420,7 @@ export default function POS() {
           <div className="flex items-center gap-3">
             <i className="fa-solid fa-bars text-lg text-white/70" />
             <h1 className="text-lg font-extrabold">{th.posTitle}</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/20">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-200" /> {th.online}
-            </span>
+            <ConnBadge />
             <BranchPill />
           </div>
           <div className="flex items-center gap-3">
@@ -922,6 +931,38 @@ function PriceCheckModal({ product, currency, memberGetsWholesale, onLookup, onC
 
         <button className="btn-ghost mt-5 w-full" onClick={onClose}>เสร็จสิ้น</button>
       </div>
+    </div>
+  );
+}
+
+// Live connectivity + offline-sale queue indicator. Shows online/offline, and a clickable
+// "pending sync" chip (manual replay) whenever sales are queued from an offline period.
+function ConnBadge() {
+  const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
+  const pending = useOffline((s) => s.items.length);
+  const syncing = useOffline((s) => s.syncing);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${online ? 'bg-white/15 text-white ring-white/20' : 'bg-amber-400/90 text-amber-950 ring-amber-300'}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${online ? 'bg-emerald-200' : 'bg-amber-900'}`} /> {online ? th.online : th.offline}
+      </span>
+      {pending > 0 && (
+        <button
+          onClick={() => useOffline.getState().sync()}
+          disabled={syncing || !online}
+          title={th.syncNow}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/20 hover:bg-white/25 disabled:opacity-60"
+        >
+          <i className={`fa-solid ${syncing ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'}`} /> {syncing ? th.syncing : `${th.pendingSync} ${pending}`}
+        </button>
+      )}
     </div>
   );
 }
