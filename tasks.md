@@ -380,7 +380,9 @@ is already branch-correct).
   e2e (puppeteer): TH default → toggling to EN swaps
   the `th`-routed labels (Thai gone); offline e2e still passes. The **back-office navigation**
   (6 section titles + 26 items in `BackLayout`) is now migrated to `th.nav*` keys too — verified
-  e2e (EN nav shows Suppliers/Payables/Gift cards; Thai nav labels gone). **Remaining:** the
-  back-office PAGE bodies still have inline Thai literals (titles/columns/toasts) not routed
-  through `th` — migrating those per-page is the path to 100%.
+  e2e (EN nav shows Suppliers/Payables/Gift cards; Thai nav labels gone). The **shared list-page
+  chrome** (`ListToolbar` search/filter/export/zip + `DataTable` no-data) is also migrated to
+  `th.tb*` — bilingual on every list page (verified: Members page shows "Export" in EN, Thai gone).
+  **Remaining:** per-page bodies (titles/columns/toasts + the custom search placeholders some
+  pages pass to ListToolbar) still inline Thai — migrating those per-page is the path to 100%.
 - ✅ `*.tsbuildinfo` gitignored + untracked (build cache no longer committed)

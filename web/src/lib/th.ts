@@ -226,6 +226,15 @@ const thDict = {
   navUsers: 'ผู้ใช้งานระบบ',
   navAudit: 'บันทึกการใช้งาน',
   navBackup: 'สำรอง / กู้คืนข้อมูล',
+  // Shared list-page chrome (ListToolbar / DataTable)
+  tbSearch: 'ค้นหา…',
+  tbFilter: 'ตัวกรอง',
+  tbAdvFilter: 'ตัวกรองขั้นสูง',
+  tbClearFilter: 'ล้างตัวกรอง',
+  tbApplyFilter: 'ใช้ตัวกรอง',
+  tbExport: 'ส่งออก',
+  tbImagesZip: 'รูปภาพ + CSV (.zip)',
+  tbNoData: 'ไม่มีข้อมูล',
 };
 
 const enDict: typeof thDict = {
@@ -449,6 +458,14 @@ const enDict: typeof thDict = {
   navUsers: 'System users',
   navAudit: 'Audit log',
   navBackup: 'Backup / restore',
+  tbSearch: 'Search…',
+  tbFilter: 'Filter',
+  tbAdvFilter: 'Advanced filter',
+  tbClearFilter: 'Clear filter',
+  tbApplyFilter: 'Apply filter',
+  tbExport: 'Export',
+  tbImagesZip: 'Images + CSV (.zip)',
+  tbNoData: 'No data',
 };
 
 export type Lang = 'th' | 'en';

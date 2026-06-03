@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { th } from '../lib/th';
 
 /**
  * Admin data table that FILLS its container height: it measures the available
@@ -13,7 +14,7 @@ export function DataTable<T>({
   rows,
   renderRow,
   colCount,
-  empty = 'ไม่มีข้อมูล',
+  empty = th.tbNoData,
   rowPx = 49,
 }: {
   head: ReactNode;
