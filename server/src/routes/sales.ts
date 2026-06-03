@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, requireRole } from '../middleware/auth.js';
@@ -13,6 +12,7 @@ import { buildReceiptSms } from '../lib/receiptSms.js';
 import { sendSms } from '../lib/sms.js';
 import { shouldEmailReceipt, shouldSmsReceipt } from '../lib/autoReceipt.js';
 import { withinDiscountLimit } from '../lib/discountLimit.js';
+import { matchPin } from '../lib/pinAuth.js';
 import { computeTenderPlan } from '../lib/tender.js';
 import { baseFromForeign, fxNote } from '../lib/fx.js';
 import { computeRedeem, computeEarn } from '../lib/loyaltyCalc.js';
@@ -134,9 +134,7 @@ salesRouter.post(
       if (!withinDiscountLimit({ role: req.user!.role, discountAmount: manualDiscount, subtotal, maxPct: Number(setting.cashierMaxDiscountPct ?? 100) })) {
         if (data.discountApprovalPin) {
           const mgrs = await tx.user.findMany({ where: { isActive: true, role: { in: ['ADMIN', 'MANAGER'] }, pinHash: { not: null } } });
-          for (const u of mgrs) {
-            if (u.pinHash && (await bcrypt.compare(data.discountApprovalPin, u.pinHash))) { discountApprover = u.name; break; }
-          }
+          discountApprover = (await matchPin(mgrs, data.discountApprovalPin))?.name ?? null;
         }
         if (!discountApprover) {
           throw Object.assign(new Error(`ส่วนลดเกินสิทธิ์ของแคชเชียร์ (สูงสุด ${setting.cashierMaxDiscountPct}% ของยอดสินค้า) — ต้องได้รับการอนุมัติจากผู้จัดการ`), { status: 403 });

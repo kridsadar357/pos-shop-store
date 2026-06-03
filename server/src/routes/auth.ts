@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { ah, requireAuth, signToken } from '../middleware/auth.js';
+import { matchPin } from '../lib/pinAuth.js';
 
 export const authRouter = Router();
 
@@ -29,14 +30,10 @@ authRouter.post(
   '/pin',
   ah(async (req, res) => {
     const { pin } = z.object({ pin: z.string().min(4).max(8) }).parse(req.body);
-    const users = await prisma.user.findMany({ where: { isActive: true, pinHash: { not: null } } });
-    for (const u of users) {
-      if (u.pinHash && (await bcrypt.compare(pin, u.pinHash))) {
-        const profile = { id: u.id, username: u.username, name: u.name, role: u.role };
-        return res.json({ token: signToken(profile), user: profile });
-      }
-    }
-    return res.status(401).json({ error: 'PIN ไม่ถูกต้อง' });
+    const u = await matchPin(await prisma.user.findMany({ where: { isActive: true, pinHash: { not: null } } }), pin);
+    if (!u) return res.status(401).json({ error: 'PIN ไม่ถูกต้อง' });
+    const profile = { id: u.id, username: u.username, name: u.name, role: u.role };
+    return res.json({ token: signToken(profile), user: profile });
   })
 );
 
