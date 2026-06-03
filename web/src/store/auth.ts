@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api, setToken } from '../api/client';
+import { isNetworkError } from './offline';
 
 export type Role = 'ADMIN' | 'MANAGER' | 'CASHIER';
 export interface User {
@@ -44,14 +45,19 @@ export const useAuth = create<AuthState>((set) => ({
   logout() {
     setToken(null);
     localStorage.removeItem('pos_user');
+    localStorage.removeItem('pos_shift');
     set({ user: null });
   },
   async restore() {
     if (!localStorage.getItem('pos_token')) return;
+    const cached = JSON.parse(localStorage.getItem('pos_user') || 'null') as User | null;
     try {
       const res = await api<{ user: User }>('/auth/me');
       set({ user: res.user });
-    } catch {
+    } catch (e) {
+      // Offline (e.g. a cold reload during an outage): trust the cached user so the POS
+      // stays usable. Only a real auth rejection (online 401) clears the session.
+      if (isNetworkError(e) && cached) { set({ user: cached }); return; }
       setToken(null);
       localStorage.removeItem('pos_user');
       set({ user: null });

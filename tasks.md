@@ -261,8 +261,17 @@ is already branch-correct).
   (exporters/charts/scanner — left to runtime cache). Cache name is content-hashed so a new
   build invalidates the old precache (activate handler already prunes). Verified: build emits
   `pos-shell-<hash>` + a 59-entry manifest with POS/vendor/index in and the heavy chunks out.
-  **Offline POS is now genuinely complete** (idempotent checkout + outbox + data cache +
-  precached shell). Remaining nicety: cache active promotions for offline discount preview.
+  **Phase 5 (offline cold-reload correctness) done** — surfaced by the new headless e2e: a
+  reload while offline used to (a) log the cashier out (`auth.restore()` nulled the user when
+  `/auth/me` failed) and (b) hide the register behind the open-shift gate (`shift.refresh()`
+  nulled the shift when `/shifts/current` failed). Both stores now persist their state (added
+  `pos_shift`) and KEEP it on a network error (only a real online response clears it), via the
+  shared `isNetworkError`. Server stays authoritative (synced sales re-attribute to the
+  server-open shift). Verified by the e2e (offline reload → stays logged in, register open, grid
+  renders).
+  **Offline POS is now genuinely complete + e2e-verified** (idempotent checkout + outbox + data
+  cache + precached shell + cold-reload session). Remaining nicety: cache active promotions for
+  offline discount preview.
 - ✅ Production deploy story — single-image deploy: Express serves the API **and** the
   built SPA (`WEB_DIST`, SPA fallback for non-`/api`/`/uploads`/`/ws` GETs). Multi-stage
   `Dockerfile` (build web → build server → slim runtime), `docker-compose.prod.yml`
@@ -281,8 +290,14 @@ is already branch-correct).
   (`postMovement`+FEFO, `postPoints`, `postGift`, `nextSeq`), 7 integration tests.
   GitHub Actions (`.github/workflows/ci.yml`):
   install → prisma generate → **migrate deploy on a Postgres service** → unit test → **integration
-  test** → typecheck-build server + web. Root `npm test` / `npm run test:integration`. (e2e still
-  to expand.)
+  test** → typecheck-build server + web. Root `npm test` / `npm run test:integration`.
+  **Headless-browser e2e added** (`web/e2e/offline.e2e.mjs`, `npm --prefix web run test:e2e`,
+  puppeteer-core + system Chrome): boots the production build via the server's WEB_DIST and drives
+  the real service worker + IndexedDB cache to prove the **offline cold-reload** path — load /pos
+  online, go offline, reload, assert the cashier stays logged in and the product grid renders from
+  cache. It found + verified fixes for two real offline bugs (see §8 Offline). Not yet wired into
+  CI (needs Chrome + a build step); run locally after `npm run build`. (More e2e coverage — the
+  offline checkout/queue/sync UI flow — still to expand.)
 
 ## 9. Smaller polish / known stubs
 - ✅ Sidebar "เปลี่ยนสาขา" — the back-office POS sidebar branch button is now a live
