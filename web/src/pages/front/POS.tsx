@@ -13,6 +13,7 @@ import { ChangePasswordModal } from '../../components/ChangePasswordModal';
 import { printReceipt } from '../../lib/printing';
 import { useBranch } from '../../store/branch';
 import { useOffline, isNetworkError } from '../../store/offline';
+import { cacheProducts, cachedProducts, cacheCategories, cachedCategories, cacheSetting, cachedSetting } from '../../lib/catalogCache';
 import { ShiftGate, CloseShiftModal, CashDrawerModal } from './ShiftModals';
 import { MemberPicker } from './MemberWidget';
 import { PosSidebar } from './PosSidebar';
@@ -102,7 +103,9 @@ export default function POS() {
   function reload() {
     // Scope on-hand to the terminal's active branch (Phase 2 per-branch stock).
     const branchId = useBranch.getState().activeId ?? undefined;
-    api<Product[]>('/products', { query: { branchId } }).then(setProducts).catch(() => {});
+    api<Product[]>('/products', { query: { branchId } })
+      .then((p) => { setProducts(p); cacheProducts(branchId, p); }) // refresh the offline cache
+      .catch(async () => { const c = await cachedProducts(branchId); if (c) setProducts(c); }); // offline → cached catalog
     api<Stats>('/sales/stats').then(setStats).catch(() => {});
     api<Product[]>('/products/favorites', { query: { limit: 8 } })
       .then((f) => setFavIds(new Set(f.map((p) => p.id))))
@@ -113,14 +116,18 @@ export default function POS() {
   const activeBranchId = useBranch((s) => s.activeId);
   useEffect(() => {
     refreshShift();
-    api<Category[]>('/categories').then(setCategories).catch(() => {});
+    api<Category[]>('/categories')
+      .then((c) => { setCategories(c); cacheCategories(c); })
+      .catch(async () => { const c = await cachedCategories(); if (c) setCategories(c); });
     publisher.current = createPublisher();
     return () => publisher.current?.close();
   }, []);
   // (Re)load products + branch-resolved settings for the active branch (also on change).
   useEffect(() => {
     reload();
-    api<Setting>('/settings/resolved', { query: { branchId: activeBranchId ?? undefined } }).then(setSetting).catch(() => {});
+    api<Setting>('/settings/resolved', { query: { branchId: activeBranchId ?? undefined } })
+      .then((s) => { setSetting(s); cacheSetting(activeBranchId ?? undefined, s); })
+      .catch(async () => { const s = await cachedSetting(activeBranchId ?? undefined); if (s) setSetting(s); });
   }, [activeBranchId]);
 
   const memberWholesale = !!member && !!setting?.memberGetsWholesale;

@@ -243,9 +243,18 @@ is already branch-correct).
   auto-triggered on login, the `online` event, and a 20s interval (`App.tsx`). POS header
   `ConnBadge` shows live online/offline + a clickable "รอซิงค์ N" chip (manual replay). Verified
   e2e: a queued sale replays to exactly one bill, a duplicate sync trigger is a no-op (201 then
-  200). **Still pending (Phase 3):** IndexedDB catalog + branch-stock cache so the product grid
-  itself works after a cold reload while offline (today the outbox covers a network drop
-  mid-session, when products are already loaded).
+  200).
+  **Phase 3 (offline catalog cache) done**: `web/src/lib/idb.ts` (tiny promise IndexedDB
+  key-value, no dep) + `web/src/lib/catalogCache.ts` cache the branch-scoped **products**,
+  **categories**, and **resolved settings**. POS load points write the cache on a successful
+  fetch and fall back to it on failure (offline) — so the product grid + cart + checkout
+  (→ outbox) survive a **cold reload while offline**. Fail-safe by construction: cache writes
+  are best-effort (errors swallowed), reads only run inside a fetch `.catch`, so the online path
+  can't regress. Verified by typecheck + production build + review (the offline-reload runtime
+  path itself wants a headless-browser e2e — see §8 e2e). **Offline POS is now functionally
+  complete**; remaining polish: cache active promotions for offline preview, and an explicit
+  service-worker app-shell so the SPA assets load offline (Vite PWA only ships the customer
+  display today).
 - ✅ Production deploy story — single-image deploy: Express serves the API **and** the
   built SPA (`WEB_DIST`, SPA fallback for non-`/api`/`/uploads`/`/ws` GETs). Multi-stage
   `Dockerfile` (build web → build server → slim runtime), `docker-compose.prod.yml`
