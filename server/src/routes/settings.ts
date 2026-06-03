@@ -33,12 +33,14 @@ settingsRouter.get(
   })
 );
 
-// Global settings merged with a branch's per-branch overrides.
+// Global settings merged with a branch's per-branch overrides. This is what the POS
+// front-end fetches, so strip the secrets (SMTP password / SMS API key) like GET '/'.
 settingsRouter.get(
   '/resolved',
   ah(async (req, res) => {
     const branchId = req.query.branchId ? Number(req.query.branchId) : null;
-    res.json(await resolvedSettings(branchId));
+    const { smtpPass, smsApiKey, ...safe } = await resolvedSettings(branchId);
+    res.json({ ...safe, smtpPassSet: !!smtpPass, smsApiKeySet: !!smsApiKey });
   })
 );
 
