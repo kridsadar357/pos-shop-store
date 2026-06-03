@@ -93,6 +93,9 @@ export default function POS() {
   const [showSearch, setShowSearch] = useState(false);
   const publisher = useRef<ReturnType<typeof createPublisher> | null>(null);
   const vfdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Idempotency key for the current cart's checkout: stays stable across retries (so a
+  // re-sent sale isn't duplicated), reset by clearCart() once a sale completes.
+  const checkoutRef = useRef<string | null>(null);
 
   function loadHeld() { api<HeldBill[]>('/held-bills').then(setHeld).catch(() => setHeld([])); }
   function reload() {
@@ -163,7 +166,7 @@ export default function POS() {
     setLines((prev) => prev.map((l) => (l.product.id === id ? { ...l, serials } : l)));
   }
   const parseSerials = (s?: string) => (s ?? '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
-  function clearCart() { setLines([]); setMember(null); setDiscount(0); setRedeemPts(0); setCashReceived(0); setCoupon(''); setPromo({ promoDiscount: 0, applied: [] }); }
+  function clearCart() { setLines([]); setMember(null); setDiscount(0); setRedeemPts(0); setCashReceived(0); setCoupon(''); setPromo({ promoDiscount: 0, applied: [] }); checkoutRef.current = null; }
 
   // Live promotion preview whenever the cart / coupon / pricing context changes.
   useEffect(() => {
@@ -258,6 +261,9 @@ export default function POS() {
     // Serial-tracked lines: if the cashier captured serials, the count must match qty.
     const badSerial = lines.find((l) => l.product.trackSerials && parseSerials(l.serials).length > 0 && parseSerials(l.serials).length !== l.qty);
     if (badSerial) { toast.error(`จำนวนซีเรียลของ "${badSerial.product.name}" ไม่ตรงกับจำนวน (${parseSerials(badSerial.serials).length}/${badSerial.qty})`); return; }
+    // Stable idempotency key for this cart — reused on retry so a re-sent sale (after a
+    // flaky network or a double-click) returns the original bill instead of duplicating it.
+    if (!checkoutRef.current) checkoutRef.current = crypto.randomUUID();
     try {
       const sale = await api<Sale>('/sales', {
         method: 'POST',
@@ -265,6 +271,7 @@ export default function POS() {
           type: mode, paymentMethod: method, discount: totals.manualDisc, couponCode: coupon,
           cashReceived: method === 'CASH' ? cashReceived : 0,
           paymentRef: ref, memberId: member?.id ?? null, pointsRedeem: totals.usePts, branchId: useBranch.getState().activeId ?? undefined,
+          clientRef: checkoutRef.current,
           ...(payments ? { payments } : {}),
           items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, ...(l.product.trackSerials && parseSerials(l.serials).length ? { serials: parseSerials(l.serials) } : {}) })),
         },

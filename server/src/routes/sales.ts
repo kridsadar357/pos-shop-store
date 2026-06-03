@@ -27,6 +27,9 @@ const checkoutSchema = z.object({
   memberId: z.number().int().nullable().optional(),
   pointsRedeem: z.number().int().nonnegative().default(0), // loyalty points to spend on this bill
   branchId: z.number().int().nullable().optional(),
+  // Idempotency key for offline replay / double-submit protection. Resending the same
+  // clientRef returns the original sale instead of creating a duplicate.
+  clientRef: z.string().min(1).max(80).optional(),
   // Optional split / multi-tender payments. When omitted, the single paymentMethod
   // (+ cashReceived) is used as today.
   payments: z
@@ -41,11 +44,25 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// The shape every checkout response (fresh or idempotent replay) is returned in.
+const saleInclude = {
+  items: true,
+  payments: true,
+  member: { select: { name: true, phone: true } },
+} as const;
+
 salesRouter.post(
   '/',
   ah(async (req, res) => {
     const data = checkoutSchema.parse(req.body);
     const cashierId = req.user!.id;
+
+    // Idempotent replay: a retried offline sale (or a double-click) carrying a clientRef
+    // we've already processed returns the original bill instead of charging twice.
+    if (data.clientRef) {
+      const existing = await prisma.sale.findUnique({ where: { clientRef: data.clientRef }, include: saleInclude });
+      if (existing) return res.status(200).json(existing);
+    }
 
     const setting = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
     const defaultTax = Number(setting.taxRatePct);
@@ -60,7 +77,9 @@ salesRouter.post(
     }
     const memberWholesale = !!memberId && setting.memberGetsWholesale;
 
-    const sale = await prisma.$transaction(async (tx) => {
+    let sale;
+    try {
+      sale = await prisma.$transaction(async (tx) => {
       // Attach to the cashier's open shift, if any.
       const openShift = await tx.shift.findFirst({ where: { userId: cashierId, status: 'OPEN' } });
 
@@ -146,6 +165,7 @@ salesRouter.post(
       const created = await tx.sale.create({
         data: {
           orderNo,
+          clientRef: data.clientRef ?? null,
           type: memberWholesale ? 'WHOLESALE' : data.type,
           status: 'PAID',
           subtotal,
@@ -220,7 +240,16 @@ salesRouter.post(
       }
 
       return { ...created, payments };
-    });
+      });
+    } catch (e) {
+      // Concurrent replay: another request with the same clientRef won the unique race
+      // (Prisma P2002). Return the bill it created rather than surfacing an error.
+      if (data.clientRef && (e as { code?: string })?.code === 'P2002') {
+        const existing = await prisma.sale.findUnique({ where: { clientRef: data.clientRef }, include: saleInclude });
+        if (existing) return res.status(200).json(existing);
+      }
+      throw e;
+    }
 
     res.status(201).json(sale);
   })

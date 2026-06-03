@@ -694,6 +694,10 @@ model StockTransferItem {
 model Sale {
   id            Int           @id @default(autoincrement())
   orderNo       String        @unique
+  // Client-supplied idempotency key for offline POS replay / double-submit protection.
+  // A retried checkout carrying the same clientRef returns the original sale instead of
+  // creating a duplicate. Null for sales created without one (e.g. server-side conversions).
+  clientRef     String?       @unique
   type          SaleType      @default(RETAIL)
   status        SaleStatus    @default(PAID)
   subtotal      Decimal       @db.Decimal(12, 2)

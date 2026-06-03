@@ -228,8 +228,17 @@ is already branch-correct).
   License settings tab shows a re-check button + an overdue nudge
 
 ## 8. Platform / offline / PWA
-- 🟨 Offline POS — the customer display is an installable PWA, but the POS itself
-  doesn't queue sales offline; needs local persistence + sync
+- 🟨 Offline POS — **Phase 1 (replay-safe checkout) done**: `Sale.clientRef` (nullable
+  unique) idempotency key. `POST /api/sales` accepts an optional `clientRef`; a resend of the
+  same key returns the original bill (HTTP 200) instead of creating a duplicate — covers offline
+  replay AND double-click/flaky-network double-submits. Pre-check by clientRef + a P2002
+  unique-race fallback inside the handler; the POS generates a stable `crypto.randomUUID()` per
+  cart (reused on retry, reset by `clearCart` on success). Verified e2e: same ref twice → one
+  sale (201 then 200, identical id); no-ref path still 201. **Still pending (Phase 2+):** the
+  client doesn't yet cache the catalog or queue sales while actually offline — needs IndexedDB
+  product/branch-stock cache + an outbox that replays queued sales (using clientRef) on
+  reconnect + a "pending sync" UI. The idempotent endpoint is the foundation that makes that
+  replay safe.
 - ✅ Production deploy story — single-image deploy: Express serves the API **and** the
   built SPA (`WEB_DIST`, SPA fallback for non-`/api`/`/uploads`/`/ws` GETs). Multi-stage
   `Dockerfile` (build web → build server → slim runtime), `docker-compose.prod.yml`
