@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { subscribe, type DisplayState } from '../lib/display';
 import { QRCanvas } from '../components/QRCode';
 import { ProductImage } from '../components/ProductImage';
-import { money } from '../lib/format';
+import { money, secondaryAmount } from '../lib/format';
 import { th } from '../lib/th';
 
 /**
@@ -104,6 +104,9 @@ export default function Display() {
             <div className="mt-6 border-t-2 border-dashed border-slate-200 pt-5">
               <div className="text-sm font-bold text-slate-400">{th.totalDue}</div>
               <div className="text-6xl font-black tracking-tight text-brand-700">{money(s.total, currency)}</div>
+              {secondaryAmount(s.total, s.secondaryCurrency, s.secondaryRate) && (
+                <div className="mt-1 text-2xl font-bold text-slate-400">{secondaryAmount(s.total, s.secondaryCurrency, s.secondaryRate)}</div>
+              )}
             </div>
           </div>
         </div>

@@ -168,7 +168,8 @@ is already branch-correct).
   Excel/PDF/CSV export, total + by-category summary, CRUD modal). Branch-aware,
   records the user; seeded with a few demo expenses
 - 🟨 Multi-currency support — configurable **secondary-currency display** (approx.
-  conversion at a set rate) shown on the POS net total and the receipt
+  conversion at a set rate) shown on the POS net total, the receipt, and the **customer
+  display** (`DisplayState.secondaryCurrency`/`secondaryRate` → `≈ USD x.xx` under the total)
   (`Setting.secondaryCurrency`/`secondaryRate`, `secondaryAmount()` helper).
   **Foreign-currency cash tender done**: a cashier can take cash in the secondary currency at
   the POS (a THB/⟨currency⟩ toggle on the cash field; shows the THB equivalent + change in both).

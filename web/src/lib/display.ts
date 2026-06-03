@@ -27,6 +27,9 @@ export interface DisplayState {
   subtotal: number;
   tax: number;
   total: number;
+  // Optional secondary-currency display (≈ conversion) so foreign customers see the price.
+  secondaryCurrency?: string;
+  secondaryRate?: number;
   member?: { name: string } | null;
   isMemberPrice?: boolean;
   qrPayload?: string;

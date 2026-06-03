@@ -248,6 +248,7 @@ export default function POS() {
       status: 'CART', storeName: setting?.storeName || 'POS', currency,
       items: lines.map((l) => ({ name: l.product.name, qty: l.qty, unitPrice: unitPriceOf(l.product, l.qty), lineTotal: unitPriceOf(l.product, l.qty) * l.qty, imageUrl: l.product.imageUrl })),
       count: totals.count, subtotal: totals.subtotal, tax: totals.tax, total: totals.net,
+      secondaryCurrency: setting?.secondaryCurrency, secondaryRate: num(setting?.secondaryRate ?? 0) || undefined,
       member: member ? { name: member.name } : null, isMemberPrice: memberWholesale, ts: Date.now(),
     };
   }
