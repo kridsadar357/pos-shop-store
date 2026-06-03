@@ -186,8 +186,10 @@ is already branch-correct).
   (foreignTotal + baseTotal THB + count). Verified e2e (USD sale → currency=USD/fxRate=35/
   foreignAmount; report lists USD + THB). **Phase 2 — Reports UI (done)**: a "ตามสกุลเงิน" tab on
   the Reports page (currency · foreign total · THB equivalent · #payments, sortable + CSV/PDF via
-  the shared TableView), verified e2e (tab renders THB row). **Next** = per-currency receipt
-  breakdown; **later** = multiple configurable currencies + FX gain/loss.
+  the shared TableView), verified e2e (tab renders THB row). The back-office **bill detail** now
+  shows a tender breakdown incl. foreign currency (`NN.NN <ccy> @ rate`); the receipt already shows
+  the foreign-tender note. **Later** = multiple configurable currencies (+ a rates table/UI). NOTE:
+  FX gain/loss isn't applicable to this cash POS (no foreign-currency receivables).
 
 ## 6. Reporting & data
 - ✅ Cash-flow report — `/reports/cash-flow` (range + branch): cash in (cash sales + petty-cash
