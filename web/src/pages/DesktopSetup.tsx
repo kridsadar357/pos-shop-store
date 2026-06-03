@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { setApiBase } from '../api/client';
 import { toast } from '../components/Toast';
+import { LangToggle } from '../components/LangToggle';
 import { th } from '../lib/th';
 
 // First-run setup wizard for the desktop app: pick whether THIS machine is the shop's
@@ -41,9 +42,12 @@ export default function DesktopSetup() {
   return (
     <div className="grid min-h-screen place-items-center bg-gradient-to-br from-ink-950 to-ink-900 p-6 text-slate-200">
       <div className="card w-full max-w-lg bg-white p-8 text-ink-900">
-        <div className="mb-1 flex items-center gap-2 text-brand-600">
-          <i className="fa-solid fa-desktop text-xl" />
-          <span className="text-xs font-bold uppercase tracking-[0.2em]">POS Suite · Desktop</span>
+        <div className="mb-1 flex items-center justify-between gap-2 text-brand-600">
+          <div className="flex items-center gap-2">
+            <i className="fa-solid fa-desktop text-xl" />
+            <span className="text-xs font-bold uppercase tracking-[0.2em]">POS Suite · Desktop</span>
+          </div>
+          <LangToggle />
         </div>
         <h1 className="text-2xl font-extrabold tracking-tight">{th.desktopSetupTitle}</h1>
         <p className="mt-1 text-sm text-slate-500">{th.desktopSetupSub}</p>

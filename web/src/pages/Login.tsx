@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { isBackStore, useAuth } from '../store/auth';
 import { toast } from '../components/Toast';
 import { ServerConnect } from '../components/ServerConnect';
+import { LangToggle } from '../components/LangToggle';
 import { getApiBase } from '../api/client';
 import { th } from '../lib/th';
 
@@ -68,6 +69,7 @@ export default function Login() {
 
       <div className="flex items-center justify-center bg-gradient-to-br from-slate-50 to-brand-50/40 p-6">
         <div className="card w-full max-w-sm animate-rise p-8">
+          <div className="mb-3 flex justify-end"><LangToggle /></div>
           <h2 className="text-2xl font-extrabold tracking-tight">Welcome back</h2>
           <p className="mt-1 text-sm text-slate-500">Sign in to your register.</p>
 

@@ -371,5 +371,13 @@ is already branch-correct).
 - 🟨 Code-split — the heavy export libs (xlsx+jszip, ~173 KB gz) are now lazy-loaded
   (`lib/export.ts` dynamic `import()`), off the initial load of every export-capable page;
   keep new heavy libs lazy as features grow
-- ⬜ i18n toggle (UI is Thai-only; English option)
+- 🟨 i18n toggle (Thai default + English option) — **foundation + central table done**:
+  `web/src/lib/th.ts` now holds a Thai dict + a full **English dict (`enDict: typeof thDict`** so
+  TS enforces all 187 keys incl. the 3 function strings); the active dict is selected at load from
+  `localStorage 'pos_lang'` and exported as `th`, so **every existing `th.x` call site is bilingual
+  with zero changes**. `getLang()`/`setLang()` (persist + reload). `LangToggle` (ไทย/EN) on the
+  Login screen + desktop setup wizard. Verified e2e (puppeteer): TH default → toggling to EN swaps
+  the `th`-routed labels (Thai gone); offline e2e still passes. **Remaining:** some components have
+  inline Thai literals not routed through `th` (page titles, some toasts) — those stay Thai until
+  migrated to keys; the toggle covers the central table only.
 - ✅ `*.tsbuildinfo` gitignored + untracked (build cache no longer committed)
