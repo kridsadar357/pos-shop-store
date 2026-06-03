@@ -40,5 +40,8 @@ console.log('• 4/4  install production deps + generate Prisma client (in the s
 run('npm ci --omit=dev', stage);
 run('npx prisma generate', stage);
 
+// Migrate-then-start entrypoint (applies pending migrations on a fresh DB before serving).
+cpSync(join(here, 'run-server.mjs'), join(stage, 'run-server.mjs'));
+
 console.log(`\n✓ server bundle staged at ${stage}`);
 console.log('  next: cd desktop && npx tauri build   (set DATABASE_URL in the Server setup wizard)');

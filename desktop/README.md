@@ -76,8 +76,10 @@ Configure it (so packaging/dev can set the command without code changes), e.g.:
   "server_env": { "DATABASE_URL": "postgresql://…", "PORT": "4000", "WEB_DIST": "" }
 }
 ```
-**Postgres is required** — the spawned server connects to the `DATABASE_URL` you provide (a local
-or LAN Postgres). Bundling Node + the server binary + Postgres into the installer is the remaining
+On startup the bundled server runs `run-server.mjs`, which applies any pending Prisma migrations
+(`prisma migrate deploy`) before serving — so a **fresh empty Postgres** gets all its tables
+automatically. **Postgres is required** — the spawned server connects to the `DATABASE_URL` you
+provide (a local or LAN Postgres). Bundling Node + Postgres into the installer is the remaining
 packaging work.
 
 ## Status / roadmap

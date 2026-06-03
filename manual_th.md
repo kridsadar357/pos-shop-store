@@ -43,10 +43,10 @@
 ใช้ทดสอบหน้าจอ/ตัวช่วยตั้งค่า (เหมาะกับโหมด Client หรือเชื่อมต่อเซิร์ฟเวอร์ที่เปิดอยู่แล้ว)
 
 ```bash
-# 1. สร้างหน้าเว็บ (แอปเดสก์ท็อปจะโหลดไฟล์จาก web/dist)
-npm --prefix web run build
+# 1. รันเซิร์ฟเวอร์พัฒนาของหน้าเว็บ (Vite dev server ที่พอร์ต 5173)
+npm --prefix web run dev
 
-# 2. เปิดแอปเดสก์ท็อป
+# 2. เปิดแอปเดสก์ท็อป (ในอีกหน้าต่าง Terminal)
 cd desktop
 npm run dev          # = cargo tauri dev
 ```
@@ -151,8 +151,11 @@ CORS_ORIGIN='*' npm --prefix server start
 ## 8) สรุปคำสั่งที่ใช้บ่อย
 
 ```bash
-# ทดสอบ (dev)
-npm --prefix web run build && (cd desktop && npm run dev)
+# ทดสอบ (dev) - ต้องเปิดสองหน้าต่าง/โปรเซสคู่กัน
+# หน้าต่างที่ 1: รัน Vite dev server
+npm --prefix web run dev
+# หน้าต่างที่ 2: รัน Tauri desktop
+cd desktop && npm run dev
 
 # สร้างตัวติดตั้งครบในตัว
 cd desktop && npm run build

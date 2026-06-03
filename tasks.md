@@ -277,8 +277,9 @@ is already branch-correct).
   node_modules + generated Prisma client + the platform query-engine) into
   `src-tauri/resources/server/`; `tauri.conf.json` `bundle.resources` folds it into the app;
   `npm run build` = bundle + `cargo tauri build` → .dmg/.msi/.AppImage. The Rust launcher
-  auto-resolves the bundled server (`<resources>/server/dist/src/index.js` via `resource_dir()`,
-  run with system `node`) in Server mode; the wizard's Server step takes a `DATABASE_URL` (stored
+  auto-resolves the bundled server (`<resources>/server/run-server.mjs` via `resource_dir()`,
+  run with system `node` — the runner applies `prisma migrate deploy` so a FRESH Postgres gets its
+  tables, then starts the API) in Server mode; the wizard's Server step takes a `DATABASE_URL` (stored
   via `set_desktop_role`, passed to the server child). **Verified: bundle.mjs runs end-to-end
   (288MB staged bundle with engine + @prisma/client + express); cargo check clean; web build
   clean.** Caveats (documented): build per target OS (Prisma engine is platform-specific),

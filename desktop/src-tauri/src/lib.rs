@@ -90,10 +90,11 @@ fn start_server_if_configured(app: &tauri::AppHandle) -> Option<Child> {
         return c.spawn().ok();
     }
 
-    // Bundled server: <resources>/server/dist/src/index.js run with system node.
+    // Bundled server: <resources>/server/run-server.mjs (applies pending migrations, then
+    // starts the API), run with system node.
     let res = app.path().resource_dir().ok()?;
     let server_dir = res.join("server");
-    let entry = server_dir.join("dist").join("src").join("index.js");
+    let entry = server_dir.join("run-server.mjs");
     if !entry.exists() {
         return None;
     }
