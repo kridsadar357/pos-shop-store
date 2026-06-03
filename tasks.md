@@ -141,7 +141,15 @@ is already branch-correct).
   pass on PUT keeps existing), `lib/mailer.ts` (nodemailer, throws 400 if unconfigured),
   pure `lib/receiptEmail.ts` (HTML + text + subject, HTML-escaped, unit-tested), `POST
   /sales/:id/email` emails a receipt, `POST /settings/email-test` sends a test. Settings
-  "อีเมล (SMTP)" tab + "อีเมล" button on the Sales bill detail. SMS/LINE still pending.
+  "อีเมล (SMTP)" tab + "อีเมล" button on the Sales bill detail.
+  **SMS done**: a generic JSON HTTP gateway — `Setting.smsApiUrl`/`smsApiKey`(redacted, `smsApiKeySet`
+  flag, empty-on-PUT keeps existing)/`smsSender`; `lib/sms.ts` `sendSms` POSTs `{to,message,sender?}`
+  with an optional Bearer token (throws 400 if no URL, 502 on gateway error), pure `lib/receiptSms.ts`
+  `buildReceiptSms` (unit-tested). `POST /sales/:id/sms` {to?} texts a receipt (defaults to the
+  member's phone), `POST /settings/sms-test` sends a test. Settings "เกตเวย์ SMS" section + "SMS"
+  button on the Sales bill detail. Verified e2e against a local capture gateway (correct
+  {to,message,sender} payload; key redaction; 400 unconfigured). **LINE still pending** (LINE Notify
+  is discontinued; the Messaging API needs the customer's LINE userId — a linking-UX decision).
 
 ## 5. Finance & accounting
 - ✅ Petty cash / cash in-out during a shift — `CashMovement` model + POS drawer

@@ -63,6 +63,9 @@ export interface Setting {
   smtpUser: string;
   smtpFrom: string;
   smtpPassSet?: boolean;
+  smsApiUrl: string;
+  smsSender: string;
+  smsApiKeySet?: boolean;
   reportEmailEnabled: boolean;
   reportEmailTo: string;
   reportEmailHour: number;

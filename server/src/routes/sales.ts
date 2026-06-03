@@ -8,6 +8,8 @@ import { postGift } from '../lib/giftcard.js';
 import { consumeSerials, releaseSerials } from '../lib/serial.js';
 import { buildReceiptEmail } from '../lib/receiptEmail.js';
 import { sendMail } from '../lib/mailer.js';
+import { buildReceiptSms } from '../lib/receiptSms.js';
+import { sendSms } from '../lib/sms.js';
 import { computeTenderPlan } from '../lib/tender.js';
 import { baseFromForeign, fxNote } from '../lib/fx.js';
 import { computeRedeem, computeEarn } from '../lib/loyaltyCalc.js';
@@ -373,6 +375,25 @@ salesRouter.post(
       { to, ...msg }
     );
     res.json({ ok: true, to, messageId });
+  })
+);
+
+// Text a receipt confirmation to the customer via the configured SMS gateway. Falls back to
+// the sale's member phone when no explicit `to` is given.
+salesRouter.post(
+  '/:id/sms',
+  ah(async (req, res) => {
+    const { to } = z.object({ to: z.string().trim().optional() }).parse(req.body);
+    const [sale, setting] = await Promise.all([
+      prisma.sale.findUnique({ where: { id: Number(req.params.id) }, include: { member: { select: { phone: true } } } }),
+      prisma.setting.findUniqueOrThrow({ where: { id: 1 } }),
+    ]);
+    if (!sale) return res.status(404).json({ error: 'Not found' });
+    const phone = (to || sale.member?.phone || '').trim();
+    if (!phone) return res.status(400).json({ error: 'ไม่พบเบอร์โทรผู้รับ (ระบุเบอร์หรือผูกสมาชิกที่มีเบอร์โทร)' });
+    const message = buildReceiptSms(sale, { storeName: setting.storeName, currency: setting.currency });
+    await sendSms({ smsApiUrl: setting.smsApiUrl, smsApiKey: setting.smsApiKey, smsSender: setting.smsSender }, { to: phone, message });
+    res.json({ ok: true, to: phone });
   })
 );
 

@@ -129,6 +129,12 @@ model Setting {
   smtpPass   String  @default("")
   smtpFrom   String  @default("")     // From: header (falls back to "storeName <smtpUser>")
 
+  // Outgoing SMS gateway — a generic JSON HTTP endpoint we POST {to, message, sender?} to
+  // (point it at your SMS provider or a small relay). Empty url = off.
+  smsApiUrl  String  @default("")
+  smsApiKey  String  @default("")     // optional bearer token (redacted from GET, like smtpPass)
+  smsSender  String  @default("")     // optional sender ID
+
   // Scheduled daily sales-summary email
   reportEmailEnabled  Boolean @default(false)
   reportEmailTo       String  @default("")

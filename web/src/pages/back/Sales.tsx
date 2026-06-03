@@ -61,6 +61,16 @@ export default function Sales() {
     } catch (e) { toast.error((e as Error).message); }
   }
 
+  async function smsSale(sale: Sale) {
+    // Default to the member's phone (server resolves it); allow overriding here.
+    const to = prompt('ส่ง SMS ใบเสร็จไปยังเบอร์ (เว้นว่างเพื่อใช้เบอร์สมาชิก):', '')?.trim();
+    if (to === undefined) return; // cancelled
+    try {
+      const r = await api<{ to: string }>(`/sales/${sale.id}/sms`, { method: 'POST', body: to ? { to } : {} });
+      toast.success(`ส่ง SMS ไปยัง ${r.to} แล้ว`);
+    } catch (e) { toast.error((e as Error).message); }
+  }
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return sales.filter((s) =>
@@ -202,6 +212,7 @@ export default function Sales() {
               <button className="btn-ghost flex-1 text-sky-600" onClick={() => { setTaxFor(detail); setDetail(null); }}><i className="fa-solid fa-file-invoice mr-1.5" />ใบกำกับภาษี</button>
             )}
             <button className="btn-ghost flex-1 text-emerald-600" onClick={() => emailSale(detail)}><i className="fa-solid fa-envelope mr-1.5" />อีเมล</button>
+            <button className="btn-ghost flex-1 text-indigo-600" onClick={() => smsSale(detail)}><i className="fa-solid fa-comment-sms mr-1.5" />SMS</button>
             <button className="btn-primary flex-1" onClick={() => { doPrint(detail); setDetail(null); }}><i className="fa-solid fa-print mr-1.5" />พิมพ์ใบเสร็จ</button>
           </div>
         </Modal>

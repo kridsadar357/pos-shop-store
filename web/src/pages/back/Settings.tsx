@@ -324,6 +324,26 @@ function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }
   const [pass, setPass] = useState('');
   const [to, setTo] = useState('');
   const [busy, setBusy] = useState(false);
+  const [smsKey, setSmsKey] = useState('');
+  const [smsTo, setSmsTo] = useState('');
+
+  async function saveSms() {
+    setBusy(true);
+    try {
+      const body: Record<string, unknown> = { smsApiUrl: s.smsApiUrl, smsSender: s.smsSender };
+      if (smsKey.trim()) body.smsApiKey = smsKey.trim();
+      const updated = await api<Setting>('/settings', { method: 'PUT', body });
+      set({ smsApiKeySet: updated.smsApiKeySet });
+      setSmsKey('');
+      toast.success('บันทึกการตั้งค่า SMS แล้ว');
+    } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
+  async function sendSmsTest() {
+    if (!smsTo.trim()) return toast.error('กรอกเบอร์ผู้รับสำหรับทดสอบ');
+    setBusy(true);
+    try { await api('/settings/sms-test', { method: 'POST', body: { to: smsTo.trim() } }); toast.success(`ส่ง SMS ทดสอบไปยัง ${smsTo.trim()} แล้ว`); }
+    catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
 
   async function saveEmail() {
     setBusy(true);
@@ -381,6 +401,22 @@ function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }
           <button className="btn-ghost" onClick={sendTest} disabled={busy}><i className="fa-solid fa-paper-plane mr-1.5" />ส่งทดสอบ</button>
         </div>
         <p className="mt-2 text-xs text-slate-400">บันทึกการตั้งค่าก่อนทดสอบ การส่งจะใช้ค่าที่บันทึกไว้ในระบบ</p>
+      </Section>
+
+      <Section title="เกตเวย์ SMS (ส่งใบเสร็จทาง SMS)">
+        <p className="mb-3 text-xs text-slate-400"><i className="fa-solid fa-circle-info mr-1" />ระบบจะ POST JSON {`{ to, message, sender }`} ไปยัง URL ที่ตั้งไว้ (ชี้ไปยังผู้ให้บริการ SMS หรือตัวกลางของคุณ) เว้นว่าง URL เพื่อปิด การส่งใบเสร็จทาง SMS จะใช้เบอร์ของสมาชิกโดยอัตโนมัติ</p>
+        <div className="grid grid-cols-2 gap-3">
+          <F label="URL เกตเวย์ SMS" className="col-span-2"><input className="input" placeholder="https://sms.example.com/send" value={s.smsApiUrl} onChange={(e) => set({ smsApiUrl: e.target.value })} /></F>
+          <F label={`API Key${s.smsApiKeySet ? ' (ตั้งไว้แล้ว — เว้นว่างเพื่อคงเดิม)' : ' (ส่งเป็น Bearer token)'}`}>
+            <input type="password" className="input" placeholder={s.smsApiKeySet ? '••••••••' : 'optional'} value={smsKey} onChange={(e) => setSmsKey(e.target.value)} autoComplete="new-password" />
+          </F>
+          <F label="ชื่อผู้ส่ง (Sender ID)"><input className="input" placeholder="MyShop" value={s.smsSender} onChange={(e) => set({ smsSender: e.target.value })} /></F>
+        </div>
+        <button className="btn-primary mt-4 w-full" onClick={saveSms} disabled={busy}>บันทึกการตั้งค่า SMS</button>
+        <div className="mt-3 flex items-end gap-2">
+          <F label="ส่ง SMS ทดสอบไปยังเบอร์" className="flex-1"><input className="input" placeholder="0812345678" value={smsTo} onChange={(e) => setSmsTo(e.target.value)} /></F>
+          <button className="btn-ghost" onClick={sendSmsTest} disabled={busy}><i className="fa-solid fa-comment-sms mr-1.5" />ส่งทดสอบ</button>
+        </div>
       </Section>
 
       <Section title="สรุปยอดขายประจำวันอัตโนมัติ">

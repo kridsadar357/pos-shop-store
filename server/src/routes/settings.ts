@@ -8,6 +8,7 @@ import { ah, requireAuth, requireRole } from '../middleware/auth.js';
 import { buildPromptPayPayload, type PromptPayType } from '../lib/promptpay.js';
 import { resolvedSettings } from '../lib/branchSettings.js';
 import { sendMail } from '../lib/mailer.js';
+import { sendSms } from '../lib/sms.js';
 import { uploadsDir } from './products.js';
 
 export const settingsRouter = Router();
@@ -26,9 +27,9 @@ settingsRouter.get(
   '/',
   ah(async (_req, res) => {
     const setting = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
-    // Never expose the SMTP password; signal whether one is set instead.
-    const { smtpPass, ...safe } = setting;
-    res.json({ ...safe, smtpPassSet: !!smtpPass });
+    // Never expose secrets (SMTP password / SMS API key); signal whether each is set instead.
+    const { smtpPass, smsApiKey, ...safe } = setting;
+    res.json({ ...safe, smtpPassSet: !!smtpPass, smsApiKeySet: !!smsApiKey });
   })
 );
 
@@ -86,6 +87,10 @@ const schema = z.object({
   reportEmailEnabled: z.boolean().default(false),
   reportEmailTo: z.string().default(''),
   reportEmailHour: z.number().int().min(0).max(23).default(8),
+  // SMS gateway
+  smsApiUrl: z.string().default(''),
+  smsApiKey: z.string().default(''),
+  smsSender: z.string().default(''),
 });
 
 settingsRouter.put(
@@ -93,11 +98,12 @@ settingsRouter.put(
   requireRole('ADMIN', 'MANAGER'),
   ah(async (req, res) => {
     const data = schema.partial().parse(req.body);
-    // An empty smtpPass means "leave the stored password unchanged".
+    // An empty secret means "leave the stored value unchanged".
     if (data.smtpPass === '') delete data.smtpPass;
+    if (data.smsApiKey === '') delete data.smsApiKey;
     const setting = await prisma.setting.update({ where: { id: 1 }, data });
-    const { smtpPass, ...safe } = setting;
-    res.json({ ...safe, smtpPassSet: !!smtpPass });
+    const { smtpPass, smsApiKey, ...safe } = setting;
+    res.json({ ...safe, smtpPassSet: !!smtpPass, smsApiKeySet: !!smsApiKey });
   })
 );
 
@@ -118,6 +124,21 @@ settingsRouter.post(
       }
     );
     res.json({ ok: true, to, messageId });
+  })
+);
+
+// Send a test SMS to confirm the gateway config.
+settingsRouter.post(
+  '/sms-test',
+  requireRole('ADMIN', 'MANAGER'),
+  ah(async (req, res) => {
+    const { to } = z.object({ to: z.string().trim().min(1, 'ระบุเบอร์โทร') }).parse(req.body);
+    const s = await prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
+    await sendSms(
+      { smsApiUrl: s.smsApiUrl, smsApiKey: s.smsApiKey, smsSender: s.smsSender },
+      { to, message: `ทดสอบ SMS จาก ${s.storeName} — การตั้งค่าเกตเวย์ใช้งานได้แล้ว` }
+    );
+    res.json({ ok: true, to });
   })
 );
 
