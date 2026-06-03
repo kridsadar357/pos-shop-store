@@ -152,8 +152,9 @@ settingsRouter.post(
   ah(async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file' });
     const url = `/uploads/${req.file.filename}`;
-    const setting = await prisma.setting.update({ where: { id: 1 }, data: { receiptLogoUrl: url } });
-    res.json(setting);
+    const updated = await prisma.setting.update({ where: { id: 1 }, data: { receiptLogoUrl: url } });
+    const { smtpPass, smsApiKey, ...safe } = updated; // never return the secrets (matches GET '/')
+    res.json({ ...safe, smtpPassSet: !!smtpPass, smsApiKeySet: !!smsApiKey });
   })
 );
 
