@@ -179,8 +179,13 @@ is already branch-correct).
   secondary currency + rate are configured (else 400), sets `cashReceived` to the THB value and
   records a `"20.00 USD @ 35"` note in `paymentRef` (shown on both receipts). Verified e2e via
   curl (20 USD@35 → ฿700, change ฿665) + unit tests. Transactions are still **recorded in THB**
-  (the foreign amount is a note, not a separate ledger currency) — full multi-currency
-  accounting (FX gain/loss, multi-currency reporting) still pending.
+  (the foreign amount is a note, not a separate ledger currency).
+  **Phase 1 — per-tender FX capture (done)**: `SalePayment.currency`/`fxRate`/`foreignAmount`
+  (migration + backfill; base tenders = THB/1/amount, foreign cash = the configured secondary ccy
+  + rate + applied amount in that ccy). `GET /reports/by-currency` aggregates collected-per-currency
+  (foreignTotal + baseTotal THB + count). Verified e2e (USD sale → currency=USD/fxRate=35/
+  foreignAmount; report lists USD + THB). **Phase 2** = Reports UI tab + per-currency receipt
+  breakdown; **later** = multiple configurable currencies + FX gain/loss.
 
 ## 6. Reporting & data
 - ✅ Cash-flow report — `/reports/cash-flow` (range + branch): cash in (cash sales + petty-cash
