@@ -376,7 +376,8 @@ is already branch-correct).
   TS enforces all 187 keys incl. the 3 function strings); the active dict is selected at load from
   `localStorage 'pos_lang'` and exported as `th`, so **every existing `th.x` call site is bilingual
   with zero changes**. `getLang()`/`setLang()` (persist + reload). `LangToggle` (ไทย/EN) on the
-  Login screen + desktop setup wizard. Verified e2e (puppeteer): TH default → toggling to EN swaps
+  Login screen + desktop setup wizard + the back-office user menu (switchable in-session). Verified
+  e2e (puppeteer): TH default → toggling to EN swaps
   the `th`-routed labels (Thai gone); offline e2e still passes. **Remaining:** some components have
   inline Thai literals not routed through `th` (page titles, some toasts) — those stay Thai until
   migrated to keys; the toggle covers the central table only.

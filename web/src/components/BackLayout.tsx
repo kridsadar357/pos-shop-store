@@ -5,6 +5,7 @@ import { useBranch } from '../store/branch';
 import { api } from '../api/client';
 import { ProductImage } from './ProductImage';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import { LangToggle } from './LangToggle';
 import { money } from '../lib/format';
 import { toast } from './Toast';
 import type { Member, Product } from '../types';
@@ -207,6 +208,8 @@ export function BackLayout() {
                 <div className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl bg-white py-1 shadow-pop ring-1 ring-slate-200" onMouseLeave={() => setMenuOpen(false)}>
                   <button className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMenuOpen(false); navigate('/back/settings'); }}><i className="fa-solid fa-gear w-4 text-slate-400" /> ตั้งค่า</button>
                   <button className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setMenuOpen(false); setPwOpen(true); }}><i className="fa-solid fa-key w-4 text-slate-400" /> เปลี่ยนรหัสผ่าน</button>
+                  <div className="flex items-center gap-2 px-4 py-2 text-sm text-slate-500"><i className="fa-solid fa-language w-4 text-slate-400" /> <LangToggle /></div>
+                  <div className="my-1 border-t border-slate-100" />
                   <button className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-rose-600 hover:bg-rose-50" onClick={() => { logout(); navigate('/login'); }}><i className="fa-solid fa-right-from-bracket w-4" /> ออกจากระบบ</button>
                 </div>
               )}
