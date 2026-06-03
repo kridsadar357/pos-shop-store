@@ -329,6 +329,9 @@ export interface SaleTender {
   id?: number;
   method: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT' | 'GIFT';
   amount: string | number;
+  currency?: string;
+  fxRate?: string | number;
+  foreignAmount?: string | number;
   reference?: string;
 }
 

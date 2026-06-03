@@ -336,7 +336,7 @@ salesRouter.get(
     const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
     const sales = await prisma.sale.findMany({
       where: { createdAt: { gte: from, lte: to }, branchId },
-      include: { cashier: { select: { name: true } }, branch: { select: { name: true } }, items: true },
+      include: { cashier: { select: { name: true } }, branch: { select: { name: true } }, items: true, payments: true },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });

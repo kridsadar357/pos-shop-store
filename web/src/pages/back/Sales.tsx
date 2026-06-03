@@ -206,6 +206,19 @@ export default function Sales() {
             )}
           </div>
 
+          {detail.payments && detail.payments.length > 0 && (
+            <div className="mt-4 ml-auto w-full max-w-xs space-y-1 text-sm">
+              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">การชำระเงิน</div>
+              {detail.payments.map((p, i) => (
+                <Row
+                  key={p.id ?? i}
+                  label={`${PAY_TH[p.method] ?? p.method}${p.currency && p.currency !== 'THB' ? ` · ${Number(p.foreignAmount).toFixed(2)} ${p.currency} @ ${Number(p.fxRate)}` : ''}`}
+                  value={money(p.amount)}
+                />
+              ))}
+            </div>
+          )}
+
           <div className="mt-5 flex gap-2">
             <button className="btn-ghost flex-1" onClick={() => setDetail(null)}>ปิด</button>
             {detail.status === 'PAID' && (
