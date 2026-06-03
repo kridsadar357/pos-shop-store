@@ -99,6 +99,49 @@ try {
     console.log('   [diag] pos_branch =', diag.posBranch);
     console.log('   [diag] IDB keys =', JSON.stringify(diag.counts), diag.err || '');
   }
+
+  // ---- OFFLINE CHECKOUT: complete a sale offline → it should queue in the outbox ----
+  let clientRef = null;
+  if (productsOffline) {
+    console.log('• completing a CARD sale while OFFLINE…');
+    const added = await page.evaluate((ns) => {
+      const card = [...document.querySelectorAll('button')].find((b) => !b.disabled && ns.some((n) => b.textContent.includes(n)));
+      if (card) { card.click(); return true; }
+      return false;
+    }, names);
+    check(added, 'offline: added a product to the cart');
+    await sleep(400);
+    // CARD tender has no cash-received guard — simplest to drive headlessly.
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'บัตรเครดิต')?.click());
+    await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.className.includes('btn-primary') && b.textContent.includes('ชำระเงิน'))?.click());
+    await sleep(900);
+    const queued = await page.evaluate(() => JSON.parse(localStorage.getItem('pos_offline_sales') || '[]'));
+    check(queued.length === 1, `offline: sale queued to the outbox (got ${queued.length})`);
+    clientRef = queued[0]?.clientRef ?? null;
+
+    // ---- BACK ONLINE: the outbox should auto-drain ----
+    console.log('• back ONLINE — expecting auto-sync…');
+    await page.setOfflineMode(false);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    let drained = false;
+    for (let i = 0; i < 24; i++) {
+      await sleep(500);
+      if ((await page.evaluate(() => JSON.parse(localStorage.getItem('pos_offline_sales') || '[]').length)) === 0) { drained = true; break; }
+    }
+    check(drained, 'online: outbox drained (queued sale replayed)');
+
+    if (clientRef) {
+      const sales = await (await fetch(`${BASE}/api/sales?from=2000-01-01T00:00:00Z`, { headers: { Authorization: `Bearer ${login.token}` } })).json();
+      const synced = Array.isArray(sales) ? sales.find((s) => s.clientRef === clientRef) : null;
+      check(!!synced, `online: synced sale persisted server-side (clientRef ${clientRef})`);
+      // Self-cleanup: void the test sale so repeated e2e runs don't accumulate stock drift.
+      if (synced) {
+        const r = await fetch(`${BASE}/api/sales/${synced.id}/void`, { method: 'POST', headers: { Authorization: `Bearer ${login.token}`, 'Content-Type': 'application/json' }, body: '{}' });
+        console.log(`• cleaned up test sale ${synced.orderNo} (void HTTP ${r.status})`);
+      }
+    }
+  }
 } catch (e) {
   console.error('e2e error:', e.message);
   failures++;

@@ -296,8 +296,10 @@ is already branch-correct).
   the real service worker + IndexedDB cache to prove the **offline cold-reload** path — load /pos
   online, go offline, reload, assert the cashier stays logged in and the product grid renders from
   cache. It found + verified fixes for two real offline bugs (see §8 Offline). Not yet wired into
-  CI (needs Chrome + a build step); run locally after `npm run build`. (More e2e coverage — the
-  offline checkout/queue/sync UI flow — still to expand.)
+  CI (needs Chrome + a build step); run locally after `npm run build`. The e2e also drives the
+  **full offline checkout flow**: complete a CARD sale while offline → assert it queues in the
+  outbox → go back online → assert the outbox drains + the sale persists server-side (then
+  self-cleans by voiding it). Still not wired into CI.
 
 ## 9. Smaller polish / known stubs
 - ✅ Sidebar "เปลี่ยนสาขา" — the back-office POS sidebar branch button is now a live
