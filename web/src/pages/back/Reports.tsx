@@ -9,12 +9,13 @@ import type { Setting } from '../../types';
 // Shared report meta (store name + date range) for PDF headers, avoids prop drilling.
 const ReportMeta = createContext<{ store: string; range: string }>({ store: '', range: '' });
 
-type Tab = 'summary' | 'pnl' | 'cashflow' | 'payments' | 'top' | 'category' | 'hourly' | 'tax' | 'low' | 'expiring' | 'valuation' | 'z';
+type Tab = 'summary' | 'pnl' | 'cashflow' | 'payments' | 'currency' | 'top' | 'category' | 'hourly' | 'tax' | 'low' | 'expiring' | 'valuation' | 'z';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'summary', label: 'สรุปยอดขาย' },
   { key: 'pnl', label: 'กำไร-ขาดทุน (P&L)' },
   { key: 'cashflow', label: 'กระแสเงินสด' },
   { key: 'payments', label: 'ช่องทางชำระเงิน' },
+  { key: 'currency', label: 'ตามสกุลเงิน' },
   { key: 'top', label: 'สินค้าขายดี' },
   { key: 'category', label: 'กำไรตามหมวดหมู่' },
   { key: 'hourly', label: 'ยอดขายรายชั่วโมง' },
@@ -48,6 +49,7 @@ export default function Reports() {
       pnl: () => api('/reports/profit-loss', { query: range }),
       cashflow: () => api('/reports/cash-flow', { query: range }),
       payments: () => api('/reports/payment-methods', { query: range }),
+      currency: () => api('/reports/by-currency', { query: range }),
       top: () => api('/reports/top-products', { query: range }),
       category: () => api('/reports/profit-by-category', { query: range }),
       hourly: () => api('/reports/sales-by-hour', { query: range }),
@@ -97,6 +99,7 @@ export default function Reports() {
           {tab === 'pnl' && <PnlView d={data} />}
           {tab === 'cashflow' && <CashFlowView d={data} />}
           {tab === 'payments' && <PaymentsView d={data} />}
+          {tab === 'currency' && <TableView title="ยอดรับตามสกุลเงิน" rows={data} cols={[['currency', 'สกุลเงิน'], ['foreignTotal', 'ยอดในสกุลเงิน'], ['baseTotal', 'คิดเป็น THB', true], ['payments', 'จำนวนรายการ']]} file="by-currency.csv" />}
           {tab === 'top' && <TableView title="สินค้าขายดี" rows={data} cols={[['name', 'สินค้า'], ['qty', 'ขายได้ (ชิ้น)'], ['revenue', 'ยอดขาย', true], ['profit', 'กำไร', true]]} file="top-products.csv" />}
           {tab === 'category' && <CategoryView d={data} />}
           {tab === 'hourly' && <HourlyView d={data} />}

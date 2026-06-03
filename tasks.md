@@ -184,7 +184,9 @@ is already branch-correct).
   (migration + backfill; base tenders = THB/1/amount, foreign cash = the configured secondary ccy
   + rate + applied amount in that ccy). `GET /reports/by-currency` aggregates collected-per-currency
   (foreignTotal + baseTotal THB + count). Verified e2e (USD sale → currency=USD/fxRate=35/
-  foreignAmount; report lists USD + THB). **Phase 2** = Reports UI tab + per-currency receipt
+  foreignAmount; report lists USD + THB). **Phase 2 — Reports UI (done)**: a "ตามสกุลเงิน" tab on
+  the Reports page (currency · foreign total · THB equivalent · #payments, sortable + CSV/PDF via
+  the shared TableView), verified e2e (tab renders THB row). **Next** = per-currency receipt
   breakdown; **later** = multiple configurable currencies + FX gain/loss.
 
 ## 6. Reporting & data
