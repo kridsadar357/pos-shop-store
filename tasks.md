@@ -181,7 +181,16 @@ is already branch-correct).
   full JSON snapshot; `/api/backup/restore` atomically replaces all data in one
   transaction (rolls back on any error) and resets autoincrement sequences. Admin
   Backup page with download + upload/confirm. (Verified by a full round-trip.)
-- ⬜ Saved/custom report builder
+- ✅ Saved/custom report builder — `/back/custom-reports`: an ad-hoc report engine over
+  PAID sale-item facts. Pick 1–2 **group-by dimensions** (day/month/branch/cashier/payment/
+  type/category/product/member) + any **metrics** (orders=distinct bills, qty, sales=Σline,
+  cost, profit=sales−cost, margin%), a date range + branch, then run. Core aggregation is a
+  pure, unit-tested function (`server/src/lib/customReport.ts`, 9 vitest cases — distinct-bill
+  counting, 2-dim cross-tab, month-from-day, sort, config validation). `SavedReport` model +
+  `/api/custom-reports` (meta/run + name-unique CRUD, ADMIN/MANAGER); definitions are saved
+  (JSON config), reloaded, and deleted from the builder. Results table sorts on header click,
+  shows a totals row, and exports to Excel/CSV/PDF via the shared `makeExporters`. Verified
+  end-to-end against seeded sales
 
 ## 7. Security & administration
 - 🟨 Granular permissions — ADMIN can choose which back-office pages a MANAGER may
@@ -232,7 +241,11 @@ is already branch-correct).
   to expand.)
 
 ## 9. Smaller polish / known stubs
-- ⬜ Sidebar "เปลี่ยนสาขา" — currently a "coming soon" toast (see §1)
+- ✅ Sidebar "เปลี่ยนสาขา" — the back-office POS sidebar branch button is now a live
+  branch switcher (`BranchSwitcher` in `PosSidebar.tsx`) backed by the shared `useBranch`
+  store: a `<select>` of active branches (≥2) or a static pill (single-branch), reusing the
+  same `setActive` the header `BranchPill` uses — so switching re-scopes POS products +
+  resolved settings instantly (see §1)
 - 🟨 Code-split — the heavy export libs (xlsx+jszip, ~173 KB gz) are now lazy-loaded
   (`lib/export.ts` dynamic `import()`), off the initial load of every export-capable page;
   keep new heavy libs lazy as features grow

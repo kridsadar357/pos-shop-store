@@ -23,6 +23,7 @@ const StockCount = lazy(() => import('./pages/back/StockCount'));
 const Movements = lazy(() => import('./pages/back/Movements'));
 const Serials = lazy(() => import('./pages/back/Serials'));
 const Reports = lazy(() => import('./pages/back/Reports'));
+const CustomReports = lazy(() => import('./pages/back/CustomReports'));
 const Sales = lazy(() => import('./pages/back/Sales'));
 const Returns = lazy(() => import('./pages/back/Returns'));
 const Members = lazy(() => import('./pages/back/Members'));
@@ -126,6 +127,7 @@ export default function App() {
           <Route path="layaways" element={<Layaways />} />
           <Route path="serials" element={<Serials />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="custom-reports" element={<CustomReports />} />
           <Route path="settings" element={<Settings />} />
           <Route path="branches" element={<Branches />} />
           <Route path="users" element={<Users />} />

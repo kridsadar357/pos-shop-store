@@ -12,6 +12,7 @@ import { inventoryRouter } from './routes/inventory.js';
 import { stockCountsRouter } from './routes/stockcounts.js';
 import { salesRouter } from './routes/sales.js';
 import { reportsRouter } from './routes/reports.js';
+import { customReportsRouter } from './routes/customReports.js';
 import { settingsRouter } from './routes/settings.js';
 import { usersRouter } from './routes/users.js';
 import { membersRouter } from './routes/members.js';
@@ -56,6 +57,7 @@ export function createApp() {
   app.use('/api/stock-counts', stockCountsRouter);
   app.use('/api/sales', salesRouter);
   app.use('/api/reports', reportsRouter);
+  app.use('/api/custom-reports', customReportsRouter);
   app.use('/api/settings', settingsRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/members', membersRouter);

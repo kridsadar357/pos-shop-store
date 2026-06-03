@@ -75,6 +75,7 @@ model User {
   shifts        Shift[]
   cashMovements CashMovement[]
   expenses      Expense[]
+  savedReports  SavedReport[]
 }
 
 model Setting {
@@ -861,4 +862,17 @@ model StockCountItem {
 model Counter {
   key   String @id
   value Int    @default(0)
+}
+
+// A saved custom-report definition (the "report builder"). `config` is the JSON
+// ReportConfig (groupBy[], metrics[], sort) consumed by lib/customReport.ts.
+model SavedReport {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  config      String // JSON ReportConfig
+  createdById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User? @relation(fields: [createdById], references: [id])
 }
