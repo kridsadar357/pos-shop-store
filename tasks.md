@@ -272,8 +272,18 @@ is already branch-correct).
   `window.__TAURI__.core.invoke` (gated, browser-safe). **Architecture decision: require a
   reachable Postgres** (the spawned server connects via `DATABASE_URL`) — bundling Postgres /
   SQLite migration both rejected as too lossy. Verified: `cargo check` compiles the launcher
-  clean; web build clean. **Next:** bundle Node + the server (+ Postgres) into the installer for a
-  true one-click all-in-one (the launch command is config-driven so no code change needed).
+  clean; web build clean. **Phase 2c done (all-in-one packaging)**: `desktop/scripts/bundle.mjs`
+  (`npm run bundle`) builds web+server and stages a production server (dist + prisma + prod
+  node_modules + generated Prisma client + the platform query-engine) into
+  `src-tauri/resources/server/`; `tauri.conf.json` `bundle.resources` folds it into the app;
+  `npm run build` = bundle + `cargo tauri build` → .dmg/.msi/.AppImage. The Rust launcher
+  auto-resolves the bundled server (`<resources>/server/dist/src/index.js` via `resource_dir()`,
+  run with system `node`) in Server mode; the wizard's Server step takes a `DATABASE_URL` (stored
+  via `set_desktop_role`, passed to the server child). **Verified: bundle.mjs runs end-to-end
+  (288MB staged bundle with engine + @prisma/client + express); cargo check clean; web build
+  clean.** Caveats (documented): build per target OS (Prisma engine is platform-specific),
+  Postgres must be reachable (not bundled), and `cargo tauri build` / the installer + the actual
+  server spawn can't run in this CI env — run on the target Mac/PC.
 - 🟨 Offline POS — **Phase 1 (replay-safe checkout) done**: `Sale.clientRef` (nullable
   unique) idempotency key. `POST /api/sales` accepts an optional `clientRef`; a resend of the
   same key returns the original bill (HTTP 200) instead of creating a duplicate — covers offline

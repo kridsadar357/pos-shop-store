@@ -5,6 +5,7 @@
   "description": "POS Suite desktop app (Tauri) — runs the POS as a client/kiosk against a configured server",
   "scripts": {
     "dev": "cargo tauri dev",
-    "build": "cargo tauri build"
+    "bundle": "node scripts/bundle.mjs",
+    "build": "npm run bundle && cargo tauri build"
   }
 }

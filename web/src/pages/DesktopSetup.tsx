@@ -13,6 +13,7 @@ const LOCAL_SERVER = 'http://localhost:4000';
 export default function DesktopSetup() {
   const [role, setRole] = useState<'client' | 'server' | null>(null);
   const [url, setUrl] = useState('');
+  const [dbUrl, setDbUrl] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function finish(chosenRole: 'client' | 'server', base: string) {
@@ -23,11 +24,11 @@ export default function DesktopSetup() {
       if (!res.ok || !data?.ok) throw new Error(`HTTP ${res.status}`);
       setApiBase(base);
       localStorage.setItem(ROLE_KEY, chosenRole);
-      // Tell the native Tauri shell the role too, so a Server terminal can launch the local
-      // API server on next start (no-op in a plain browser — __TAURI__ is absent).
+      // Tell the native Tauri shell the role (+ DB URL for the Server role) so a Server terminal
+      // can launch the bundled API server on next start (no-op in a plain browser — __TAURI__ absent).
       try {
         const invoke = (window as unknown as { __TAURI__?: { core?: { invoke?: (cmd: string, args: unknown) => Promise<unknown> } } }).__TAURI__?.core?.invoke;
-        if (invoke) await invoke('set_desktop_role', { role: chosenRole });
+        if (invoke) await invoke('set_desktop_role', { role: chosenRole, databaseUrl: chosenRole === 'server' ? dbUrl.trim() || null : null });
       } catch { /* native bridge optional */ }
       toast.success(th.serverSaved);
       setTimeout(() => location.reload(), 500);
@@ -67,6 +68,10 @@ export default function DesktopSetup() {
             <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800 ring-1 ring-amber-200">
               <i className="fa-solid fa-circle-info mr-1" />{th.roleServerNote}
             </p>
+            <label className="block text-sm font-semibold text-slate-600">
+              {th.roleServerDb}
+              <input className="input mt-1 w-full" placeholder="postgresql://user:pass@localhost:5432/posdb" value={dbUrl} onChange={(e) => setDbUrl(e.target.value)} />
+            </label>
             <div className="flex gap-2">
               <button className="btn-ghost flex-1" disabled={busy} onClick={() => setRole(null)}>{th.back}</button>
               <button className="btn-primary flex-1" disabled={busy} onClick={() => finish('server', LOCAL_SERVER)}>

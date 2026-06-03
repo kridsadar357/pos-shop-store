@@ -36,11 +36,19 @@ CORS_ORIGIN=* npm --prefix server start     # or a comma-separated allow-list
 ```
 The single-image Docker deploy (`docker-compose.prod.yml`) is the easiest way to host it.
 
-## Package installers
+## Package installers (all-in-one: UI + bundled API server)
 ```bash
-npm --prefix web run build
-cd desktop && npm run build         # = cargo tauri build  → .dmg / .msi / .AppImage
+cd desktop && npm run build         # = npm run bundle && cargo tauri build
 ```
+`npm run bundle` (scripts/bundle.mjs) builds the web SPA + server and stages a **production
+server** (dist + prisma + prod node_modules + the generated Prisma client) into
+`src-tauri/resources/server/`; `cargo tauri build` then folds it into the app and emits
+`.dmg` / `.msi` / `.AppImage`. The Rust launcher runs that bundled server in Server mode.
+
+> **Build per target OS.** The staged Prisma query engine is platform-specific
+> (`libquery_engine-<platform>`), so build the installer on the OS you're shipping to.
+> **Postgres is not bundled** — provide a reachable `DATABASE_URL` in the Server setup wizard
+> (a local or LAN Postgres; the repo's `docker-compose` can host just Postgres).
 
 ## How it works
 - `src-tauri/tauri.conf.json` → `build.frontendDist = "../../web/dist"` (release) and

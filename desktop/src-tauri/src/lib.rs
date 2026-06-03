@@ -46,11 +46,17 @@ fn read_config(app: &tauri::AppHandle) -> DesktopConfig {
         .unwrap_or_default()
 }
 
-/// Persist the chosen role (called from the web setup wizard via invoke).
+/// Persist the chosen role (called from the web setup wizard via invoke). For the Server role
+/// an optional Postgres `database_url` is stored and passed to the spawned server.
 #[tauri::command]
-fn set_desktop_role(app: tauri::AppHandle, role: String) -> Result<(), String> {
+fn set_desktop_role(app: tauri::AppHandle, role: String, database_url: Option<String>) -> Result<(), String> {
     let mut cfg = read_config(&app);
     cfg.role = Some(role);
+    if let Some(url) = database_url.filter(|u| !u.trim().is_empty()) {
+        let mut env = cfg.server_env.unwrap_or_default();
+        env.insert("DATABASE_URL".to_string(), url);
+        cfg.server_env = Some(env);
+    }
     let path = config_path(&app).ok_or("no config directory")?;
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
@@ -59,21 +65,40 @@ fn set_desktop_role(app: tauri::AppHandle, role: String) -> Result<(), String> {
     std::fs::write(path, json).map_err(|e| e.to_string())
 }
 
-/// In Server role, launch the API server as a child process — only when a launch command is
-/// configured (packaging/dev sets server_cmd/cwd/env). Returns None otherwise.
+/// In Server role, launch the API server as a child process. An explicit `server_cmd` in the
+/// config wins (dev / custom); otherwise fall back to the server bundled into the app's
+/// resources (`resources/server/dist/src/index.js`) run with system `node`. Returns None if
+/// not in server role or nothing launchable is found.
 fn start_server_if_configured(app: &tauri::AppHandle) -> Option<Child> {
     let cfg = read_config(app);
     if cfg.role.as_deref() != Some("server") {
         return None;
     }
-    let cmd = cfg.server_cmd?;
-    let mut c = Command::new(cmd);
-    if let Some(args) = cfg.server_args {
-        c.args(args);
+
+    // Explicit command (dev or custom packaging).
+    if let Some(cmd) = cfg.server_cmd.clone() {
+        let mut c = Command::new(cmd);
+        if let Some(args) = cfg.server_args.clone() {
+            c.args(args);
+        }
+        if let Some(cwd) = cfg.server_cwd.clone() {
+            c.current_dir(cwd);
+        }
+        if let Some(env) = cfg.server_env.clone() {
+            c.envs(env);
+        }
+        return c.spawn().ok();
     }
-    if let Some(cwd) = cfg.server_cwd {
-        c.current_dir(cwd);
+
+    // Bundled server: <resources>/server/dist/src/index.js run with system node.
+    let res = app.path().resource_dir().ok()?;
+    let server_dir = res.join("server");
+    let entry = server_dir.join("dist").join("src").join("index.js");
+    if !entry.exists() {
+        return None;
     }
+    let mut c = Command::new("node");
+    c.arg(&entry).current_dir(&server_dir);
     if let Some(env) = cfg.server_env {
         c.envs(env);
     }
