@@ -246,6 +246,19 @@ is already branch-correct).
   License settings tab shows a re-check button + an overdue nudge
 
 ## 8. Platform / offline / PWA
+- 🟨 Desktop application (Electron) + server/client setup wizard — **Phase 1 done (client
+  foundation)**: the web client resolves its API base at RUNTIME (`apiBase()`:
+  `window.__POS_API_BASE__` → `localStorage` → build env → same-origin), a **ServerConnect**
+  setup screen (Login link) lets a terminal point at any server (tests `GET /health`, saves,
+  reloads), and server **CORS_ORIGIN** now accepts `*` / a comma-list so LAN/desktop clients are
+  reachable. **Phase 1b done (Electron shell)**: `desktop/` package — `main.js` serves `web/dist`
+  from an in-process static server on 127.0.0.1 (so router/localStorage/SW work) and loads it;
+  `preload.js` exposes `window.__POS_DESKTOP__`; electron-builder config for mac/win/linux +
+  README. Runs as a CLIENT against a configured server. (Verified: web build, CORS cross-origin,
+  offline e2e still passes, Electron files syntax + builder config valid — but Electron isn't
+  installed/GUI-launched in CI; run `cd desktop && npm i && npm start` on a desktop.) **Next
+  (Phase 2):** a role picker (Server vs Client) and a **Server** role that launches the bundled
+  API server locally (all-in-one main terminal).
 - 🟨 Offline POS — **Phase 1 (replay-safe checkout) done**: `Sale.clientRef` (nullable
   unique) idempotency key. `POST /api/sales` accepts an optional `clientRef`; a resend of the
   same key returns the original bill (HTTP 200) instead of creating a duplicate — covers offline
