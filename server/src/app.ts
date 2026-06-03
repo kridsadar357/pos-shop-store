@@ -22,6 +22,7 @@ import { heldBillsRouter } from './routes/heldBills.js';
 import { licenseRouter } from './routes/license.js';
 import { setupRouter } from './routes/setup.js';
 import { printRouter } from './routes/print.js';
+import { vfdRouter } from './routes/vfd.js';
 import { purchaseOrdersRouter } from './routes/purchaseOrders.js';
 import { returnsRouter } from './routes/returns.js';
 import { branchesRouter } from './routes/branches.js';
@@ -67,6 +68,7 @@ export function createApp() {
   app.use('/api/license', licenseRouter);
   app.use('/api/setup', setupRouter);
   app.use('/api/print', printRouter);
+  app.use('/api/vfd', vfdRouter);
   app.use('/api/purchase-orders', purchaseOrdersRouter);
   app.use('/api/returns', returnsRouter);
   app.use('/api/branches', branchesRouter);

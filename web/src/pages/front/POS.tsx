@@ -92,6 +92,7 @@ export default function POS() {
   const scanRef = useRef<HTMLInputElement>(null);
   const [showSearch, setShowSearch] = useState(false);
   const publisher = useRef<ReturnType<typeof createPublisher> | null>(null);
+  const vfdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function loadHeld() { api<HeldBill[]>('/held-bills').then(setHeld).catch(() => setHeld([])); }
   function reload() {
@@ -230,9 +231,26 @@ export default function POS() {
       member: member ? { name: member.name } : null, isMemberPrice: memberWholesale, ts: Date.now(),
     };
   }
+  // Publish to the browser/PWA customer display AND, if enabled, mirror to a network
+  // VFD pole display (debounced + fire-and-forget so a faulty display never blocks checkout).
+  function publishDisplay(state: DisplayState) {
+    publisher.current?.publish(state);
+    if (!setting?.vfdEnabled) return;
+    if (vfdTimer.current) clearTimeout(vfdTimer.current);
+    vfdTimer.current = setTimeout(() => {
+      api('/vfd/display', {
+        method: 'POST',
+        body: {
+          branchId: useBranch.getState().activeId ?? null,
+          state: { status: state.status, storeName: state.storeName, items: state.items, total: state.total, change: state.change },
+        },
+      }).catch(() => {});
+    }, 180);
+  }
+
   useEffect(() => {
     if (transfer || lastSale) return;
-    publisher.current?.publish({ ...baseDisplay(), status: totals.count ? 'CART' : 'IDLE' });
+    publishDisplay({ ...baseDisplay(), status: totals.count ? 'CART' : 'IDLE' });
   }, [lines, member, setting, totals.count]);
 
   // ---- checkout ----
@@ -251,7 +269,7 @@ export default function POS() {
           items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, ...(l.product.trackSerials && parseSerials(l.serials).length ? { serials: parseSerials(l.serials) } : {}) })),
         },
       });
-      publisher.current?.publish({ ...baseDisplay(), status: 'PAID', orderNo: sale.orderNo, paymentMethod: method === 'CASH' ? 'CASH' : 'TRANSFER', change: num(sale.changeDue), cashReceived: num(sale.cashReceived) });
+      publishDisplay({ ...baseDisplay(), status: 'PAID', orderNo: sale.orderNo, paymentMethod: method === 'CASH' ? 'CASH' : 'TRANSFER', change: num(sale.changeDue), cashReceived: num(sale.cashReceived) });
       setLastSale(sale);
       if (autoPrint) doPrint(sale);
       clearCart();
@@ -752,9 +770,9 @@ export default function POS() {
         <TransferModal
           amount={totals.net}
           currency={currency}
-          onQR={(qr) => publisher.current?.publish({ ...baseDisplay(), status: 'PAYMENT', paymentMethod: 'TRANSFER', qrPayload: qr, promptPayId: setting?.promptPayId })}
+          onQR={(qr) => publishDisplay({ ...baseDisplay(), status: 'PAYMENT', paymentMethod: 'TRANSFER', qrPayload: qr, promptPayId: setting?.promptPayId })}
           onConfirm={() => completeSale('TRANSFER', payKey === 'QR' ? 'QR PromptPay' : 'โอนเงิน')}
-          onCancel={() => { setTransfer(false); publisher.current?.publish({ ...baseDisplay(), status: totals.count ? 'CART' : 'IDLE' }); }}
+          onCancel={() => { setTransfer(false); publishDisplay({ ...baseDisplay(), status: totals.count ? 'CART' : 'IDLE' }); }}
         />
       )}
       {cashDrawer && <CashDrawerModal onClose={() => { setCashDrawer(false); refreshShift(); }} />}
@@ -768,7 +786,7 @@ export default function POS() {
           autoPrint={autoPrint}
           onToggleAuto={(v) => { setAutoPrint(v); localStorage.setItem('pos_autoprint', v ? '1' : '0'); }}
           onPrint={() => doPrint(lastSale)}
-          onClose={() => { setLastSale(null); publisher.current?.publish({ ...baseDisplay(), status: 'IDLE', items: [], count: 0, subtotal: 0, tax: 0, total: 0 }); }}
+          onClose={() => { setLastSale(null); publishDisplay({ ...baseDisplay(), status: 'IDLE', items: [], count: 0, subtotal: 0, tax: 0, total: 0 }); }}
         />
       )}
       {printSale && <ReceiptPrint sale={printSale} setting={setting} onDone={() => setPrintSale(null)} />}

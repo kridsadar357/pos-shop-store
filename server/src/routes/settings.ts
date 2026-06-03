@@ -67,6 +67,9 @@ const schema = z.object({
   printerPaper: z.enum(['58mm', '80mm']).default('80mm'),
   escposCodepage: z.number().int().min(0).max(255).default(21),
   openDrawerOnCash: z.boolean().default(true),
+  // VFD customer pole display
+  vfdEnabled: z.boolean().default(false),
+  vfdAddress: z.string().default(''),
   // Granular access (JSON array of allowed back-office page paths for MANAGER).
   managerPages: z.string().default(''),
   // Secondary display currency (approx. conversion).

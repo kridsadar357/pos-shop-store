@@ -49,7 +49,18 @@ is already branch-correct).
 - ✅ Barcode / shelf-label printing — `Labels` page: pick products (search/category),
   set copies + labels-per-row + retail/wholesale price, print an A4 grid of labels with
   a CODE128 barcode (jsbarcode) of each product's barcode/SKU, name, and price
-- ⬜ Customer pole display (VFD) support
+- ✅ Customer pole display (VFD) support — 2×20 char network pole display via the de-facto
+  **CD5220** command set. Pure byte builder `server/src/lib/vfd.ts` (`buildVfdFromState` maps the
+  POS DisplayState → two lines: last item + running TOTAL while ringing up, amount due at
+  PAYMENT, CHANGE + THANK YOU when PAID; ASCII-only — Thai → '?', each line padded/truncated to
+  20). `Builder` mirrors `escpos.ts`; `sendToVfd` = same raw-TCP path (serial-to-LAN bridge /
+  printer DM-D pass-through, :9100). 12 unit tests (framing + state rendering + ASCII reduction).
+  `Setting.vfdEnabled`/`vfdAddress` (+ per-branch `Branch.vfdAddress` override via
+  `resolvedSettings`); `/api/vfd/display` + `/api/vfd/test` (404→400 when unconfigured). Settings
+  Printer tab has the enable + address + "ทดสอบจอแสดงผล" controls; the POS mirrors every
+  DisplayState change to the VFD (debounced, fire-and-forget, gated on vfdEnabled). Verified
+  end-to-end against a TCP capture — correct CD5220 bytes on the wire. (Per-branch VFD address
+  has no back-office editor yet — inherits global; minor polish.)
 
 ## 3. Inventory depth
 - ✅ Bulk product import (CSV/Excel) — `POST /api/products/import` upserts by SKU,

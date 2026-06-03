@@ -255,6 +255,23 @@ function PrinterTab({ s, set, save, setS }: { s: Setting; set: (p: Partial<Setti
           )}
         </Section>
 
+        <Section title="จอแสดงผลลูกค้า (VFD)">
+          <label className="flex items-center justify-between rounded-xl bg-slate-50 p-3">
+            <span><span className="text-sm font-semibold">เปิดใช้งานจอแสดงผลลูกค้า (VFD)</span><span className="block text-xs text-slate-400">จอ 2 บรรทัด 20 ตัวอักษร (CD5220) แสดงรายการ/ยอดรวมให้ลูกค้าเห็น</span></span>
+            <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={s.vfdEnabled} onChange={(e) => set({ vfdEnabled: e.target.checked })} />
+          </label>
+          {s.vfdEnabled && (
+            <div className="mt-3 space-y-3">
+              <F label="ที่อยู่จอแสดงผล (IP:Port)"><input className="input" placeholder="192.168.1.60:9100" value={s.vfdAddress} onChange={(e) => set({ vfdAddress: e.target.value })} /></F>
+              <p className="text-xs text-slate-400">จอ VFD ส่วนใหญ่เชื่อมต่อผ่านสายอนุกรม (serial) — ใช้ตัวแปลง serial-to-LAN หรือพอร์ตต่อพ่วงของเครื่องพิมพ์ (พอร์ต 9100). จอแสดงผลรองรับอักษรอังกฤษ/ตัวเลขเท่านั้น (อักษรไทยจะไม่แสดง)</p>
+              <button className="btn-ghost" onClick={async () => {
+                try { await api('/vfd/test', { method: 'POST' }); toast.success('ส่งข้อความทดสอบไปยังจอแสดงผลแล้ว'); }
+                catch (e) { toast.error((e as Error).message); }
+              }}><i className="fa-solid fa-vial mr-1.5" />ทดสอบจอแสดงผล</button>
+            </div>
+          )}
+        </Section>
+
         <Section title="ออกแบบใบเสร็จ">
           <div className="space-y-3">
             <F label="โลโก้ร้าน">

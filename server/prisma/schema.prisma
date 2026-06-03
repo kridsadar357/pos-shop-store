@@ -109,6 +109,10 @@ model Setting {
   escposCodepage   Int        @default(21)          // ESC t code-page for Thai (vendor-specific)
   openDrawerOnCash Boolean     @default(true)        // pulse the cash drawer on a cash receipt
 
+  // VFD customer pole display (2×20 char, CD5220 command set over a network serial bridge).
+  vfdEnabled     Boolean      @default(false)
+  vfdAddress     String       @default("")          // host:port of the VFD / serial-over-TCP bridge
+
   // Granular access: JSON array of back-office page paths a MANAGER may open
   // (empty string = full access). ADMIN always has full access.
   managerPages   String       @default("")
@@ -155,6 +159,7 @@ model Branch {
   printerType    String @default("") // BROWSER | ESCPOS_NET | ESCPOS_USB
   printerAddress String @default("")
   printerPaper   String @default("") // 58mm | 80mm
+  vfdAddress     String @default("") // VFD pole-display host:port (empty = inherit global)
   receiptHeader  String @default("")
   receiptFooter  String @default("")
 

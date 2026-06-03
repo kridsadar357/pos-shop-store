@@ -52,6 +52,8 @@ export interface Setting {
   printerPaper: '58mm' | '80mm';
   escposCodepage: number;
   openDrawerOnCash: boolean;
+  vfdEnabled: boolean;
+  vfdAddress: string;
   managerPages: string;
   secondaryCurrency: string;
   secondaryRate: string;

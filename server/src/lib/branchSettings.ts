@@ -18,6 +18,7 @@ export async function resolvedSettings(branchId?: number | null) {
     printerType: pick(b.printerType, setting.printerType),
     printerAddress: pick(b.printerAddress, setting.printerAddress),
     printerPaper: pick(b.printerPaper, setting.printerPaper),
+    vfdAddress: pick(b.vfdAddress, setting.vfdAddress),
     receiptHeader: pick(b.receiptHeader, setting.receiptHeader),
     receiptFooter: pick(b.receiptFooter, setting.receiptFooter),
   };
