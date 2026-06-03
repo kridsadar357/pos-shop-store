@@ -193,4 +193,13 @@ export const th = {
   serverReachable: 'เชื่อมต่อเซิร์ฟเวอร์สำเร็จ ✓',
   serverUnreachable: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ',
   testConnection: 'ทดสอบการเชื่อมต่อ',
+  back: 'ย้อนกลับ',
+  desktopSetupTitle: 'ตั้งค่าเริ่มต้น',
+  desktopSetupSub: 'เลือกบทบาทของเครื่องนี้เพื่อเริ่มใช้งาน POS',
+  roleServer: 'เครื่องแม่ข่าย (Server)',
+  roleServerHint: 'เครื่องนี้เป็นเครื่องหลักที่เก็บข้อมูล/ให้บริการ POS แก่เครื่องอื่นในร้าน',
+  roleClient: 'เครื่องลูกข่าย (Client)',
+  roleClientHint: 'เครื่องขายที่เชื่อมต่อไปยังเครื่องแม่ข่ายของร้าน',
+  roleServerNote: 'ต้องเปิดเซิร์ฟเวอร์ POS บนเครื่องนี้ (พอร์ต 4000) — การเปิดอัตโนมัติจะมาในเฟสถัดไป',
+  connectThisMachine: 'เชื่อมต่อเครื่องนี้',
 };

@@ -23,6 +23,13 @@ export function setApiBase(url: string) {
   else localStorage.removeItem(API_BASE_KEY);
 }
 
+/** True when running inside the desktop shell (Tauri webview, or an injected flag). */
+export function isDesktopApp(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w = window as unknown as Record<string, unknown>;
+  return !!(w.__TAURI_INTERNALS__ || w.__TAURI__ || w.__POS_DESKTOP__);
+}
+
 /** Resolve a server-relative path (e.g. an /uploads/… image) to a fetchable URL. */
 export function resolveUrl(path: string): string {
   if (/^https?:\/\//.test(path)) return path;

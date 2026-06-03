@@ -258,8 +258,15 @@ is already branch-correct).
   server. **Verified: `cargo check` compiles clean** against Tauri 2.11.2 (validates
   tauri.conf.json + icon + capabilities + frontendDist); web build + offline e2e still pass; CORS
   cross-origin confirmed. Run `cd desktop && npm run dev` (= `cargo tauri dev`) on a desktop with
-  Rust installed. **Next (Phase 2):** a role picker (Server vs Client) + a **Server** role that
-  launches/embeds the API server locally (Tauri sidecar) for an all-in-one main terminal.
+  Rust installed. **Phase 2a done (setup wizard / role picker)**: `web/src/pages/DesktopSetup.tsx`
+  — a first-run wizard shown when `isDesktopApp()` (Tauri webview / injected flag) and no `pos_role`
+  is set yet; pick **Server** (this machine hosts — points at `localhost:4000`) or **Client** (enter
+  the shop server URL); tests `GET /health`, persists role + base, reloads. Gated BEFORE the
+  API-dependent setup check (a fresh client has no server yet); never shows in plain browser.
+  Verified in a real browser (puppeteer): wizard + both role cards render with the desktop flag,
+  and the normal login shows without it; offline e2e still passes. **Next (Phase 2b):** the
+  **Server** role actually launching/embedding the API server locally via a Tauri sidecar (+ a
+  Postgres strategy) for a true all-in-one main terminal.
 - 🟨 Offline POS — **Phase 1 (replay-safe checkout) done**: `Sale.clientRef` (nullable
   unique) idempotency key. `POST /api/sales` accepts an optional `clientRef`; a resend of the
   same key returns the original bill (HTTP 200) instead of creating a duplicate — covers offline

@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { isBackStore, useAuth, type Role } from './store/auth';
 import { useBranch } from './store/branch';
 import { useOffline } from './store/offline';
-import { api, setOnUnauthorized } from './api/client';
+import { api, setOnUnauthorized, isDesktopApp } from './api/client';
 import { ToastHost } from './components/Toast';
 import type { LicenseState } from './types';
 
@@ -12,6 +12,7 @@ import type { LicenseState } from './types';
 // pushing heavy back-office libs (recharts, xlsx, jszip) into on-demand chunks.
 const Login = lazy(() => import('./pages/Login'));
 const Setup = lazy(() => import('./pages/Setup'));
+const DesktopSetup = lazy(() => import('./pages/DesktopSetup'));
 const Display = lazy(() => import('./pages/Display'));
 const POS = lazy(() => import('./pages/front/POS'));
 const BackLayout = lazy(() => import('./components/BackLayout').then((m) => ({ default: m.BackLayout })));
@@ -82,6 +83,17 @@ export default function App() {
     const t = setInterval(sync, 20000);
     return () => { window.removeEventListener('online', sync); clearInterval(t); };
   }, [user]);
+
+  // Desktop first-run: pick Server/Client role + server connection BEFORE anything that needs
+  // the API (a fresh desktop client has no server configured yet). Self-contained (reloads).
+  if (isDesktopApp() && !localStorage.getItem('pos_role')) {
+    return (
+      <Suspense fallback={<Loader />}>
+        <DesktopSetup />
+        <ToastHost />
+      </Suspense>
+    );
+  }
 
   // Wait until we know whether first-run setup is needed (avoids a flash).
   if (setupDone === null) {
