@@ -447,6 +447,7 @@ salesRouter.post(
   ah(async (req, res) => {
     const id = Number(req.params.id);
     const userId = req.user!.id;
+    const { reason } = z.object({ reason: z.string().max(200).optional() }).parse(req.body ?? {});
     const result = await prisma.$transaction(async (tx) => {
       const sale = await tx.sale.findUniqueOrThrow({ where: { id }, include: { items: true, payments: true } });
       if (sale.status === 'VOID') throw Object.assign(new Error('Already voided'), { status: 400 });
@@ -493,7 +494,7 @@ salesRouter.post(
 
       return tx.sale.update({
         where: { id },
-        data: { status: 'VOID', voidedById: userId, voidedAt: new Date() },
+        data: { status: 'VOID', voidedById: userId, voidedAt: new Date(), voidReason: reason?.trim() || '' },
       });
     });
     res.json(result);

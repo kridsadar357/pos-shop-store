@@ -730,6 +730,7 @@ model Sale {
   shiftId       Int?
   voidedById    Int?
   voidedAt      DateTime?
+  voidReason    String        @default("") // why the sale was voided (audit / loss prevention)
   createdAt     DateTime      @default(now())
 
   branchId      Int?

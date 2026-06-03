@@ -44,9 +44,11 @@ export default function Sales() {
   useEffect(() => { api<Setting>('/settings').then(setSetting).catch(() => {}); }, []);
 
   async function voidSale(id: number) {
+    const reason = prompt('เหตุผลในการยกเลิกบิล (เพื่อการตรวจสอบ):', '');
+    if (reason === null) return; // cancelled
     if (!confirm('ยกเลิกบิลนี้? สต็อกจะถูกคืนเข้าคลัง')) return;
     try {
-      await api(`/sales/${id}/void`, { method: 'POST' });
+      await api(`/sales/${id}/void`, { method: 'POST', body: { reason: reason.trim() } });
       toast.success('ยกเลิกบิลแล้ว — คืนสต็อกเรียบร้อย');
       load();
     } catch (e) { toast.error((e as Error).message); }
@@ -168,6 +170,7 @@ export default function Sales() {
             <Info label="แคชเชียร์" value={detail.cashier?.name ?? '—'} />
             {detail.member && <Info label="ลูกค้า" value={`${detail.member.name} (${detail.member.phone})`} />}
             <Info label="สถานะ" value={detail.status === 'VOID' ? 'ยกเลิก' : 'ชำระแล้ว'} />
+            {detail.status === 'VOID' && detail.voidReason && <Info label="เหตุผลที่ยกเลิก" value={detail.voidReason} />}
           </div>
 
           <div className="mt-4 overflow-hidden rounded-xl ring-1 ring-slate-200">

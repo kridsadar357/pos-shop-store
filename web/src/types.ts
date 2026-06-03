@@ -169,6 +169,7 @@ export interface Sale {
   orderNo: string;
   type: 'RETAIL' | 'WHOLESALE';
   status: 'PAID' | 'VOID';
+  voidReason?: string;
   subtotal: string;
   discount: string;
   promoDiscount?: string;
