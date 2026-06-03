@@ -226,7 +226,7 @@ is already branch-correct).
   open (`Setting.managerPages`); enforced in the sidebar nav + a route gate in
   BackLayout (empty = full access; dashboard always allowed). UI-level access control;
   admin-only data routes (users/branches/audit/backup) remain hard-gated server-side.
-  First per-action control shipped: a CASHIER manual-discount cap (Setting.cashierMaxDiscountPct, enforced server-side at checkout via pure tested withinDiscountLimit; ADMIN/MANAGER unlimited). Full per-action backend permission matrix still pending.
+  First per-action control shipped: a CASHIER manual-discount cap (Setting.cashierMaxDiscountPct, enforced server-side at checkout via pure tested withinDiscountLimit; ADMIN/MANAGER unlimited; POS clamps + warns the cashier). An over-cap discount can be approved at the register with a **manager/admin PIN** (`discountApprovalPin` — bcrypt-verified server-side, approver recorded on the bill's paymentRef; POS "ผู้จัดการอนุมัติ" prompt lifts the clamp). Full per-action backend permission matrix still pending.
 - ✅ Audit log of user actions — `AuditLog` model + app-level `auditLogger`
   middleware that records every mutating /api call (actor snapshot, method, path,
   action label, status, IP) after the response finishes; no request bodies stored.
