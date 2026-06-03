@@ -251,10 +251,18 @@ is already branch-correct).
   (→ outbox) survive a **cold reload while offline**. Fail-safe by construction: cache writes
   are best-effort (errors swallowed), reads only run inside a fetch `.catch`, so the online path
   can't regress. Verified by typecheck + production build + review (the offline-reload runtime
-  path itself wants a headless-browser e2e — see §8 e2e). **Offline POS is now functionally
-  complete**; remaining polish: cache active promotions for offline preview, and an explicit
-  service-worker app-shell so the SPA assets load offline (Vite PWA only ships the customer
-  display today).
+  path itself wants a headless-browser e2e — see §8 e2e).
+  **Phase 4 (robust offline app-shell) done**: the SW (`web/public/sw.js`) used to precache
+  only index.html + icons and rely on opportunistic runtime caching for the hashed JS/CSS — so
+  a cold reload offline broke right after a deploy (new hashes not yet fetched). Build step
+  `web/scripts/gen-sw-precache.mjs` (run from `npm run build`) now rewrites `dist/sw.js` to
+  precache the real built app-shell on install: index.html + manifest + icons + CSS + the
+  critical JS chunks (POS/vendor/index/th/ui/…), EXCLUDING the heavy lazy chunks
+  (exporters/charts/scanner — left to runtime cache). Cache name is content-hashed so a new
+  build invalidates the old precache (activate handler already prunes). Verified: build emits
+  `pos-shell-<hash>` + a 59-entry manifest with POS/vendor/index in and the heavy chunks out.
+  **Offline POS is now genuinely complete** (idempotent checkout + outbox + data cache +
+  precached shell). Remaining nicety: cache active promotions for offline discount preview.
 - ✅ Production deploy story — single-image deploy: Express serves the API **and** the
   built SPA (`WEB_DIST`, SPA fallback for non-`/api`/`/uploads`/`/ws` GETs). Multi-stage
   `Dockerfile` (build web → build server → slim runtime), `docker-compose.prod.yml`

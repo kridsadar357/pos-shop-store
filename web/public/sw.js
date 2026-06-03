@@ -1,7 +1,13 @@
-/* POS Suite service worker — offline app shell for the installable PWA
+/* POS Suite service worker — offline app shell for the POS + installable PWA
    (customer display / kiosk). API, WebSocket and uploads always hit the
-   network so live data is never stale. */
-const CACHE = 'pos-shell-v1';
+   network so live data is never stale.
+
+   NOTE: the CACHE name + SHELL list below are rewritten at build time by
+   scripts/gen-sw-precache.mjs to a content-hashed cache + the real built-asset
+   manifest, so a cold reload while offline reliably boots the app (not just
+   whatever happened to be runtime-cached). Edits to these two lines are
+   overwritten by the build. */
+const CACHE = 'pos-shell-dev';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
