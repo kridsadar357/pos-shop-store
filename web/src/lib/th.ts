@@ -181,4 +181,9 @@ export const th = {
   offline: 'ออฟไลน์',
   foreignCash: 'รับเงินสดสกุลต่างประเทศ',
   foreignTender: 'เงินต่างสกุล',
+  pendingSyncTitle: 'รายการขายออฟไลน์ที่รอซิงค์',
+  pendingSyncEmpty: 'ไม่มีรายการรอซิงค์',
+  syncFailed: 'ซิงค์ไม่สำเร็จ',
+  discard: 'ลบ',
+  discardConfirm: 'ลบรายการขายออฟไลน์นี้? รายการนี้จะไม่ถูกบันทึกเข้าระบบ',
 };

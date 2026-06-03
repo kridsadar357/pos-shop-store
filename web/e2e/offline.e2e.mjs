@@ -120,6 +120,14 @@ try {
     check(queued.length === 1, `offline: sale queued to the outbox (got ${queued.length})`);
     clientRef = queued[0]?.clientRef ?? null;
 
+    // Pending-sync panel: clicking the "รอซิงค์" chip opens a list of the queued sales.
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('รอซิงค์'))?.click());
+    await sleep(400);
+    const panelShows = await page.evaluate(() => document.body.innerText.includes('รายการขายออฟไลน์ที่รอซิงค์'));
+    check(panelShows, 'offline: pending-sync panel lists the queued sale');
+    await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '✕')?.click()); // close it
+    await sleep(200);
+
     // ---- BACK ONLINE: the outbox should auto-drain ----
     console.log('• back ONLINE — expecting auto-sync…');
     await page.setOfflineMode(false);

@@ -10,6 +10,7 @@ import { QRCanvas } from '../../components/QRCode';
 import { ReceiptPrint } from '../../components/ReceiptPrint';
 import { ShiftReport } from '../../components/ShiftReport';
 import { ChangePasswordModal } from '../../components/ChangePasswordModal';
+import { Modal } from '../../components/Modal';
 import { printReceipt } from '../../lib/printing';
 import { useBranch } from '../../store/branch';
 import { useOffline, isNetworkError } from '../../store/offline';
@@ -970,6 +971,7 @@ function PriceCheckModal({ product, currency, memberGetsWholesale, onLookup, onC
 // "pending sync" chip (manual replay) whenever sales are queued from an offline period.
 function ConnBadge() {
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
+  const [showPending, setShowPending] = useState(false);
   const pending = useOffline((s) => s.items.length);
   const syncing = useOffline((s) => s.syncing);
   useEffect(() => {
@@ -986,15 +988,48 @@ function ConnBadge() {
       </span>
       {pending > 0 && (
         <button
-          onClick={() => useOffline.getState().sync()}
-          disabled={syncing || !online}
-          title={th.syncNow}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/20 hover:bg-white/25 disabled:opacity-60"
+          onClick={() => setShowPending(true)}
+          title={th.pendingSyncTitle}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/20 hover:bg-white/25"
         >
           <i className={`fa-solid ${syncing ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'}`} /> {syncing ? th.syncing : `${th.pendingSync} ${pending}`}
         </button>
       )}
+      {showPending && <PendingSyncModal online={online} onClose={() => setShowPending(false)} />}
     </div>
+  );
+}
+
+// Detail panel for the offline outbox: view queued sales, retry the lot, or discard one
+// (e.g. a sale the server rejects on replay — flagged with its error so it isn't stuck unseen).
+function PendingSyncModal({ online, onClose }: { online: boolean; onClose: () => void }) {
+  const items = useOffline((s) => s.items);
+  const syncing = useOffline((s) => s.syncing);
+  return (
+    <Modal title={th.pendingSyncTitle} onClose={onClose} wide>
+      {items.length === 0 ? (
+        <p className="py-6 text-center text-sm text-slate-500">{th.pendingSyncEmpty}</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((it) => (
+            <div key={it.clientRef} className="flex items-center justify-between rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-ink-900">{money(it.total)} · {it.itemCount} {th.items}</div>
+                <div className="text-xs text-slate-400">{new Date(it.queuedAt).toLocaleString('th-TH')}</div>
+                {it.lastError && <div className="mt-0.5 text-xs font-semibold text-rose-600"><i className="fa-solid fa-triangle-exclamation mr-1" />{it.lastError}</div>}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${it.lastError ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{it.lastError ? th.syncFailed : th.pendingSync}</span>
+                <button onClick={() => { if (window.confirm(th.discardConfirm)) useOffline.getState().remove(it.clientRef); }} className="px-1 text-slate-400 hover:text-rose-500" title={th.discard}><i className="fa-solid fa-trash text-xs" /></button>
+              </div>
+            </div>
+          ))}
+          <button onClick={() => useOffline.getState().sync()} disabled={syncing || !online} className="btn-primary mt-2 w-full disabled:opacity-50">
+            <i className={`fa-solid ${syncing ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'} mr-1.5`} />{online ? th.syncNow : th.offline}
+          </button>
+        </div>
+      )}
+    </Modal>
   );
 }
 

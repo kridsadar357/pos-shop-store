@@ -259,9 +259,11 @@ is already branch-correct).
   exact POST body (carrying its clientRef), and lets the cashier keep selling. `sync()` replays
   oldest-first (idempotent via clientRef; stops on a network error, flags business rejections);
   auto-triggered on login, the `online` event, and a 20s interval (`App.tsx`). POS header
-  `ConnBadge` shows live online/offline + a clickable "รอซิงค์ N" chip (manual replay). Verified
-  e2e: a queued sale replays to exactly one bill, a duplicate sync trigger is a no-op (201 then
-  200).
+  `ConnBadge` shows live online/offline + a clickable "รอซิงค์ N" chip that opens a **pending-sync
+  panel** (`PendingSyncModal`): lists each queued sale (time, total, items, status), with retry-all
+  + per-item discard (so a sale the server rejects on replay — flagged with its error — isn't stuck
+  unseen). Verified e2e: a queued sale replays to exactly one bill, a duplicate sync trigger is a
+  no-op (201 then 200), and the panel lists the queued sale.
   **Phase 3 (offline catalog cache) done**: `web/src/lib/idb.ts` (tiny promise IndexedDB
   key-value, no dep) + `web/src/lib/catalogCache.ts` cache the branch-scoped **products**,
   **categories**, and **resolved settings**. POS load points write the cache on a successful
