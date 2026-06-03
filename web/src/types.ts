@@ -66,6 +66,8 @@ export interface Setting {
   smsApiUrl: string;
   smsSender: string;
   smsApiKeySet?: boolean;
+  autoReceiptEmail: boolean;
+  autoReceiptSms: boolean;
   reportEmailEnabled: boolean;
   reportEmailTo: string;
   reportEmailHour: number;

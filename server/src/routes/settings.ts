@@ -93,6 +93,8 @@ const schema = z.object({
   smsApiUrl: z.string().default(''),
   smsApiKey: z.string().default(''),
   smsSender: z.string().default(''),
+  autoReceiptEmail: z.boolean().default(false),
+  autoReceiptSms: z.boolean().default(false),
 });
 
 settingsRouter.put(

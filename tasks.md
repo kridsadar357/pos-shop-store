@@ -148,7 +148,7 @@ is already branch-correct).
   `buildReceiptSms` (unit-tested). `POST /sales/:id/sms` {to?} texts a receipt (defaults to the
   member's phone), `POST /settings/sms-test` sends a test. Settings "เกตเวย์ SMS" section + "SMS"
   button on the Sales bill detail. Verified e2e against a local capture gateway (correct
-  {to,message,sender} payload; key redaction; 400 unconfigured). **LINE still pending** (LINE Notify
+  {to,message,sender} payload; key redaction; 400 unconfigured). **Auto-send on checkout** (opt-in): Setting.autoReceiptEmail/autoReceiptSms (default off) — a completed sale to a member with an email/phone auto-sends the receipt (fire-and-forget after the response; pure shouldEmailReceipt/shouldSmsReceipt in lib/autoReceipt.ts, 6 unit tests; Settings toggles). **LINE still pending** (LINE Notify
   is discontinued; the Messaging API needs the customer's LINE userId — a linking-UX decision).
 
 ## 5. Finance & accounting

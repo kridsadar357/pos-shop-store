@@ -135,6 +135,10 @@ model Setting {
   smsApiKey  String  @default("")     // optional bearer token (redacted from GET, like smtpPass)
   smsSender  String  @default("")     // optional sender ID
 
+  // Auto-send a receipt to the member on a completed sale (fire-and-forget, default off).
+  autoReceiptEmail Boolean @default(false) // email the receipt if the member has an email
+  autoReceiptSms   Boolean @default(false) // SMS the receipt if the member has a phone
+
   // Scheduled daily sales-summary email
   reportEmailEnabled  Boolean @default(false)
   reportEmailTo       String  @default("")

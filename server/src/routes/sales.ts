@@ -10,6 +10,7 @@ import { buildReceiptEmail } from '../lib/receiptEmail.js';
 import { sendMail } from '../lib/mailer.js';
 import { buildReceiptSms } from '../lib/receiptSms.js';
 import { sendSms } from '../lib/sms.js';
+import { shouldEmailReceipt, shouldSmsReceipt } from '../lib/autoReceipt.js';
 import { computeTenderPlan } from '../lib/tender.js';
 import { baseFromForeign, fxNote } from '../lib/fx.js';
 import { computeRedeem, computeEarn } from '../lib/loyaltyCalc.js';
@@ -55,7 +56,7 @@ function round2(n: number): number {
 const saleInclude = {
   items: true,
   payments: true,
-  member: { select: { name: true, phone: true } },
+  member: { select: { name: true, phone: true, email: true } },
 } as const;
 
 salesRouter.post(
@@ -272,6 +273,29 @@ salesRouter.post(
     }
 
     res.status(201).json(sale);
+
+    // Auto-send the receipt to the member (fire-and-forget — never blocks or fails the sale).
+    const m = (sale as { member?: { phone?: string | null; email?: string | null } | null }).member;
+    void (async () => {
+      try {
+        if (shouldEmailReceipt(setting, m)) {
+          const msg = buildReceiptEmail(sale as never, {
+            storeName: setting.storeName, address: setting.address, phone: setting.phone,
+            taxId: setting.taxId, currency: setting.currency, receiptFooter: setting.receiptFooter,
+          });
+          await sendMail(
+            { smtpHost: setting.smtpHost, smtpPort: setting.smtpPort, smtpSecure: setting.smtpSecure, smtpUser: setting.smtpUser, smtpPass: setting.smtpPass, smtpFrom: setting.smtpFrom, storeName: setting.storeName },
+            { to: m!.email!, ...msg }
+          );
+        }
+        if (shouldSmsReceipt(setting, m)) {
+          await sendSms(
+            { smsApiUrl: setting.smsApiUrl, smsApiKey: setting.smsApiKey, smsSender: setting.smsSender },
+            { to: m!.phone!, message: buildReceiptSms(sale as never, { storeName: setting.storeName, currency: setting.currency }) }
+          );
+        }
+      } catch { /* fire-and-forget: a failed auto-receipt must not affect the completed sale */ }
+    })();
   })
 );
 

@@ -330,7 +330,7 @@ function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }
   async function saveSms() {
     setBusy(true);
     try {
-      const body: Record<string, unknown> = { smsApiUrl: s.smsApiUrl, smsSender: s.smsSender };
+      const body: Record<string, unknown> = { smsApiUrl: s.smsApiUrl, smsSender: s.smsSender, autoReceiptSms: s.autoReceiptSms };
       if (smsKey.trim()) body.smsApiKey = smsKey.trim();
       const updated = await api<Setting>('/settings', { method: 'PUT', body });
       set({ smsApiKeySet: updated.smsApiKeySet });
@@ -353,6 +353,7 @@ function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }
         smtpUser: s.smtpUser, smtpFrom: s.smtpFrom,
         reportEmailEnabled: s.reportEmailEnabled, reportEmailTo: s.reportEmailTo,
         reportEmailHour: Math.round(num(s.reportEmailHour)),
+        autoReceiptEmail: s.autoReceiptEmail,
       };
       if (pass.trim()) body.smtpPass = pass.trim();
       const updated = await api<Setting>('/settings', { method: 'PUT', body });
@@ -391,6 +392,10 @@ function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }
             <input type="password" className="input" placeholder={s.smtpPassSet ? '••••••••' : 'รหัสผ่าน / App password'} value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="new-password" />
           </F>
           <F label="ชื่อผู้ส่ง (From) — เว้นว่างเพื่อใช้ชื่อร้าน" className="col-span-2"><input className="input" placeholder={`${s.storeName} <${s.smtpUser || 'you@example.com'}>`} value={s.smtpFrom} onChange={(e) => set({ smtpFrom: e.target.value })} /></F>
+          <label className="col-span-2 flex items-center justify-between rounded-xl bg-slate-50 p-3">
+            <span><span className="text-sm font-semibold">ส่งใบเสร็จทางอีเมลอัตโนมัติ</span><span className="block text-xs text-slate-400">เมื่อปิดการขายให้สมาชิกที่มีอีเมล ระบบจะส่งใบเสร็จให้อัตโนมัติ</span></span>
+            <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={s.autoReceiptEmail} onChange={(e) => set({ autoReceiptEmail: e.target.checked })} />
+          </label>
         </div>
         <button className="btn-primary mt-4 w-full" onClick={saveEmail} disabled={busy}>บันทึกการตั้งค่าอีเมล</button>
       </Section>
@@ -411,6 +416,10 @@ function EmailTab({ s, set }: { s: Setting; set: (p: Partial<Setting>) => void }
             <input type="password" className="input" placeholder={s.smsApiKeySet ? '••••••••' : 'optional'} value={smsKey} onChange={(e) => setSmsKey(e.target.value)} autoComplete="new-password" />
           </F>
           <F label="ชื่อผู้ส่ง (Sender ID)"><input className="input" placeholder="MyShop" value={s.smsSender} onChange={(e) => set({ smsSender: e.target.value })} /></F>
+          <label className="col-span-2 flex items-center justify-between rounded-xl bg-slate-50 p-3">
+            <span><span className="text-sm font-semibold">ส่งใบเสร็จทาง SMS อัตโนมัติ</span><span className="block text-xs text-slate-400">เมื่อปิดการขายให้สมาชิกที่มีเบอร์โทร ระบบจะส่ง SMS ใบเสร็จให้อัตโนมัติ</span></span>
+            <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={s.autoReceiptSms} onChange={(e) => set({ autoReceiptSms: e.target.checked })} />
+          </label>
         </div>
         <button className="btn-primary mt-4 w-full" onClick={saveSms} disabled={busy}>บันทึกการตั้งค่า SMS</button>
         <div className="mt-3 flex items-end gap-2">
