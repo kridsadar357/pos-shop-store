@@ -23,6 +23,12 @@ export default function DesktopSetup() {
       if (!res.ok || !data?.ok) throw new Error(`HTTP ${res.status}`);
       setApiBase(base);
       localStorage.setItem(ROLE_KEY, chosenRole);
+      // Tell the native Tauri shell the role too, so a Server terminal can launch the local
+      // API server on next start (no-op in a plain browser — __TAURI__ is absent).
+      try {
+        const invoke = (window as unknown as { __TAURI__?: { core?: { invoke?: (cmd: string, args: unknown) => Promise<unknown> } } }).__TAURI__?.core?.invoke;
+        if (invoke) await invoke('set_desktop_role', { role: chosenRole });
+      } catch { /* native bridge optional */ }
       toast.success(th.serverSaved);
       setTimeout(() => location.reload(), 500);
     } catch (e) {

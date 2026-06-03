@@ -52,7 +52,29 @@ cd desktop && npm run build         # = cargo tauri build  → .dmg / .msi / .Ap
   (`window.__POS_API_BASE__` → `localStorage 'pos_api_base'` → build-time env → same-origin);
   the connection screen writes `localStorage`.
 
+## Server role (auto-launch the API locally)
+When the setup wizard picks **Server**, the app writes the role to a native config file
+(`pos-desktop.json` in the OS app-config dir). On the next launch, if a launch command is
+configured there, the shell spawns the API server as a managed child process (killed on exit).
+Configure it (so packaging/dev can set the command without code changes), e.g.:
+
+```jsonc
+// <app-config-dir>/pos-desktop.json
+{
+  "role": "server",
+  "server_cmd": "node",
+  "server_args": ["dist/src/index.js"],
+  "server_cwd": "/path/to/server",
+  "server_env": { "DATABASE_URL": "postgresql://…", "PORT": "4000", "WEB_DIST": "" }
+}
+```
+**Postgres is required** — the spawned server connects to the `DATABASE_URL` you provide (a local
+or LAN Postgres). Bundling Node + the server binary + Postgres into the installer is the remaining
+packaging work.
+
 ## Status / roadmap
-- **Done:** Tauri client shell + in-app server connection. `cargo check` passes.
-- **Next:** a role picker in the setup wizard (**Server** vs **Client**), and a **Server** role
-  that launches/embeds the API server locally (Tauri sidecar) so the main terminal is all-in-one.
+- **Done:** Tauri client shell + in-app server connection; setup wizard with **Server/Client**
+  role picker; native server-launcher (spawns/kills the API child process in Server role when
+  `server_cmd` is configured). `cargo check` passes; wizard verified in-browser.
+- **Next:** bundle Node + the server + a Postgres strategy into the installer so the Server role
+  is truly one-click all-in-one.

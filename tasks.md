@@ -264,9 +264,16 @@ is already branch-correct).
   the shop server URL); tests `GET /health`, persists role + base, reloads. Gated BEFORE the
   API-dependent setup check (a fresh client has no server yet); never shows in plain browser.
   Verified in a real browser (puppeteer): wizard + both role cards render with the desktop flag,
-  and the normal login shows without it; offline e2e still passes. **Next (Phase 2b):** the
-  **Server** role actually launching/embedding the API server locally via a Tauri sidecar (+ a
-  Postgres strategy) for a true all-in-one main terminal.
+  and the normal login shows without it; offline e2e still passes. **Phase 2b done (Server-role
+  launcher)**: `src-tauri/src/lib.rs` — a `set_desktop_role` Tauri command persists the role to a
+  native config (`pos-desktop.json`); on startup, if role==server AND a launch command is
+  configured (`server_cmd`/`args`/`cwd`/`env`), the shell **spawns the API server as a managed
+  child process and kills it on exit**. `withGlobalTauri` on; the wizard calls the command via
+  `window.__TAURI__.core.invoke` (gated, browser-safe). **Architecture decision: require a
+  reachable Postgres** (the spawned server connects via `DATABASE_URL`) — bundling Postgres /
+  SQLite migration both rejected as too lossy. Verified: `cargo check` compiles the launcher
+  clean; web build clean. **Next:** bundle Node + the server (+ Postgres) into the installer for a
+  true one-click all-in-one (the launch command is config-driven so no code change needed).
 - 🟨 Offline POS — **Phase 1 (replay-safe checkout) done**: `Sale.clientRef` (nullable
   unique) idempotency key. `POST /api/sales` accepts an optional `clientRef`; a resend of the
   same key returns the original bill (HTTP 200) instead of creating a duplicate — covers offline
