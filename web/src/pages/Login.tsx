@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isBackStore, useAuth } from '../store/auth';
 import { toast } from '../components/Toast';
+import { ServerConnect } from '../components/ServerConnect';
+import { getApiBase } from '../api/client';
+import { th } from '../lib/th';
 
 const QUICK = [
   { username: 'admin', password: 'admin123', label: 'Admin' },
@@ -14,6 +17,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showServer, setShowServer] = useState(false);
 
   async function submit(u: string, p: string) {
     try {
@@ -99,8 +103,14 @@ export default function Login() {
               ))}
             </div>
           </div>
+
+          <button onClick={() => setShowServer(true)} className="mt-6 flex w-full items-center justify-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-brand-600">
+            <i className="fa-solid fa-server" /> {th.serverConnect}
+            {getApiBase() && <span className="truncate font-normal text-slate-400">· {getApiBase()}</span>}
+          </button>
         </div>
       </div>
+      {showServer && <ServerConnect onClose={() => setShowServer(false)} />}
     </div>
   );
 }

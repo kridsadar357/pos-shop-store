@@ -1,9 +1,32 @@
-const BASE = import.meta.env.VITE_API_URL || '';
+// Runtime-resolved API base so the POS can run as a desktop / LAN client pointing at any
+// server (set via the server-connection setup), not just the same-origin or build-time URL.
+// Priority: Electron-injected global → user-configured (localStorage) → build-time env → same-origin.
+const API_BASE_KEY = 'pos_api_base';
+const normalizeBase = (u: string) => u.trim().replace(/\/+$/, '');
+
+export function apiBase(): string {
+  const injected = typeof window !== 'undefined' ? (window as unknown as { __POS_API_BASE__?: string }).__POS_API_BASE__ : undefined;
+  if (injected) return normalizeBase(injected);
+  const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(API_BASE_KEY) : null;
+  if (stored) return normalizeBase(stored);
+  return normalizeBase(import.meta.env.VITE_API_URL || '');
+}
+/** The configured server URL (empty = same-origin). For the connection-setup UI. */
+export function getApiBase(): string {
+  const injected = typeof window !== 'undefined' ? (window as unknown as { __POS_API_BASE__?: string }).__POS_API_BASE__ : undefined;
+  return injected ? normalizeBase(injected) : (localStorage.getItem(API_BASE_KEY) || '');
+}
+/** Persist the server URL (empty clears it → same-origin). */
+export function setApiBase(url: string) {
+  const v = normalizeBase(url);
+  if (v) localStorage.setItem(API_BASE_KEY, v);
+  else localStorage.removeItem(API_BASE_KEY);
+}
 
 /** Resolve a server-relative path (e.g. an /uploads/… image) to a fetchable URL. */
 export function resolveUrl(path: string): string {
   if (/^https?:\/\//.test(path)) return path;
-  return `${BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  return `${apiBase()}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
 let authToken: string | null = localStorage.getItem('pos_token');
@@ -24,7 +47,7 @@ export async function api<T = unknown>(
   options: { method?: string; body?: unknown; query?: Record<string, unknown> } = {}
 ): Promise<T> {
   const { method = 'GET', body, query } = options;
-  let url = `${BASE}/api${path}`;
+  let url = `${apiBase()}/api${path}`;
   if (query) {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
@@ -58,7 +81,7 @@ export async function api<T = unknown>(
 export async function uploadFile<T = unknown>(path: string, field: string, file: File): Promise<T> {
   const form = new FormData();
   form.append(field, file);
-  const res = await fetch(`${BASE}/api${path}`, {
+  const res = await fetch(`${apiBase()}/api${path}`, {
     method: 'POST',
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
     body: form,

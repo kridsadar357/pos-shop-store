@@ -39,7 +39,13 @@ import { auditLogger } from './middleware/audit.js';
 
 export function createApp() {
   const app = express();
-  app.use(cors({ origin: env.CORS_ORIGIN }));
+  // CORS_ORIGIN: '*' allows any origin (LAN/desktop clients — auth is bearer-token, not cookies,
+  // so this is safe), or a comma-separated allow-list. Default stays the dev origin.
+  const corsOrigin =
+    env.CORS_ORIGIN === '*'
+      ? '*'
+      : env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean);
+  app.use(cors({ origin: corsOrigin }));
   app.use(express.json({ limit: '64mb' })); // large enough for full backup restore
 
   app.get('/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
