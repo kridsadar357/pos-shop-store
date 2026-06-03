@@ -173,4 +173,5 @@ export const th = {
   noHeld: 'ไม่มีบิลที่พักไว้',
   confirmPayment: 'ยืนยันการชำระเงิน',
   branch: 'สาขา',
+  switchBranch: 'เปลี่ยนสาขา',
 };

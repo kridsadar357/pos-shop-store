@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/auth';
+import { useBranch } from '../../store/branch';
 import { toast } from '../../components/Toast';
 import { th } from '../../lib/th';
 
@@ -67,10 +68,7 @@ export function PosSidebar({ branch }: { branch?: string }) {
             <div className="truncate text-[11px] text-slate-400">{user?.username}@pos</div>
           </div>
         </div>
-        <button className="flex w-full items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 ring-1 ring-white/10">
-          <span className="truncate">🏪 {branch || th.branch}</span>
-          <span className="text-slate-500">▾</span>
-        </button>
+        <BranchSwitcher fallback={branch} />
         <button
           onClick={() => { logout(); navigate('/login'); }}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-500/90 px-3 py-2.5 text-sm font-bold text-white hover:bg-rose-500"
@@ -79,5 +77,35 @@ export function PosSidebar({ branch }: { branch?: string }) {
         </button>
       </div>
     </aside>
+  );
+}
+
+function BranchSwitcher({ fallback }: { fallback?: string }) {
+  const { branches, activeId, setActive, active } = useBranch();
+  const cur = active();
+
+  // No branch context yet (single-branch shop or not loaded) — show a static pill.
+  if (branches.length <= 1) {
+    return (
+      <div className="flex w-full items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 ring-1 ring-white/10">
+        <span>🏪</span>
+        <span className="truncate">{cur?.name || fallback || th.branch}</span>
+      </div>
+    );
+  }
+
+  return (
+    <label className="flex w-full items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 ring-1 ring-white/10 focus-within:ring-brand-400/60">
+      <span>🏪</span>
+      <select
+        value={activeId ?? cur?.id}
+        onChange={(e) => setActive(Number(e.target.value))}
+        className="min-w-0 flex-1 cursor-pointer truncate bg-transparent font-semibold text-slate-200 outline-none [&>option]:text-slate-900"
+        title={th.switchBranch}
+      >
+        {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+      </select>
+      <span className="text-slate-500">▾</span>
+    </label>
   );
 }
