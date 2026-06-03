@@ -164,6 +164,8 @@ salesRouter.post(
       // of the tender math stays in the base currency. Only for a single (non-split) cash bill.
       let cashReceived = data.cashReceived;
       let paymentRef = data.paymentRef;
+      let cashFxCurrency = 'THB';
+      let cashFxRate = 1;
       if (data.cashForeignAmount && data.cashCurrency && data.paymentMethod === 'CASH' && !data.payments?.length) {
         const rate = Number(setting.secondaryRate);
         if (!setting.secondaryCurrency || setting.secondaryCurrency !== data.cashCurrency || rate <= 0) {
@@ -171,6 +173,8 @@ salesRouter.post(
         }
         cashReceived = baseFromForeign(data.cashForeignAmount, rate);
         paymentRef = fxNote(data.cashForeignAmount, data.cashCurrency, rate);
+        cashFxCurrency = data.cashCurrency;
+        cashFxRate = rate;
       }
       // Record who approved an over-cap discount (for the receipt / audit).
       if (discountApprover) paymentRef = `${paymentRef ? paymentRef + ' · ' : ''}อนุมัติส่วนลด: ${discountApprover}`;
@@ -264,9 +268,15 @@ salesRouter.post(
         await postGift(tx, { giftCardId: card.id, type: 'REDEEM', amount: -row.amount, saleId: created.id, note: orderNo, userId: cashierId });
       }
 
-      // Record the tender(s) — the per-method source of truth.
+      // Record the tender(s) — the per-method source of truth, with multi-currency capture.
       const payments = await Promise.all(
-        paymentRows.map((p) => tx.salePayment.create({ data: { saleId: created.id, method: p.method, amount: p.amount, reference: p.reference } }))
+        paymentRows.map((p) => {
+          const fx = p.method === 'CASH' && cashFxCurrency !== 'THB';
+          const currency = fx ? cashFxCurrency : 'THB';
+          const fxRate = fx ? cashFxRate : 1;
+          const foreignAmount = fx ? round2(p.amount / cashFxRate) : p.amount;
+          return tx.salePayment.create({ data: { saleId: created.id, method: p.method, amount: p.amount, currency, fxRate, foreignAmount, reference: p.reference } });
+        })
       );
 
       // Loyalty: spend redeemed points first, then credit earned points.

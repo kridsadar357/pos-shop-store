@@ -91,6 +91,30 @@ reportsRouter.get(
   })
 );
 
+// --- Tenders grouped by currency (multi-currency accounting) ---
+reportsRouter.get(
+  '/by-currency',
+  ah(async (req, res) => {
+    const { from, to, branchId } = range(req);
+    const grouped = await prisma.salePayment.groupBy({
+      by: ['currency'],
+      where: { sale: { status: 'PAID', branchId, createdAt: { gte: from, lte: to } } },
+      _sum: { amount: true, foreignAmount: true },
+      _count: { _all: true },
+    });
+    res.json(
+      grouped
+        .map((g) => ({
+          currency: g.currency,
+          foreignTotal: round2(num(g._sum.foreignAmount)), // amount in the tender currency
+          baseTotal: round2(num(g._sum.amount)), // THB equivalent applied to bills
+          payments: g._count._all,
+        }))
+        .sort((a, b) => b.baseTotal - a.baseTotal)
+    );
+  })
+);
+
 // --- Top selling products ---
 reportsRouter.get(
   '/top-products',
