@@ -27,7 +27,7 @@ function encodeThai(s: string): Buffer {
 export interface ReceiptLine { nameSnapshot: string; qty: number; unitPrice: any; lineTotal: any }
 export interface ReceiptSale {
   orderNo: string; createdAt: Date; type: string; subtotal: any; discount: any; taxAmount: any;
-  total: any; paymentMethod: string; cashReceived: any; changeDue: any;
+  total: any; paymentMethod: string; cashReceived: any; changeDue: any; paymentRef?: string;
   cashier?: { name: string } | null; member?: { name: string; phone: string } | null; items: ReceiptLine[];
 }
 export interface ReceiptSetting {
@@ -108,6 +108,7 @@ export function buildReceipt(sale: ReceiptSale, setting: ReceiptSetting, opts: {
   if (sale.paymentMethod === 'CASH') {
     b.cols('รับเงิน', n2(sale.cashReceived), W);
     b.cols('เงินทอน', n2(sale.changeDue), W);
+    if (sale.paymentRef && sale.paymentRef.includes('@')) b.cols('เงินต่างสกุล', sale.paymentRef, W);
   }
 
   if (opts.qr) {

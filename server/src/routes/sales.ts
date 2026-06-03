@@ -9,6 +9,7 @@ import { consumeSerials, releaseSerials } from '../lib/serial.js';
 import { buildReceiptEmail } from '../lib/receiptEmail.js';
 import { sendMail } from '../lib/mailer.js';
 import { computeTenderPlan } from '../lib/tender.js';
+import { baseFromForeign, fxNote } from '../lib/fx.js';
 import { computeRedeem, computeEarn } from '../lib/loyaltyCalc.js';
 import { computeSaleLines } from '../lib/salePricing.js';
 import { buildPromptPayPayload, type PromptPayType } from '../lib/promptpay.js';
@@ -24,6 +25,10 @@ const checkoutSchema = z.object({
   couponCode: z.string().optional(),
   cashReceived: z.number().nonnegative().default(0),
   paymentRef: z.string().default(''),
+  // Foreign-currency cash tender: the cashier took cash in the shop's secondary currency.
+  // The server converts to THB at the stored rate (authoritative) — see lib/fx.ts.
+  cashCurrency: z.string().optional(),
+  cashForeignAmount: z.number().positive().optional(),
   memberId: z.number().int().nullable().optional(),
   pointsRedeem: z.number().int().nonnegative().default(0), // loyalty points to spend on this bill
   branchId: z.number().int().nullable().optional(),
@@ -135,13 +140,26 @@ salesRouter.post(
       // Points earned on the net total (only when loyalty is on and a member is attached).
       const pointsEarned = memberId && setting.loyaltyEnabled ? computeEarn(total, Number(setting.pointsEarnBaht) || 0) : 0;
 
+      // Foreign-currency cash: convert to THB at the stored rate (authoritative) so the rest
+      // of the tender math stays in the base currency. Only for a single (non-split) cash bill.
+      let cashReceived = data.cashReceived;
+      let paymentRef = data.paymentRef;
+      if (data.cashForeignAmount && data.cashCurrency && data.paymentMethod === 'CASH' && !data.payments?.length) {
+        const rate = Number(setting.secondaryRate);
+        if (!setting.secondaryCurrency || setting.secondaryCurrency !== data.cashCurrency || rate <= 0) {
+          throw Object.assign(new Error('ยังไม่ได้ตั้งค่าสกุลเงินที่สองหรืออัตราแลกเปลี่ยน'), { status: 400 });
+        }
+        cashReceived = baseFromForeign(data.cashForeignAmount, rate);
+        paymentRef = fxNote(data.cashForeignAmount, data.cashCurrency, rate);
+      }
+
       // ---- Tender plan: single payment, or split / multi-tender ----
       const { paymentRows, cashTendered, changeDue, dominant, isSplit } = computeTenderPlan({
         total,
         payments: data.payments,
         paymentMethod: data.paymentMethod,
-        cashReceived: data.cashReceived,
-        paymentRef: data.paymentRef,
+        cashReceived,
+        paymentRef,
       });
 
       // PromptPay QR payload for a single transfer payment (uses the branch's PromptPay if set).
@@ -179,7 +197,7 @@ salesRouter.post(
           paymentMethod: dominant,
           cashReceived: cashTendered,
           changeDue,
-          paymentRef: isSplit ? 'แยกชำระ' : data.paymentRef,
+          paymentRef: isSplit ? 'แยกชำระ' : paymentRef,
           qrPayload,
           cashierId,
           memberId,

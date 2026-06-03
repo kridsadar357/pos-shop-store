@@ -68,6 +68,9 @@ export default function POS() {
   const [showPromo, setShowPromo] = useState(false);
   const [payKey, setPayKey] = useState<PayKey>('CASH');
   const [cashReceived, setCashReceived] = useState(0);
+  // Foreign-currency cash: when on, `cashReceived` holds the amount in the shop's secondary
+  // currency; the server converts to THB at the stored rate (see lib/fx.ts).
+  const [foreignCash, setForeignCash] = useState(false);
   const [cartTab, setCartTab] = useState<'bill' | 'customer'>('bill');
   const [priceCheck, setPriceCheck] = useState(false);
   const [priceProduct, setPriceProduct] = useState<Product | null>(null);
@@ -174,7 +177,7 @@ export default function POS() {
     setLines((prev) => prev.map((l) => (l.product.id === id ? { ...l, serials } : l)));
   }
   const parseSerials = (s?: string) => (s ?? '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
-  function clearCart() { setLines([]); setMember(null); setDiscount(0); setRedeemPts(0); setCashReceived(0); setCoupon(''); setPromo({ promoDiscount: 0, applied: [] }); checkoutRef.current = null; }
+  function clearCart() { setLines([]); setMember(null); setDiscount(0); setRedeemPts(0); setCashReceived(0); setForeignCash(false); setCoupon(''); setPromo({ promoDiscount: 0, applied: [] }); checkoutRef.current = null; }
 
   // Live promotion preview whenever the cart / coupon / pricing context changes.
   useEffect(() => {
@@ -230,7 +233,13 @@ export default function POS() {
     return { subtotal, tax, manualDisc, promoDisc, redeemDisc, usePts, maxRedeemPts, disc, net, count };
   }, [lines, mode, member, setting, discount, promo, redeemPts]);
 
-  const change = payKey === 'CASH' ? Math.max(0, cashReceived - totals.net) : 0;
+  const fxRate = num(setting?.secondaryRate ?? 0) || 0;
+  const fxCurrency = setting?.secondaryCurrency || '';
+  const fxEnabled = !!fxCurrency && fxRate > 0;
+  const cashFx = payKey === 'CASH' && foreignCash && fxEnabled;
+  // THB value of the cash tendered (cashReceived is in the foreign currency when cashFx).
+  const cashThb = cashFx ? Math.round(cashReceived * fxRate * 100) / 100 : cashReceived;
+  const change = payKey === 'CASH' ? Math.max(0, cashThb - totals.net) : 0;
   const vatPct = num(setting?.taxRatePct ?? 7);
 
   // ---- customer display ----
@@ -274,7 +283,8 @@ export default function POS() {
     if (!checkoutRef.current) checkoutRef.current = crypto.randomUUID();
     const body = {
       type: mode, paymentMethod: method, discount: totals.manualDisc, couponCode: coupon,
-      cashReceived: method === 'CASH' ? cashReceived : 0,
+      cashReceived: method === 'CASH' && !cashFx ? cashReceived : 0,
+      ...(cashFx && method === 'CASH' ? { cashCurrency: fxCurrency, cashForeignAmount: cashReceived } : {}),
       paymentRef: ref, memberId: member?.id ?? null, pointsRedeem: totals.usePts, branchId: useBranch.getState().activeId ?? undefined,
       clientRef: checkoutRef.current,
       ...(payments ? { payments } : {}),
@@ -311,7 +321,7 @@ export default function POS() {
   function onPay() {
     if (!lines.length) return;
     if (payKey === 'CASH') {
-      if (cashReceived < totals.net) return toast.error('จำนวนเงินที่รับน้อยกว่ายอดสุทธิ');
+      if (cashThb < totals.net) return toast.error('จำนวนเงินที่รับน้อยกว่ายอดสุทธิ');
       return completeSale('CASH');
     }
     if (payKey === 'TRANSFER' || payKey === 'QR') return setTransfer(true);
@@ -729,13 +739,26 @@ export default function POS() {
 
               {/* received / change */}
               <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
-                  <span className="text-xs font-semibold text-slate-500">{th.received}</span>
-                  <input type="number" disabled={payKey !== 'CASH'} className="w-20 bg-transparent text-right font-bold outline-none disabled:opacity-40" value={cashReceived || ''} onChange={(e) => setCashReceived(Number(e.target.value))} placeholder="0.00" />
+                <div className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                      {th.received}
+                      {payKey === 'CASH' && fxEnabled && (
+                        <button onClick={() => setForeignCash((v) => !v)} title={th.foreignCash} className={`rounded px-1 text-[10px] font-bold ring-1 ${cashFx ? 'bg-amber-100 text-amber-700 ring-amber-300' : 'bg-white text-slate-500 ring-slate-300'}`}>
+                          {cashFx ? fxCurrency : 'THB'}
+                        </button>
+                      )}
+                    </span>
+                    <input type="number" disabled={payKey !== 'CASH'} className="w-20 bg-transparent text-right font-bold outline-none disabled:opacity-40" value={cashReceived || ''} onChange={(e) => setCashReceived(Number(e.target.value))} placeholder="0.00" />
+                  </div>
+                  {cashFx && <div className="mt-0.5 text-right text-[10px] font-semibold text-slate-400">= {money(cashThb, currency)}</div>}
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
-                  <span className="text-xs font-semibold text-slate-500">{th.change}</span>
-                  <span className="font-bold text-emerald-600">{change.toFixed(2)}</span>
+                <div className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">{th.change}</span>
+                    <span className="font-bold text-emerald-600">{change.toFixed(2)}</span>
+                  </div>
+                  {cashFx && change > 0 && <div className="mt-0.5 text-right text-[10px] font-semibold text-slate-400">{secondaryAmount(change, fxCurrency, fxRate)}</div>}
                 </div>
               </div>
 
@@ -1277,6 +1300,7 @@ function ReceiptModal({ sale, setting, currency, autoPrint, onToggleAuto, onPrin
             <>
               <div className="flex justify-between text-slate-500"><span>{th.received}</span><span>{money(sale.cashReceived, currency)}</span></div>
               <div className="flex justify-between font-semibold text-emerald-700"><span>{th.change}</span><span>{money(sale.changeDue, currency)}</span></div>
+              {sale.paymentRef && /@/.test(sale.paymentRef) && <div className="flex justify-between text-slate-400"><span>{th.foreignTender}</span><span>{sale.paymentRef}</span></div>}
             </>
           )}
         </div>

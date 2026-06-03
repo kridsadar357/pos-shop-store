@@ -175,6 +175,7 @@ export interface Sale {
   paymentMethod: 'CASH' | 'TRANSFER' | 'CARD' | 'CREDIT';
   cashReceived: string;
   changeDue: string;
+  paymentRef: string;
   qrPayload: string;
   createdAt: string;
   memberId?: number | null;

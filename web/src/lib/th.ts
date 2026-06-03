@@ -179,4 +179,6 @@ export const th = {
   syncNow: 'ซิงค์เดี๋ยวนี้',
   syncing: 'กำลังซิงค์…',
   offline: 'ออฟไลน์',
+  foreignCash: 'รับเงินสดสกุลต่างประเทศ',
+  foreignTender: 'เงินต่างสกุล',
 };
