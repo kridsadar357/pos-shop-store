@@ -378,7 +378,9 @@ is already branch-correct).
   with zero changes**. `getLang()`/`setLang()` (persist + reload). `LangToggle` (ไทย/EN) on the
   Login screen + desktop setup wizard + the back-office user menu (switchable in-session). Verified
   e2e (puppeteer): TH default → toggling to EN swaps
-  the `th`-routed labels (Thai gone); offline e2e still passes. **Remaining:** some components have
-  inline Thai literals not routed through `th` (page titles, some toasts) — those stay Thai until
-  migrated to keys; the toggle covers the central table only.
+  the `th`-routed labels (Thai gone); offline e2e still passes. The **back-office navigation**
+  (6 section titles + 26 items in `BackLayout`) is now migrated to `th.nav*` keys too — verified
+  e2e (EN nav shows Suppliers/Payables/Gift cards; Thai nav labels gone). **Remaining:** the
+  back-office PAGE bodies still have inline Thai literals (titles/columns/toasts) not routed
+  through `th` — migrating those per-page is the path to 100%.
 - ✅ `*.tsbuildinfo` gitignored + untracked (build cache no longer committed)

@@ -6,6 +6,7 @@ import { api } from '../api/client';
 import { ProductImage } from './ProductImage';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { LangToggle } from './LangToggle';
+import { th } from '../lib/th';
 import { money } from '../lib/format';
 import { toast } from './Toast';
 import type { Member, Product } from '../types';
@@ -18,58 +19,58 @@ interface NavGroup { title: string; items: NavItem[]; }
 
 const GROUPS: NavGroup[] = [
   {
-    title: 'ภาพรวม',
-    items: [{ to: '/back', label: 'แดชบอร์ด', icon: 'fa-gauge-high', end: true }],
+    title: th.navOverview,
+    items: [{ to: '/back', label: th.navDashboard, icon: 'fa-gauge-high', end: true }],
   },
   {
-    title: 'การขาย',
+    title: th.navSales,
     items: [
-      { to: '/back/sales', label: 'รายการขาย', icon: 'fa-receipt' },
-      { to: '/back/quotations', label: 'ใบเสนอราคา', icon: 'fa-file-lines' },
-      { to: '/back/layaways', label: 'ออมก่อนรับ / มัดจำ', icon: 'fa-piggy-bank' },
-      { to: '/back/returns', label: 'การคืนสินค้า', icon: 'fa-rotate-left' },
-      { to: '/back/promotions', label: 'การตลาด', icon: 'fa-bullhorn' },
-      { to: '/back/gift-cards', label: 'บัตรของขวัญ', icon: 'fa-gift' },
+      { to: '/back/sales', label: th.navSalesList, icon: 'fa-receipt' },
+      { to: '/back/quotations', label: th.navQuotations, icon: 'fa-file-lines' },
+      { to: '/back/layaways', label: th.navLayaways, icon: 'fa-piggy-bank' },
+      { to: '/back/returns', label: th.navReturns, icon: 'fa-rotate-left' },
+      { to: '/back/promotions', label: th.navPromotions, icon: 'fa-bullhorn' },
+      { to: '/back/gift-cards', label: th.navGiftCards, icon: 'fa-gift' },
     ],
   },
   {
-    title: 'สินค้าคงคลัง',
+    title: th.navInventory,
     items: [
-      { to: '/back/products', label: 'สินค้า', icon: 'fa-box' },
-      { to: '/back/labels', label: 'พิมพ์ป้ายราคา/บาร์โค้ด', icon: 'fa-barcode' },
-      { to: '/back/movements', label: 'คลังสินค้า', icon: 'fa-warehouse' },
-      { to: '/back/transfers', label: 'โอนสินค้าระหว่างสาขา', icon: 'fa-right-left' },
-      { to: '/back/purchase-orders', label: 'ใบสั่งซื้อ', icon: 'fa-file-invoice-dollar' },
-      { to: '/back/receive', label: 'จัดซื้อ / รับเข้า', icon: 'fa-truck-ramp-box' },
-      { to: '/back/serials', label: 'ซีเรียล / รับประกัน', icon: 'fa-barcode' },
+      { to: '/back/products', label: th.navProducts, icon: 'fa-box' },
+      { to: '/back/labels', label: th.navLabels, icon: 'fa-barcode' },
+      { to: '/back/movements', label: th.navMovements, icon: 'fa-warehouse' },
+      { to: '/back/transfers', label: th.navTransfers, icon: 'fa-right-left' },
+      { to: '/back/purchase-orders', label: th.navPurchaseOrders, icon: 'fa-file-invoice-dollar' },
+      { to: '/back/receive', label: th.navReceive, icon: 'fa-truck-ramp-box' },
+      { to: '/back/serials', label: th.navSerials, icon: 'fa-barcode' },
     ],
   },
   {
-    title: 'ลูกค้าและคู่ค้า',
+    title: th.navCustomers,
     items: [
-      { to: '/back/members', label: 'ลูกค้า / สมาชิก', icon: 'fa-users' },
-      { to: '/back/suppliers', label: 'ผู้จำหน่าย', icon: 'fa-handshake' },
+      { to: '/back/members', label: th.navMembers, icon: 'fa-users' },
+      { to: '/back/suppliers', label: th.navSuppliers, icon: 'fa-handshake' },
     ],
   },
   {
-    title: 'การเงินและรายงาน',
+    title: th.navFinance,
     items: [
-      { to: '/back/shifts', label: 'การเงิน / กะ', icon: 'fa-cash-register' },
-      { to: '/back/expenses', label: 'ค่าใช้จ่าย', icon: 'fa-money-bill-wave' },
-      { to: '/back/payables', label: 'เจ้าหนี้การค้า', icon: 'fa-file-invoice-dollar' },
-      { to: '/back/tax-invoices', label: 'รายงานภาษีขาย', icon: 'fa-file-invoice' },
-      { to: '/back/reports', label: 'รายงาน', icon: 'fa-chart-line' },
-      { to: '/back/custom-reports', label: 'รายงานแบบกำหนดเอง', icon: 'fa-table-cells' },
+      { to: '/back/shifts', label: th.navShifts, icon: 'fa-cash-register' },
+      { to: '/back/expenses', label: th.navExpenses, icon: 'fa-money-bill-wave' },
+      { to: '/back/payables', label: th.navPayables, icon: 'fa-file-invoice-dollar' },
+      { to: '/back/tax-invoices', label: th.navTaxInvoices, icon: 'fa-file-invoice' },
+      { to: '/back/reports', label: th.navReports, icon: 'fa-chart-line' },
+      { to: '/back/custom-reports', label: th.navCustomReports, icon: 'fa-table-cells' },
     ],
   },
   {
-    title: 'ตั้งค่าระบบ',
+    title: th.navSystem,
     items: [
-      { to: '/back/settings', label: 'ตั้งค่า', icon: 'fa-gear' },
-      { to: '/back/branches', label: 'สาขา', icon: 'fa-code-branch', adminOnly: true },
-      { to: '/back/users', label: 'ผู้ใช้งานระบบ', icon: 'fa-user-shield', adminOnly: true },
-      { to: '/back/audit', label: 'บันทึกการใช้งาน', icon: 'fa-clipboard-list', adminOnly: true },
-      { to: '/back/backup', label: 'สำรอง / กู้คืนข้อมูล', icon: 'fa-database', adminOnly: true },
+      { to: '/back/settings', label: th.navSettings, icon: 'fa-gear' },
+      { to: '/back/branches', label: th.navBranches, icon: 'fa-code-branch', adminOnly: true },
+      { to: '/back/users', label: th.navUsers, icon: 'fa-user-shield', adminOnly: true },
+      { to: '/back/audit', label: th.navAudit, icon: 'fa-clipboard-list', adminOnly: true },
+      { to: '/back/backup', label: th.navBackup, icon: 'fa-database', adminOnly: true },
     ],
   },
 ];
