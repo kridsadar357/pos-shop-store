@@ -53,3 +53,58 @@ jobs:
 
       - name: Web typecheck / build
         run: npm --prefix web run build
+
+  # Headless-browser end-to-end test of the offline POS path (service worker + IndexedDB
+  # cache + offline outbox + idempotent sync). Runs against the production build served by
+  # the API server (the e2e script spawns it with WEB_DIST). Separate job so it runs in
+  # parallel and its (browser) flakiness can't mask the core unit/integration signal.
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://pos:pos@localhost:5432/posdb_test?schema=public
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pos
+          POSTGRES_PASSWORD: pos
+          POSTGRES_DB: posdb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pos -d posdb_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install server dependencies
+        run: npm --prefix server ci
+
+      - name: Install web dependencies
+        run: npm --prefix web ci
+
+      - name: Generate Prisma client
+        run: npm --prefix server run generate
+
+      - name: Apply migrations (test DB)
+        run: npx prisma migrate deploy
+        working-directory: server
+
+      - name: Seed demo data (products + admin user the e2e logs in as)
+        run: npm --prefix server run seed
+
+      - name: Build web (SPA + service-worker precache)
+        run: npm --prefix web run build
+
+      - name: Set up Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Offline POS e2e
+        run: npm --prefix web run test:e2e
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}

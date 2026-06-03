@@ -295,11 +295,13 @@ is already branch-correct).
   puppeteer-core + system Chrome): boots the production build via the server's WEB_DIST and drives
   the real service worker + IndexedDB cache to prove the **offline cold-reload** path — load /pos
   online, go offline, reload, assert the cashier stays logged in and the product grid renders from
-  cache. It found + verified fixes for two real offline bugs (see §8 Offline). Not yet wired into
-  CI (needs Chrome + a build step); run locally after `npm run build`. The e2e also drives the
-  **full offline checkout flow**: complete a CARD sale while offline → assert it queues in the
+  cache. It found + verified fixes for two real offline bugs (see §8 Offline). The e2e also drives
+  the **full offline checkout flow**: complete a CARD sale while offline → assert it queues in the
   outbox → go back online → assert the outbox drains + the sale persists server-side (then
-  self-cleans by voiding it). Still not wired into CI.
+  self-cleans by voiding it). **Wired into CI** as a dedicated `e2e` job in `ci.yml` (Postgres
+  service → migrate deploy → seed → web build → `browser-actions/setup-chrome` → `test:e2e` with
+  CHROME_PATH). Separate job so browser flakiness can't mask the unit/integration signal. CI is
+  now: build-and-test (unit + integration + builds) ‖ e2e (offline browser flow).
 
 ## 9. Smaller polish / known stubs
 - ✅ Sidebar "เปลี่ยนสาขา" — the back-office POS sidebar branch button is now a live
