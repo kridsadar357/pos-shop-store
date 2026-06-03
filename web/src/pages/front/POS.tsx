@@ -220,7 +220,11 @@ export default function POS() {
       const r = l.product.taxRatePct != null ? num(l.product.taxRatePct) : rate;
       tax += inc ? lt - lt / (1 + r / 100) : lt * (r / 100);
     }
-    const manualDisc = Math.min(discount, subtotal);
+    // Cashier manual-discount cap (mirrors the server enforcement; ADMIN/MANAGER unlimited).
+    const maxPct = num(setting?.cashierMaxDiscountPct ?? 100);
+    const discountCap = user?.role === 'CASHIER' && maxPct < 100 ? Math.round((subtotal * maxPct) / 100 * 100) / 100 : Infinity;
+    const manualDisc = Math.min(discount, subtotal, discountCap);
+    const discountCapped = discount > discountCap;
     const promoDisc = Math.min(promo.promoDiscount, subtotal - manualDisc);
     // Loyalty redemption — capped by the member's balance and the remaining bill room.
     const redeemRate = num(setting?.pointsRedeemValue ?? 0);
@@ -231,8 +235,8 @@ export default function POS() {
     const disc = manualDisc + promoDisc + redeemDisc;
     const net = inc ? subtotal - disc : subtotal + tax - disc;
     const count = lines.reduce((s, l) => s + l.qty, 0);
-    return { subtotal, tax, manualDisc, promoDisc, redeemDisc, usePts, maxRedeemPts, disc, net, count };
-  }, [lines, mode, member, setting, discount, promo, redeemPts]);
+    return { subtotal, tax, manualDisc, promoDisc, redeemDisc, usePts, maxRedeemPts, disc, net, count, discountCapped, maxPct };
+  }, [lines, mode, member, setting, discount, promo, redeemPts, user]);
 
   const fxRate = num(setting?.secondaryRate ?? 0) || 0;
   const fxCurrency = setting?.secondaryCurrency || '';
@@ -704,6 +708,9 @@ export default function POS() {
                   <button className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50" onClick={() => setShowDiscount(true)}>+ {th.add}</button>
                 )}
               </div>
+              {totals.discountCapped && (
+                <div className="mb-2 text-[11px] font-semibold text-rose-500"><i className="fa-solid fa-triangle-exclamation mr-1" />{th.discountOverCap(totals.maxPct)}</div>
+              )}
 
               {/* Loyalty: redeem the attached member's points as a discount */}
               {setting?.loyaltyEnabled && member && totals.maxRedeemPts > 0 && (

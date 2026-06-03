@@ -235,6 +235,7 @@ const thDict = {
   tbExport: 'ส่งออก',
   tbImagesZip: 'รูปภาพ + CSV (.zip)',
   tbNoData: 'ไม่มีข้อมูล',
+  discountOverCap: (pct: number) => `ส่วนลดเกินเพดานของแคชเชียร์ (สูงสุด ${pct}% ของยอดสินค้า)`,
 };
 
 const enDict: typeof thDict = {
@@ -466,6 +467,7 @@ const enDict: typeof thDict = {
   tbExport: 'Export',
   tbImagesZip: 'Images + CSV (.zip)',
   tbNoData: 'No data',
+  discountOverCap: (pct: number) => `Discount exceeds the cashier cap (max ${pct}% of items)`,
 };
 
 export type Lang = 'th' | 'en';
